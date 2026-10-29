@@ -71,6 +71,30 @@ ligar**, então não precisa rodar `npm run register` na Discloud.
 > `RAM=256` no `discloud.config` dá folga para o parsing do webcrack. Ajuste
 > conforme teu plano.
 
+## Hospedar no Square Cloud
+
+Alternativa brasileira à Discloud, com config quase igual. Já vem o
+`squarecloud.app`. O bot registra o `/deobf` sozinho ao ligar.
+
+1. No painel do Square Cloud, adicione a variável de ambiente **`DISCORD_TOKEN`**
+   (e opcional `GUILD_ID`). Nunca coloque o token no `squarecloud.app`.
+2. Suba um `.zip` do projeto (sem `node_modules`/`.env` — já coberto pelo
+   `.squarecloudignore`) pelo site ou pelo app do Square Cloud no Discord (`/up`).
+3. O Square Cloud instala as dependências e sobe o bot 24/7.
+
+## Hospedar com Docker (Railway, Fly.io, Koyeb, Render…)
+
+Já vem um `Dockerfile`. Em qualquer host que rode containers:
+
+1. Conecte este repositório (ou faça deploy do Dockerfile).
+2. Defina a variável de ambiente **`DISCORD_TOKEN`** (e opcional `GUILD_ID`)
+   no painel do host.
+3. O host builda a imagem e roda `node src/index.js`.
+
+> Para bot 24/7, escolha um serviço que **não durma** por inatividade
+> (ex: Railway/Fly worker, Koyeb). Serviços "web gratuitos" que hibernam
+> derrubam a conexão do bot.
+
 ## Requisitos
 
-- Node.js 18+
+- Node.js 18+ (ou Docker)
