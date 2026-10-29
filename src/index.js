@@ -1,6 +1,7 @@
 import 'dotenv/config.js';
-import { Client, GatewayIntentBits, Events, AttachmentBuilder } from 'discord.js';
+import { Client, GatewayIntentBits, Events, AttachmentBuilder, REST, Routes } from 'discord.js';
 import { downloadSource, deobfuscate } from './deobfuscate.js';
+import { deobfCommand } from './command.js';
 
 // Discord hard-limits a single message to 2000 chars. We inline a short
 // preview and always attach the full result as a file.
@@ -14,8 +15,29 @@ if (!token) {
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 
-client.once(Events.ClientReady, (c) => {
+// Register the slash command on boot (idempotent). This is what makes the
+// bot work on hosts like Discloud where you can't run a separate script.
+async function registerCommands(clientId) {
+  const guildId = process.env.GUILD_ID;
+  const rest = new REST({ version: '10' }).setToken(token);
+  const route = guildId
+    ? Routes.applicationGuildCommands(clientId, guildId)
+    : Routes.applicationCommands(clientId);
+  await rest.put(route, { body: [deobfCommand.toJSON()] });
+  console.log(
+    guildId
+      ? `/deobf registrado na guild ${guildId}.`
+      : '/deobf registrado globalmente (propaga em até ~1h).',
+  );
+}
+
+client.once(Events.ClientReady, async (c) => {
   console.log(`Bot online como ${c.user.tag}`);
+  try {
+    await registerCommands(c.user.id);
+  } catch (err) {
+    console.error('Falha ao registrar comando no boot:', err);
+  }
 });
 
 client.on(Events.InteractionCreate, async (interaction) => {

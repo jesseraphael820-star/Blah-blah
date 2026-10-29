@@ -1,19 +1,11 @@
 import 'dotenv/config.js';
-import { REST, Routes, SlashCommandBuilder } from 'discord.js';
+import { REST, Routes } from 'discord.js';
+import { deobfCommand } from './command.js';
 
-// Registers the /deobf slash command.
-// If GUILD_ID is set, registers to that guild (instant, good for dev).
-// Otherwise registers globally (can take up to ~1h to propagate).
-const command = new SlashCommandBuilder()
-  .setName('deobf')
-  .setDescription('Deobfusca um arquivo JavaScript a partir de uma URL.')
-  .addStringOption((opt) =>
-    opt
-      .setName('url')
-      .setDescription('URL direta do arquivo .js a deobfuscar')
-      .setRequired(true),
-  );
-
+// Standalone command registration (optional — the bot also auto-registers
+// on startup). Useful for local dev when you want to (re)register without
+// running the full bot.
+// If GUILD_ID is set, registers to that guild (instant). Otherwise global.
 const token = process.env.DISCORD_TOKEN;
 const clientId = process.env.CLIENT_ID;
 const guildId = process.env.GUILD_ID;
@@ -30,7 +22,7 @@ const route = guildId
   : Routes.applicationCommands(clientId);
 
 try {
-  await rest.put(route, { body: [command.toJSON()] });
+  await rest.put(route, { body: [deobfCommand.toJSON()] });
   console.log(
     guildId
       ? `Comando /deobf registrado na guild ${guildId}.`

@@ -51,6 +51,26 @@ O bot responde com um trecho inline e anexa o arquivo deobfuscado completo.
 - O preview inline é truncado em ~1500 caracteres (limite de mensagem do
   Discord); o arquivo anexado sempre contém o resultado completo.
 
+## Hospedar na Discloud
+
+O projeto já vem com `discloud.config`. O bot **registra o `/deobf` sozinho ao
+ligar**, então não precisa rodar `npm run register` na Discloud.
+
+1. No **painel da Discloud** (ou via app da Discloud no Discord), adicione a
+   variável de ambiente **`DISCORD_TOKEN`** com o token do bot.
+   - Opcional: `GUILD_ID` para o comando aparecer na hora em um servidor.
+   - Não precisa de `CLIENT_ID` na Discloud — o bot descobre sozinho ao ligar.
+   - **Nunca** coloque o token no `discloud.config` nem no Git.
+2. Faça o deploy de uma destas formas:
+   - **Zip:** gere um `.zip` da pasta (sem `node_modules`) e suba pelo site ou
+     com `.up` (app da Discloud no Discord). A Discloud instala as dependências
+     pelo `package.json` automaticamente.
+   - **CLI:** `npm i -g discloud` → `discloud login` → `discloud up`.
+3. Pronto — o bot sobe, registra o `/deobf` e fica online 24/7.
+
+> `RAM=256` no `discloud.config` dá folga para o parsing do webcrack. Ajuste
+> conforme teu plano.
+
 ## Requisitos
 
 - Node.js 18+
