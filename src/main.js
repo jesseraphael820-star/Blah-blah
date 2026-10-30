@@ -24,6 +24,7 @@ import { Shops, PLACES } from './shops.js';
 import { Combat } from './combat.js';
 import { Animals } from './animals.js';
 import { Props } from './props.js';
+import { startRag, ragHits, getUp } from './ragdoll.js';
 import { periodAt } from './sky.js';
 
 const settings = new Settings();
@@ -163,7 +164,7 @@ const game = {
   },
   placePlayer(x, z, h) {
     const p = this.player;
-    p.swim = false; p.under = false; p.vy = 0; p.tumble = null; p.down = 0; stopSmoking(p, false); p.idleT = 0;
+    p.swim = false; p.under = false; p.vy = 0; p.tumble = null; p.down = 0; p.rag = null; p.getupT = 0; if (p.char) { p.char.getup = 0; p.char.root.rotation.set(0, p.heading || 0, 0); } stopSmoking(p, false); p.idleT = 0;
     if (p.vehicle) this.exitVehicle(true);
     p.pos.set(x, groundAt(x, z), z); p.vel.set(0, 0, 0); p.heading = h; this.cam.yaw = h;
   },
@@ -342,6 +343,39 @@ function updateTumble(dt) {
   p.speed = Math.hypot(p.vel.x, p.vel.z);
   game.ui.nearCar = false;
 }
+// jogador atropelado: mesma física do pedestre; depois fica caído e levanta
+function updatePlayerRag(dt) {
+  const p = player, ch = p.char;
+  if (p.rag) {
+    const R = p.rag;
+    const near = game.vehicles.filter((v) => v !== p.vehicle && !v.t.boat && Math.abs(v.pos.x - R.pos.x) < 9 && Math.abs(v.pos.z - R.pos.z) < 9);
+    R.step(dt, near, world.col);
+    ragHits(game, R, (dv, head) => {
+      p.health -= (dv - 3.5) * (head ? 5 : 2.2);
+      game.cam.shake = Math.max(game.cam.shake, clamp(dv * 0.03, 0.08, 0.4)); input.rumble(clamp(dv / 12, 0.3, 1), 0.6, 160);
+    }, fx);
+    R.apply(ch.root);
+    const f = R.feet;
+    p.pos.set(f.x, f.y, f.z);
+    p.vel.copy(R.vel).setY(0);
+    ch.ragK = R.flail;
+    ch.animate(dt, 0, 'rag');
+    if (R.done || R.air > 8) {
+      p.rag = null; p.restQ = ch.root.quaternion.clone(); p.restPos = ch.root.position.clone();
+      p.getupT = 1.6; p.vel.set(0, 0, 0);
+    }
+  } else {
+    p.getupT -= dt;
+    getUp(ch.root, p.restQ, p.restPos, p.heading, p.getupT, ch);
+    ch.animate(dt, 0, 'rag');
+    if (p.getupT <= 0) {
+      p.pos.set(ch.root.position.x, groundAt(ch.root.position.x, ch.root.position.z), ch.root.position.z);
+      ch.root.rotation.set(0, p.heading, 0); ch.getup = 0; p.getupT = 0; p.onGround = true; p.vy = 0;
+    }
+  }
+  p.speed = Math.hypot(p.vel.x, p.vel.z);
+  game.ui.nearCar = false;
+}
 const surfaceAtCached = (x, z) => surfaceAt(x, z);
 
 // parado um tempo: tira o cigarro do bolso, acende e fuma; perto da parede encosta com o pé nela
@@ -439,6 +473,7 @@ function updateIdle(dt, inp, mode) {
 function updateOnFoot(dt, inp) {
   const p = player, ch = p.char;
   if (p.tumble) { updateTumble(dt); return; }
+  if (p.rag || p.getupT > 0) { updatePlayerRag(dt); return; }
   const free = !game.locked && p.down <= 0;
   let mx = free ? inp.moveX : 0, my = free ? inp.moveY : 0, mag = free ? inp.mag : 0;
   const yaw = game.cam.yaw;
@@ -517,10 +552,15 @@ function updateOnFoot(dt, inp) {
   for (const v of game.vehicles) {
     if (Math.abs(v.pos.x - p.pos.x) > 6 || Math.abs(v.pos.z - p.pos.z) > 6) continue;
     if (!v.contains(p.pos.x, p.pos.z, 0.35) || p.pos.y > v.pos.y + v.t.height + 0.2) continue;
-    if (v.speed > 6 && p.down <= 0) {
-      p.down = 2.2; p.health -= v.speed * 2.5;
-      p.vel.copy(v.vel).multiplyScalar(0.8);
-      audio.crash(v.speed * 0.5); input.rumble(0.8, 0.6, 250);
+    if (v.speed > 4 && !p.rag) {
+      // atropelado: corpo físico batendo na lataria e no chão
+      stopSmoking(p, true);
+      p.rag = startRag(p.pos, p.heading, p.vel, v);
+      p.health -= Math.max(0, v.speed - 3) * 2.5;
+      ch.ragHead = 0; ch.ragTurn = 0;
+      audio.crash(v.speed * 0.5); audio.thud(0, v.speed); input.rumble(0.8, 0.6, 250);
+      game.cam.shake = Math.max(game.cam.shake, clamp(v.speed * 0.02, 0.1, 0.45));
+      return;
     }
     const sh = Math.sin(v.heading), chh = Math.cos(v.heading);
     const dx = p.pos.x - v.pos.x, dz = p.pos.z - v.pos.z;

@@ -216,6 +216,8 @@ function buildMesh(t, color) {
   P.trunk = trunk || addBox(body, W * 0.94, 0.04, bz0 + L / 2 - 0.08, 0, top + 0.02, (bz0 - L / 2 + 0.08) / 2, paint);
   P.doorL = addBox(body, 0.04, bodyH * 0.8, cd, W / 2 + 0.02, bodyY + 0.03, cz, doorMat);
   P.doorR = addBox(body, 0.04, bodyH * 0.8, cd, -W / 2 - 0.02, bodyY + 0.03, cz, doorMat);
+  // silhueta da lataria (altura do capô, para-brisa, teto) pra colisão com pedestre atropelado
+  P.prof = { top: top + 0.04, roof: cy + ch / 2 + 0.05, fz0, bz0 };
   const deform = body.children.filter((m) => m.isMesh && m.material !== headMat && m.material !== tailMat && !(siren && (m.material === siren.red || m.material === siren.blue)));
   return { root, body, wheels, headMat, tailMat, paint, siren, parts: P, deform };
 }

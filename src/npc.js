@@ -4,6 +4,7 @@ import { CITIES, ROAD_W, cityAt, groundAt, crossingAhead, lightAt, GANGS, gangAt
 import { Vehicle, CAR_COLORS } from './vehicle.js';
 import { Character, randomLook } from './character.js';
 import { LINES } from './i18n.js';
+import { startRag, ragHits, getUp } from './ragdoll.js';
 
 const LANE = 3.3;
 
@@ -245,6 +246,51 @@ export class Peds {
     this.g.addWanted(strong ? 0.6 : 0.25);
   }
 
+  // atropelado: vira corpo físico encostado na lataria (não começa enfiado dentro do carro)
+  hitByCar(p, v) {
+    if (p.rag) return;
+    const g = this.g, sh = Math.sin(v.heading), ch = Math.cos(v.heading);
+    const walk = p.state === 'dead' ? new THREE.Vector3() : new THREE.Vector3(Math.sin(p.heading) * (p.speedNow || 0), 0, Math.cos(p.heading) * (p.speedNow || 0));
+    p.rag = startRag(p.pos, p.heading, walk, v);
+    p.restQ = null; p.ch.getup = 0;
+    if (p.state !== 'dead') p.state = 'rag';
+    p.byPlayer = v.driver === 'player';
+    p.ch.ragHead = (Math.random() - 0.5) * 0.6; p.ch.ragTurn = (Math.random() - 0.5) * 1.2;
+    p.ch.talk = 0;
+    const sp = v.speed, d = p.pos.distanceTo(g.camera.position);
+    // pernas no para-choque
+    if (p.hp > 0) p.hp -= Math.max(0, sp - 3) * 4.5;
+    if (sp > 7) v.damage(Math.min(6, sp * 0.3), p.pos.x, p.pos.z, -sh, -ch);
+    g.audio.thud(d, sp); if (sp > 6) g.audio.crash(sp * 0.35);
+    if (p.byPlayer) { g.input.rumble(clamp(sp / 15, 0.3, 0.9), 0.5, 180); g.cam.shake = Math.max(g.cam.shake, clamp(sp * 0.012, 0.03, 0.2)); }
+    if (p.state === 'rag') { this.say(p, 'hit'); if (p.byPlayer) g.addWanted(sp > 9 ? 0.6 : 0.3); }
+    this.scare(p.pos.x, p.pos.z, 25);
+  }
+
+  updateRag(p, dt, dP) {
+    const g = this.g, R = p.rag;
+    const near = g.vehicles.filter((v) => !v.t.boat && Math.abs(v.pos.x - R.pos.x) < 9 && Math.abs(v.pos.z - R.pos.z) < 9);
+    R.step(dt, near, g.world.col);
+    // dano pela variação de velocidade em cada pancada: cabeça pesa mais
+    ragHits(g, R, (dv, head) => { p.hp -= (dv - 3.5) * (head ? 8 : 3.5); }, Vehicle.fx);
+    R.apply(p.ch.root);
+    const f = R.feet;
+    p.pos.set(f.x, f.y, f.z);
+    p.ch.ragK = p.hp > 0 ? R.flail : R.flail * 0.4;
+    if (dP < 160) p.ch.animate(dt, 0, 'rag');
+    p.ch.root.visible = dP < 160;
+    if (!R.done && R.air < 8) return;
+    // assentou: morto fica onde caiu; vivo levanta
+    p.rag = null;
+    p.restQ = p.ch.root.quaternion.clone();
+    p.restPos = p.ch.root.position.clone();
+    p.pos.y = groundAt(p.pos.x, p.pos.z);
+    if (p.hp <= 0) {
+      if (p.state !== 'dead') { p.state = 'rag2'; this.damage(p, 1, R.vel.x || 0.01, R.vel.z || 0.01, p.byPlayer); }
+      p.state = 'dead'; p.t = Math.max(p.t || 0, 40);
+    } else { p.state = 'getup'; p.t = 1.3 + Math.random() * 1.2; p.getT = 0; }
+  }
+
   // soco: dois primeiros cambaleiam, o gancho (ou o 3º golpe) derruba
   punched(p, fx, fz, type) {
     if (p.state === 'down' || p.state === 'dead') return;
@@ -313,7 +359,7 @@ export class Peds {
   }
 
   scare(x, z, r = 25) {
-    for (const p of this.list) if (p.state !== 'down' && p.state !== 'dead' && !p.gang && Math.hypot(p.pos.x - x, p.pos.z - z) < r) { p.state = 'flee'; p.t = 5 + Math.random() * 3; p.from = { x, z }; }
+    for (const p of this.list) if (p.state !== 'down' && p.state !== 'dead' && !p.rag && p.state !== 'getup' && !p.gang && Math.hypot(p.pos.x - x, p.pos.z - z) < r) { p.state = 'flee'; p.t = 5 + Math.random() * 3; p.from = { x, z }; }
   }
 
   update(dt) {
@@ -337,6 +383,40 @@ export class Peds {
       if (dP > 190 && !p.keep) { this.remove(p); continue; }
       p.said -= dt;
       let speed = 0, mode = 'ground';
+      if (p.rag) { this.updateRag(p, dt, dP); continue; }
+      if (p.state === 'getup') {
+        // fica caído um instante, depois levanta girando em volta do quadril
+        p.t -= dt;
+        const root = p.ch.root;
+        getUp(root, p.restQ, p.restPos, p.heading, p.t, p.ch);
+        if (dP < 160) p.ch.animate(dt, 0, 'rag');
+        if (p.t <= 0) {
+          p.pos.set(root.position.x, groundAt(root.position.x, root.position.z), root.position.z);
+          root.rotation.set(0, p.heading, 0); p.ch.getup = 0; p.restQ = null;
+          p.state = 'flee'; p.t = 6; p.from = { x: plr.pos.x, z: plr.pos.z };
+          this.say(p, 'hit');
+        }
+        continue;
+      }
+      if (p.state === 'dead' && p.restQ) {
+        p.t -= dt;
+        if (p.t <= 0 && dP > 40) { this.remove(p); continue; }
+        // roda passando por cima do corpo: tranco no carro
+        p.bumpT = (p.bumpT || 0) - dt;
+        const hitter = p.bumpT <= 0 && g.vehicles.find((v) => v.speed > 2 && !v.t.boat && v.contains(p.restPos.x, p.restPos.z, 0));
+        if (hitter) {
+          p.bumpT = 0.35;
+          if (hitter.jolt) hitter.sHv += Math.min(1.4, 0.4 + hitter.speed * 0.05);
+          hitter.vel.multiplyScalar(0.985);
+          g.audio.thud(Math.hypot(p.restPos.x - g.camera.position.x, p.restPos.z - g.camera.position.z), 5);
+          if (g.combat) g.combat.blood(p.restPos.x, p.restPos.y + 0.15, p.restPos.z, 3);
+        }
+        p.ch.root.position.copy(p.restPos); p.ch.root.quaternion.copy(p.restQ);
+        p.ch.ragK = 0;
+        if (dP < 90) p.ch.animate(dt, 0, 'rag');
+        p.ch.root.visible = dP < 160;
+        continue;
+      }
       if (p.state === 'dead') {
         p.t -= dt;
         p.vel.x *= Math.exp(-dt * 4); p.vel.z *= Math.exp(-dt * 4);
@@ -399,6 +479,7 @@ export class Peds {
         // espera carro passar antes de atravessar
         if (p.state === 'cross') for (const v of g.vehicles) if (v.speed > 3 && v.contains(p.pos.x + Math.sin(p.heading) * 3, p.pos.z + Math.cos(p.heading) * 3, 4)) speed = 0;
       }
+      p.speedNow = speed;
       if (p.state !== 'down') {
         p.pos.x += Math.sin(p.heading) * speed * dt;
         p.pos.z += Math.cos(p.heading) * speed * dt;
@@ -408,12 +489,7 @@ export class Peds {
       for (const v of g.vehicles) {
         if (!v.contains(p.pos.x, p.pos.z, 0.4)) continue;
         const sp = v.speed;
-        if (sp > 3.5 && p.state !== 'down') {
-          this.knock(p, v.vel.x * 0.7, v.vel.z * 0.7, sp > 9);
-          v.vel.multiplyScalar(0.94);
-          g.audio.crash(sp * 0.4);
-          if (v.driver === 'player') g.input.rumble(0.5, 0.4, 150);
-        } else {
+        if (sp > 2.5) { this.hitByCar(p, v); break; } else {
           const dx = p.pos.x - v.pos.x, dz = p.pos.z - v.pos.z, d = Math.hypot(dx, dz) || 1;
           p.pos.x += (dx / d) * 0.08; p.pos.z += (dz / d) * 0.08;
         }

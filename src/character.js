@@ -268,6 +268,22 @@ export class Character {
       AL.sh.rotation.z = 1.4; AR.sh.rotation.z = -0.4; AR.sh.rotation.x = -0.6;
       L.hp.rotation.z = 0.25; Rr.hp.rotation.z = -0.1; L.kn.rotation.x = 0.3;
       this.head.rotation.y = 0.6;
+    } else if (mode === 'rag') {
+      // corpo solto (atropelado): o tronco vem da física; braços e pernas se debatem no ar e amolecem no chão
+      const k = this.ragK || 0;
+      this.phase += dt * (3 + k * 11);
+      const s = Math.sin(this.phase), c = Math.cos(this.phase * 1.37);
+      AL.sh.rotation.z = 0.35 + k * (1.3 + s * 0.6); AR.sh.rotation.z = -0.3 - k * (1.1 + c * 0.6);
+      AL.sh.rotation.x = -0.15 - k * 0.9 * c; AR.sh.rotation.x = -0.1 + k * 0.8 * s;
+      AL.el.rotation.x = -0.25 - k * 0.7 * Math.abs(s); AR.el.rotation.x = -0.35 - k * 0.6 * Math.abs(c);
+      L.hp.rotation.x = -0.15 - k * (0.5 + s * 0.45); Rr.hp.rotation.x = 0.08 - k * (0.25 - c * 0.45);
+      L.kn.rotation.x = 0.25 + k * (0.7 + c * 0.4); Rr.kn.rotation.x = 0.12 + k * (0.5 - s * 0.4);
+      L.hp.rotation.z = 0.14; Rr.hp.rotation.z = -0.1;
+      this.head.rotation.x = (this.ragHead || 0) + k * s * 0.3;
+      this.head.rotation.y = this.ragTurn || 0;
+      this.torso.rotation.x = k * c * 0.2;
+      // levantando: joelhos dobrados e mão no chão
+      if (this.getup) { const u = this.getup; L.kn.rotation.x = Rr.kn.rotation.x = 1.6 * u; L.hp.rotation.x = Rr.hp.rotation.x = -1.2 * u; AL.sh.rotation.x = AR.sh.rotation.x = -0.6 * u; this.hips.position.y = 0.95 - 0.35 * u; }
     } else if (mode === 'chat') {
       AR.sh.rotation.x = -0.3 + Math.sin(this.t * 2.3) * 0.25;
       AR.el.rotation.x = -1.1;
