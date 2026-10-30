@@ -40,6 +40,7 @@ export class Audio {
     this.rain = noiseChain('bandpass', 2500, 0.5);
     this.tire = noiseChain('bandpass', 1700, 6);
     this.road = noiseChain('lowpass', 180, 0.5);
+    this.hiss = noiseChain('highpass', 3200, 0.7); // pneu no asfalto molhado
     // motor
     this.eg = C.createGain(); this.eg.gain.value = 0;
     this.ef = C.createBiquadFilter(); this.ef.type = 'lowpass'; this.ef.frequency.value = 900; this.ef.Q.value = 3;
@@ -97,6 +98,7 @@ export class Audio {
     this.set(this.rain.g, st.rain * 0.16 * (st.indoor ? 0.4 : 1), 0.4);
     this.set(this.tire.g, st.slip * 0.18);
     this.set(this.road.g, st.engine ? clamp(st.speed / 40, 0, 1) * 0.12 : 0);
+    this.set(this.hiss.g, st.engine ? (st.wet || 0) * clamp(st.speed / 30, 0, 1) * 0.11 : 0, 0.15);
     if (st.engine) {
       const f = 28 + st.rpmN * 150;
       this.eo1.frequency.setTargetAtTime(f, now, 0.03);

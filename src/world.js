@@ -388,9 +388,12 @@ export function addWet(mat, U, { puddles = true, dark = 0.62 } = {}) {
       .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 0.025, pud);')
       .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
         if (uRain > 0.02 && uWet > 0.1) {
-          vec2 gr = ripples(vWP.xz, uTime) * uRain * up * (pud * 0.55 + 0.06 * uWet);
+          float near = 1.0 - smoothstep(9.0, 32.0, length(vWP - cameraPosition));
+          vec2 gr = near > 0.0 ? ripples(vWP.xz, uTime) * uRain * up * near * (pud * 0.55 + 0.06 * uWet) : vec2(0.0);
           normal = normalize(normal + (viewMatrix * vec4(gr.x, 0.0, gr.y, 0.0)).xyz);
         }`)
+      // prédios e árvores tapam boa parte do céu que o chão refletiria (o mapa de ambiente é só céu)
+      .replace('#include <lights_fragment_maps>', '#include <lights_fragment_maps>\n#if defined( RE_IndirectSpecular )\nradiance *= mix(0.32, 0.7, pud);\n#endif')
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
         // reflexo das luzes (postes, faróis) no chão molhado: alongado no asfalto, espelhado na poça
         if (uWet > 0.05) {

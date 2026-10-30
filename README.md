@@ -23,6 +23,15 @@ Ou publique a pasta no GitHub Pages / Netlify. É preciso internet na primeira v
 - **NPCs**: pedestres andam pelas calçadas, atravessam a rua, fogem, reclamam e caem. O trânsito anda pela mão direita, para diante de obstáculos, buzina e desencalha sozinho. Dá para roubar carros.
 - **Dublagem** em português do Brasil e inglês (voz sintetizada do navegador), com legendas independentes do idioma da voz.
 - **Rádio** com 3 estações procedurais: G-Funk, Funk Carioca e Bossa Lo-fi.
+- **Chuva no chão**: o asfalto e as calçadas escurecem e ficam brilhando quando molham, e se formam poças que crescem com a chuva. As gotas abrem anéis nas poças e respingam no chão. Postes, faróis e lanternas se refletem na rua molhada, em faixas compridas no asfalto e como espelho nas poças. Os pneus levantam névoa atrás do carro, passar na poça espirra água para os lados, pisar na poça a pé também espirra, e dá para ouvir o chiado do pneu no molhado. Com chuva ou neblina, o facho do farol aparece no ar.
+- **Física mais real**:
+  - suspensão com mola e amortecedor: o carro mergulha ao frear, agacha ao acelerar, inclina na curva e quica ao cair de um salto;
+  - ladeira de verdade: o carro sem freio desce sozinho e perde força subindo;
+  - aquaplanagem: em alta velocidade numa poça o pneu perde aderência, e a poça de um lado só puxa o carro para aquele lado;
+  - no molhado o carro freia em uma distância bem maior (de 80 km/h: 31 m no seco, 45 m na chuva);
+  - o carro perde aderência quando o peso joga para um lado, mais na frente que atrás, então no limite ele sai de frente;
+  - o Faísca GT tem carga aerodinâmica que gruda mais no chão quanto mais rápido;
+  - a roda que patina gira mais rápido que o chão.
 - **Freio realista**: o carro não tem ABS. Se você frear forte demais, as rodas travam: o pneu desliza com atrito cinético (menos aderência), a dianteira travada não obedece o volante, e ficam marcas de pneu no asfalto (ou de terra fora dele) com fumaça. Dosando o freio no analógico você para mais rápido sem travar. Derrapando de lado o carro perde velocidade como na vida real (cerca de 0,7 g), sem parar do nada. O freio de mão trava a traseira para dar drift.
 - **Farol**: liga e desliga com `L` / D-pad ↑ / 💡. Se você não desligar, ele continua aceso depois que você sai do carro.
 - **Soco em combo**: apertando no ritmo sai jab de esquerda, direto de direita e gancho. O personagem fica em guarda depois de socar e mira no pedestre mais perto. Quem apanha cambaleia, e o gancho derruba.

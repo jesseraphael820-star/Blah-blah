@@ -5,7 +5,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { clamp, lerp, smoothstep, angleDiff } from './util.js';
 import { World, groundAt, heightAt, zoneName, cityAt, puddleAt, LIGHTS_N } from './world.js';
-import { Vehicle, collideVehicles } from './vehicle.js';
+import { Vehicle, collideVehicles, BEAM } from './vehicle.js';
 import { Character } from './character.js';
 import { Traffic, Peds } from './npc.js';
 import { Environment } from './sky.js';
@@ -584,6 +584,7 @@ function tick() {
   police.update(dt);
   air.update(dt);
   fx.light = 0.1 + 0.9 * (env.day ?? 1);
+  BEAM.uBeam.value = (0.12 + 0.88 * env.night) * (0.05 + env.p.rain * 0.35 + clamp((env.p.fog - 0.0005) * 60, 0, 0.3));
   fx.update(dt, camera.position);
   peds.update(dt);
   for (const a of game.actors) { a.ch.root.position.copy(a.pos); a.ch.root.rotation.y = a.heading; a.ch.animate(dt, 0, 'ground'); }
@@ -676,7 +677,7 @@ function tick() {
   // som
   const pv = p.vehicle;
   audio.update({
-    wind: env.windSpeed, speed: pv ? pv.speed : p.speed, rain: env.p.rain, indoor: false,
+    wind: env.windSpeed, speed: pv ? pv.speed : p.speed, rain: env.p.rain, indoor: !!pv && !pv.t.twoWheel, wet: pv && (pv.surface === 'road' || pv.surface === 'walk') ? env.wetness : 0,
     slip: pv && pv.onGround && !pv.t.pedal ? clamp(pv.slip * 1.4, 0, 1) : 0,
     engine: !!pv && !pv.t.pedal && pv.health > 0, rpmN: pv && !pv.t.pedal ? (pv.rpm - pv.t.idle) / (pv.t.redline - pv.t.idle) : 0, throttle: pv ? pv.thr || 0 : 0,
   });

@@ -240,7 +240,7 @@ export class Environment {
     const sunCol = new THREE.Color(1, 0.97, 0.92).lerp(new THREE.Color(1, 0.55, 0.28), warm);
     let lightDir = this.sunDir, li;
     if (elev > -0.04) li = 3.2 * smoothstep(-0.04, 0.14, elev) * (1 - 0.72 * cl);
-    else { lightDir = this.sunDir.clone().negate(); lightDir.y = Math.abs(lightDir.y) + 0.3; lightDir.normalize(); sunCol.setRGB(0.55, 0.65, 1); li = 0.35 * (1 - cl * 0.7); }
+    else { lightDir = this.sunDir.clone().negate(); lightDir.y = Math.abs(lightDir.y) + 0.3; lightDir.normalize(); sunCol.setRGB(0.55, 0.65, 1); li = 0.3 * (1 - cl * 0.7); }
     this.sun.color.copy(sunCol);
     this.sun.intensity = li;
     this.sun.position.copy(focus).addScaledVector(lightDir, 400);
@@ -248,9 +248,9 @@ export class Environment {
     this.sun.castShadow = this.s.get('shadows') && li > 0.05;
     this.flash *= Math.exp(-dt * 7);
     const day = 1 - this.night;
-    this.hemi.intensity = (lerp(0.1, 0.95, day) * (1 - 0.25 * cl)) + this.flash * 4;
+    this.hemi.intensity = (lerp(0.13, 0.95, day) * (1 - 0.25 * cl)) + this.flash * 4;
     this.hemi.color.setRGB(lerp(0.25, 0.75, day), lerp(0.3, 0.84, day), lerp(0.55, 1, day)).lerp(new THREE.Color(0.7, 0.7, 0.72), cl * 0.6);
-    this.hemi.groundColor.setRGB(0.32 * day + 0.04, 0.27 * day + 0.04, 0.2 * day + 0.06);
+    this.hemi.groundColor.setRGB(0.32 * day + 0.09, 0.27 * day + 0.06, 0.2 * day + 0.04); // à noite: brilho alaranjado da iluminação pública
 
     const u = this.sky.material.uniforms;
     u.sunPosition.value.copy(this.sunDir).multiplyScalar(1).setY(Math.max(this.sunDir.y, -0.25));
@@ -335,7 +335,7 @@ export class Environment {
       if (this.envRT) this.envRT.dispose();
       this.envRT = rt;
       this.scene.environment = rt.texture;
-      this.scene.environmentIntensity = lerp(0.12, 1, day);
+      this.scene.environmentIntensity = lerp(0.2, 1, day);
     }
   }
 

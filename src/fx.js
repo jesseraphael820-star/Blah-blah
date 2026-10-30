@@ -129,7 +129,7 @@ export class FX {
   }
   // borrifo dos pneus no asfalto molhado (névoa atrás do carro)
   spray(x, y, z, vx, vz, amt) {
-    this.sprite(x + (Math.random() - 0.5) * 0.3, y, z + (Math.random() - 0.5) * 0.3, { color: 0xc9d2da, op: 0.16 * amt, size: 0.5, life: 0.7 + Math.random() * 0.5, vx: vx * 0.35 + (Math.random() - 0.5), vy: 0.6 + Math.random() * 0.8, vz: vz * 0.35 + (Math.random() - 0.5), grow: 3 });
+    this.sprite(x + (Math.random() - 0.5) * 0.3, y, z + (Math.random() - 0.5) * 0.3, { color: 0xc9d2da, op: 0.22 * amt, size: 0.55, life: 0.7 + Math.random() * 0.5, vx: vx * 0.35 + (Math.random() - 0.5), vy: 0.6 + Math.random() * 0.8, vz: vz * 0.35 + (Math.random() - 0.5), grow: 3 });
   }
   // roda passando na poça: lençol d'água para os lados
   puddle(x, y, z, sx, sz, vx, vz, spd) {

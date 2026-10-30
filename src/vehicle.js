@@ -35,6 +35,18 @@ const M = {
   cabin: new THREE.MeshStandardMaterial({ color: 0x0b0d10, roughness: 0.6 }),
 };
 
+// facho do farol visível na chuva/neblina (cone aditivo que some na ponta e nas bordas)
+export const BEAM = { uBeam: { value: 0 } };
+const beamGeo = new THREE.ConeGeometry(1, 1, 18, 1, true).translate(0, -0.5, 0).rotateX(-Math.PI / 2);
+const beamMat = new THREE.ShaderMaterial({
+  uniforms: BEAM, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+  vertexShader: `varying float vT; varying vec3 vN, vV;
+    void main() { vT = position.z; vN = normalize(normalMatrix * normal); vec4 mv = modelViewMatrix * vec4(position, 1.0); vV = -mv.xyz; gl_Position = projectionMatrix * mv; }`,
+  fragmentShader: `uniform float uBeam; varying float vT; varying vec3 vN, vV;
+    void main() { float e = abs(dot(normalize(vN), normalize(vV))); float a = uBeam * pow(1.0 - vT, 1.6) * smoothstep(0.0, 0.06, vT) * e * e;
+      gl_FragColor = vec4(vec3(1.0, 0.95, 0.85) * a, 1.0); }`,
+});
+
 // caixas subdivididas para a lataria poder amassar localmente
 const seg = (v) => Math.max(1, Math.min(10, Math.ceil(v / 0.3)));
 function addBox(parent, w, h, d, x, y, z, mat, cast = true) {
@@ -148,6 +160,10 @@ function buildMesh(t, color) {
   for (const s of [1, -1]) {
     const k = s > 0 ? 'L' : 'R';
     P['head' + k] = addBox(body, 0.4, 0.14, 0.06, s * (W / 2 - 0.3), ly, L / 2, headMat, false);
+    const beam = new THREE.Mesh(beamGeo, beamMat);
+    beam.scale.set(2.4, 2.4, 16); beam.rotation.set(0.07, s * 0.04, 0); beam.position.z = 0.04;
+    beam.visible = false; beam.renderOrder = 3;
+    P['head' + k].add(beam); P['beam' + k] = beam;
     P['tail' + k] = addBox(body, 0.36, 0.14, 0.06, s * (W / 2 - 0.28), ly + 0.05, -L / 2, tailMat, false);
   }
   P.bumperF = addBox(body, W * 0.98, 0.14, 0.12, 0, r + 0.1, L / 2 - 0.02, M.black);
@@ -480,6 +496,7 @@ export class Vehicle {
     }
     if (this.inWater) this.root.position.y -= 0.3;
     this.headMat.emissiveIntensity = this.lights ? 4 : 0.15;
+    if (this.parts && this.parts.beamL) this.parts.beamL.visible = this.parts.beamR.visible = this.lights && BEAM.uBeam.value > 0.005;
     this.tailMat.emissiveIntensity = this.brakeOn && this.driver ? 5 : this.lights ? 1.4 : 0.1;
   }
 
