@@ -4,13 +4,13 @@ import { heightAt, surfaceAt } from './world.js';
 
 // massa kg, medidas m, torque N·m, CdA m²
 export const VTYPES = {
-  bike: { name: 'BMX', shape: 'bike', mass: 95, wheelbase: 1.05, width: 0.62, length: 1.7, height: 1.1, cgh: 0.95, wheelR: 0.33, pedal: true, power: 950, maxF: 380, grip: 1.05, CdA: 0.6, brakeF: 900, steer: 0.55, steerFall: 0.05, drive: 'rear', twoWheel: true, seat: [0, 0.52, -0.2] },
-  moto: { name: 'Sanhaço 250', shape: 'moto', mass: 240, wheelbase: 1.42, width: 0.75, length: 2.1, height: 1.2, cgh: 0.7, wheelR: 0.31, torque: 95, idle: 1200, redline: 10500, gears: [2.8, 2.0, 1.6, 1.3, 1.1, 0.95], final: 3.9, grip: 1.1, CdA: 0.55, brakeF: 3000, steer: 0.5, steerFall: 0.045, drive: 'rear', twoWheel: true, seat: [0, 0.55, -0.35] },
-  sedan: { name: 'Prima', shape: 'sedan', mass: 1300, wheelbase: 2.7, width: 1.8, length: 4.5, height: 1.45, cgh: 0.55, wheelR: 0.32, torque: 220, idle: 850, redline: 6300, gears: [3.4, 2.1, 1.45, 1.05, 0.82], final: 3.9, grip: 1.0, CdA: 0.68, brakeF: 11000, steer: 0.6, steerFall: 0.03, drive: 'rear', seat: [0.38, 0.2, -0.25] },
-  taxi: { name: 'Táxi Prima', shape: 'taxi', mass: 1330, wheelbase: 2.7, width: 1.8, length: 4.5, height: 1.45, cgh: 0.55, wheelR: 0.32, torque: 220, idle: 850, redline: 6300, gears: [3.4, 2.1, 1.45, 1.05, 0.82], final: 3.9, grip: 1.0, CdA: 0.7, brakeF: 11000, steer: 0.6, steerFall: 0.03, drive: 'rear', seat: [0.38, 0.2, -0.25] },
-  police: { name: 'Viatura', shape: 'police', mass: 1450, wheelbase: 2.8, width: 1.85, length: 4.7, height: 1.5, cgh: 0.55, wheelR: 0.33, torque: 360, idle: 800, redline: 6200, gears: [3.3, 2.1, 1.5, 1.12, 0.86], final: 3.7, grip: 1.12, CdA: 0.7, brakeF: 15000, steer: 0.6, steerFall: 0.028, drive: 'rear', seat: [0.4, 0.2, -0.25] },
-  sport: { name: 'Faísca GT', shape: 'sport', mass: 1250, wheelbase: 2.55, width: 1.95, length: 4.4, height: 1.15, cgh: 0.45, wheelR: 0.33, torque: 520, idle: 950, redline: 7900, gears: [3.1, 2.2, 1.65, 1.28, 1.02, 0.84], final: 3.5, grip: 1.25, CdA: 0.6, brakeF: 16000, steer: 0.55, steerFall: 0.03, drive: 'awd', seat: [0.4, -0.1, -0.35] },
-  pickup: { name: 'Touro', shape: 'pickup', mass: 1900, wheelbase: 3.1, width: 2.0, length: 5.2, height: 1.85, cgh: 0.78, wheelR: 0.39, torque: 430, idle: 700, redline: 5200, gears: [3.6, 2.2, 1.45, 1.0, 0.76], final: 3.7, grip: 0.95, CdA: 1.1, brakeF: 15000, steer: 0.55, steerFall: 0.03, drive: 'rear', seat: [0.42, 0.45, 0.4] },
+  bike: { name: 'BMX', shape: 'bike', mass: 95, wheelbase: 1.05, width: 0.62, length: 1.7, height: 1.1, cgh: 0.95, wheelR: 0.33, pedal: true, power: 950, maxF: 380, grip: 1.05, CdA: 0.6, brakeF: 1200, steer: 0.55, steerFall: 0.05, drive: 'rear', twoWheel: true, seat: [0, 0.52, -0.2] },
+  moto: { name: 'Sanhaço 250', shape: 'moto', mass: 240, wheelbase: 1.42, width: 0.75, length: 2.1, height: 1.2, cgh: 0.7, wheelR: 0.31, torque: 95, idle: 1200, redline: 10500, gears: [2.8, 2.0, 1.6, 1.3, 1.1, 0.95], final: 3.9, grip: 1.1, CdA: 0.55, brakeF: 4100, steer: 0.5, steerFall: 0.045, drive: 'rear', twoWheel: true, seat: [0, 0.55, -0.35] },
+  sedan: { name: 'Prima', shape: 'sedan', mass: 1300, wheelbase: 2.7, width: 1.8, length: 4.5, height: 1.45, cgh: 0.55, wheelR: 0.32, torque: 220, idle: 850, redline: 6300, gears: [3.4, 2.1, 1.45, 1.05, 0.82], final: 3.9, grip: 1.0, CdA: 0.68, brakeF: 14900, steer: 0.6, steerFall: 0.03, drive: 'rear', seat: [0.38, 0.2, -0.25] },
+  taxi: { name: 'Táxi Prima', shape: 'taxi', mass: 1330, wheelbase: 2.7, width: 1.8, length: 4.5, height: 1.45, cgh: 0.55, wheelR: 0.32, torque: 220, idle: 850, redline: 6300, gears: [3.4, 2.1, 1.45, 1.05, 0.82], final: 3.9, grip: 1.0, CdA: 0.7, brakeF: 14900, steer: 0.6, steerFall: 0.03, drive: 'rear', seat: [0.38, 0.2, -0.25] },
+  police: { name: 'Viatura', shape: 'police', mass: 1450, wheelbase: 2.8, width: 1.85, length: 4.7, height: 1.5, cgh: 0.55, wheelR: 0.33, torque: 360, idle: 800, redline: 6200, gears: [3.3, 2.1, 1.5, 1.12, 0.86], final: 3.7, grip: 1.12, CdA: 0.7, brakeF: 20200, steer: 0.6, steerFall: 0.028, drive: 'rear', seat: [0.4, 0.2, -0.25] },
+  sport: { name: 'Faísca GT', shape: 'sport', mass: 1250, wheelbase: 2.55, width: 1.95, length: 4.4, height: 1.15, cgh: 0.45, wheelR: 0.33, torque: 520, idle: 950, redline: 7900, gears: [3.1, 2.2, 1.65, 1.28, 1.02, 0.84], final: 3.5, grip: 1.25, CdA: 0.6, brakeF: 21600, steer: 0.55, steerFall: 0.03, drive: 'awd', seat: [0.4, -0.1, -0.35] },
+  pickup: { name: 'Touro', shape: 'pickup', mass: 1900, wheelbase: 3.1, width: 2.0, length: 5.2, height: 1.85, cgh: 0.78, wheelR: 0.39, torque: 430, idle: 700, redline: 5200, gears: [3.6, 2.2, 1.45, 1.0, 0.76], final: 3.7, grip: 0.95, CdA: 1.1, brakeF: 20200, steer: 0.55, steerFall: 0.03, drive: 'rear', seat: [0.42, 0.45, 0.4] },
 };
 for (const t of Object.values(VTYPES)) {
   t.a = t.wheelbase * 0.48; t.b = t.wheelbase * 0.52;
@@ -307,24 +307,43 @@ export class Vehicle {
     let FxF = Fdrive * fs, FxR = Fdrive * (1 - fs);
     const bdir = -clamp(vx * 3, -1, 1);
     const Fb = brk * t.brakeF;
-    FxF += Fb * 0.62 * bdir; FxR += Fb * 0.38 * bdir;
-    if (ctrl.handbrake) FxR += t.brakeF * 0.55 * bdir;
+    const bF = Fb * 0.62, bR = Fb * 0.38 + (ctrl.handbrake ? t.brakeF * 0.9 : 0);
+    // sem ABS: a roda trava quando o freio pede mais do que o pneu aguenta
+    const moving = Math.abs(vx) > 1.2 && this.onGround;
+    const lockF = moving && bF > mu * NF * (this.lockF ? 0.7 : 0.92);
+    const lockR = moving && bR > mu * NR * (this.lockR ? 0.7 : 0.92);
+    if (!lockF) FxF += bF * bdir;
+    if (!lockR) FxR += bR * bdir;
 
     const absvx = Math.max(Math.abs(vx), 0.6);
     const sg = vx >= 0 ? 1 : -1;
     const d = this.steer;
+    const cd = Math.cos(d), sd = Math.sin(d);
     const alphaF = Math.atan2(vy + this.yawRate * a, absvx) - d * sg;
     const alphaR = Math.atan2(vy - this.yawRate * b, absvx);
     const tire = (al) => Math.sin(1.55 * Math.atan(8.5 * al));
     let FyF = -mu * NF * tire(alphaF);
-    let FyR = -mu * NR * tire(alphaR) * (ctrl.handbrake ? 0.42 : 1);
+    let FyR = -mu * NR * tire(alphaR);
+    // pneu travado desliza: atrito cinético contra a velocidade do ponto de contato (não esterça)
+    const muK = mu * 0.78;
+    if (lockF) {
+      const cx = vx, cy = vy + this.yawRate * a, cv = Math.hypot(cx, cy) || 1;
+      const bx = (-muK * NF * cx) / cv, by = (-muK * NF * cy) / cv;
+      FxF = bx * cd + by * sd; FyF = -bx * sd + by * cd;
+    }
+    if (lockR) {
+      const cx = vx, cy = vy - this.yawRate * b, cv = Math.hypot(cx, cy) || 1;
+      FxR = (-muK * NR * cx) / cv; FyR = (-muK * NR * cy) / cv;
+    }
 
     let s = Math.hypot(FxR, FyR), lim = mu * NR;
     let slipR = 0;
-    if (s > lim) { slipR = 1 - lim / s; FxR *= lim / s; FyR *= lim / s; }
+    if (!lockR && s > lim) { slipR = 1 - lim / s; FxR *= lim / s; FyR *= lim / s; }
     s = Math.hypot(FxF, FyF); lim = mu * NF;
-    if (s > lim) { FxF *= lim / s; FyF *= lim / s; }
-    this.slip = lerp(this.slip, Math.max(slipR, Math.min(1, Math.abs(alphaR) * 2.2 - 0.25)) * clamp(Math.abs(vx) / 4, 0, 1), 0.1);
+    if (!lockF && s > lim) { FxF *= lim / s; FyF *= lim / s; }
+    const spdNow = Math.hypot(vx, vy);
+    this.lockF = lockF; this.lockR = lockR; this.slipR = slipR; this.alphaF = alphaF; this.alphaR = alphaR;
+    this.slip = lerp(this.slip, Math.max(slipR, lockF || lockR ? 1 : 0, Math.min(1, Math.abs(alphaR) * 2.2 - 0.25)) * clamp(spdNow / 4, 0, 1), 0.1);
     this.surface = surf;
 
     const rvx = this.vel.x - env.wind.x, rvz = this.vel.z - env.wind.y;
@@ -332,7 +351,6 @@ export class Vehicle {
     const k = 0.5 * 1.2 * t.CdA * rv;
     const dF = -k * (rvx * fx + rvz * fz), dL = -k * (rvx * lx + rvz * lz);
     const Froll = -S.rr * m * g * clamp(vx * 2, -1, 1);
-    const cd = Math.cos(d), sd = Math.sin(d);
     let Fx = FxR + FxF * cd - FyF * sd + dF + Froll;
     let Fy = FyR + FyF * cd + FxF * sd + dL * (t.twoWheel ? 0.4 : 1);
     let Tz = a * (FyF * cd + FxF * sd) - b * FyR;
@@ -343,13 +361,15 @@ export class Vehicle {
     this.vel.z += ((fz * Fx + lz * Fy) / m) * dt;
     this.yawRate += (Tz / t.I) * dt;
     if (this.onGround) {
-      const kk = clamp((Math.abs(vx) - 0.4) / 3, 0, 1);
+      // mistura com o modelo cinemático só quando o carro está quase parado (velocidade total, não só a frontal)
+      const spd = Math.hypot(this.vel.x, this.vel.z);
+      const kk = clamp((spd - 0.4) / 3, 0, 1);
       const kin = (vx * Math.tan(d)) / L;
       this.yawRate = lerp(kin, this.yawRate, kk);
       const vy2 = this.vel.x * lx + this.vel.z * lz;
       const kill = vy2 * (1 - kk) * Math.min(1, dt * 10);
       this.vel.x -= lx * kill; this.vel.z -= lz * kill;
-      if (Math.abs(vx) < 0.15 && thr < 0.02 && (brk > 0.05 || ctrl.handbrake || !this.driver)) {
+      if (spd < 0.25 && thr < 0.02 && (brk > 0.05 || ctrl.handbrake || !this.driver)) {
         this.vel.x *= 0.8; this.vel.z *= 0.8; this.yawRate *= 0.8;
       }
     } else this.yawRate *= 0.999;
@@ -407,7 +427,7 @@ export class Vehicle {
     const vx = this.fwdSpeed;
     for (const w of this.wheels) {
       if (w.front) w.piv.rotation.y = this.steer;
-      w.spin.rotation.x += (vx / t.wheelR) * dt;
+      if (!(w.front ? this.lockF : this.lockR)) w.spin.rotation.x += (vx / t.wheelR) * dt;
     }
     if (this.inWater) this.root.position.y -= 0.3;
     this.headMat.emissiveIntensity = this.lights ? 4 : 0.15;

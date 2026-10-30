@@ -86,6 +86,9 @@ export class Character {
     }
     this.phase = Math.random() * 6;
     this.punchT = 0;
+    this.punchType = 0;
+    this.guard = 0;
+    this.hitT = 0;
     this.talk = 0;
     this.t = Math.random() * 10;
   }
@@ -97,6 +100,7 @@ export class Character {
     g.rotation.set(0, 0, 0);
     g.position.set(0, 0, 0);
     this.hips.position.y = 0.95;
+    this.hips.rotation.set(0, 0, 0);
     this.torso.rotation.set(0, 0, 0);
     this.head.rotation.set(0, 0, 0);
     for (const a of this.arms) { a.sh.rotation.set(0, 0, 0); a.el.rotation.set(0, 0, 0); }
@@ -207,13 +211,61 @@ export class Character {
       AL.sh.rotation.z = 0.12;
       this.head.rotation.y = Math.sin(this.t * 0.7) * 0.15;
     }
+    // guarda de luta depois de socar (punhos na frente do rosto, pernas abertas)
+    if (this.guard > 0 && (mode === 'ground') ) {
+      this.guard -= dt;
+      const w = Math.min(1, this.guard * 3) * (speed < 2 ? 1 : 0.5);
+      AL.sh.rotation.x = lerp(AL.sh.rotation.x, -1.1, w); AL.el.rotation.x = lerp(AL.el.rotation.x, -2.0, w);
+      AR.sh.rotation.x = lerp(AR.sh.rotation.x, -0.9, w); AR.el.rotation.x = lerp(AR.el.rotation.x, -2.1, w);
+      AL.sh.rotation.z = lerp(AL.sh.rotation.z, -0.25, w); AR.sh.rotation.z = lerp(AR.sh.rotation.z, 0.25, w);
+      if (speed < 0.3) {
+        const bob = Math.sin(this.t * 6) * 0.02;
+        L.hp.rotation.x = -0.3; L.kn.rotation.x = 0.35; Rr.hp.rotation.x = 0.25; Rr.kn.rotation.x = 0.3;
+        this.hips.position.y = 0.92 + bob;
+        this.torso.rotation.y = 0.25;
+        this.head.rotation.x = 0.1;
+      }
+    }
+    // combo: 0 jab de esquerda, 1 direto de direita, 2 gancho de baixo pra cima
     if (this.punchT > 0) {
       this.punchT -= dt;
-      const k = Math.sin(clamp(1 - this.punchT / 0.35, 0, 1) * Math.PI);
-      AR.sh.rotation.x = lerp(AR.sh.rotation.x, -1.55, k);
-      AR.el.rotation.x = lerp(-1.2, 0, k);
-      AL.sh.rotation.x = -0.9; AL.el.rotation.x = -1.6;
-      this.torso.rotation.y = -0.35 * k;
+      const D = this.punchDur || 0.35;
+      const u = clamp(1 - this.punchT / D, 0, 1);
+      const ext = u < 0.4 ? u / 0.4 : 1 - (u - 0.4) / 0.6;
+      const k = ext * ext * (3 - 2 * ext);
+      const type = this.punchType || 0;
+      AL.sh.rotation.z = -0.15; AR.sh.rotation.z = 0.15;
+      if (type === 0) {
+        AL.sh.rotation.x = lerp(-1.1, -1.6, k); AL.el.rotation.x = lerp(-2.0, -0.05, k);
+        AR.sh.rotation.x = -0.9; AR.el.rotation.x = -2.1;
+        this.torso.rotation.y = 0.3 + 0.25 * k;
+        g.position.z = 0.08 * k;
+      } else if (type === 1) {
+        AR.sh.rotation.x = lerp(-0.9, -1.6, k); AR.el.rotation.x = lerp(-2.1, -0.05, k);
+        AL.sh.rotation.x = -1.1; AL.el.rotation.x = -2.0;
+        this.torso.rotation.y = 0.25 - 0.75 * k;
+        this.hips.rotation.y = -0.3 * k;
+        Rr.hp.rotation.x = 0.35 * k; Rr.kn.rotation.x = 0.2 + 0.3 * k;
+        g.position.z = 0.18 * k;
+      } else {
+        const wind = u < 0.3 ? u / 0.3 : 1;
+        AR.sh.rotation.x = u < 0.3 ? lerp(-0.9, -0.4, wind) : lerp(-0.4, -2.5, k);
+        AR.el.rotation.x = u < 0.3 ? -2.2 : lerp(-2.2, -1.0, k);
+        AL.sh.rotation.x = -1.1; AL.el.rotation.x = -2.0;
+        this.hips.position.y = 0.95 - (u < 0.3 ? 0.1 * wind : 0.1 * (1 - k));
+        L.kn.rotation.x = Rr.kn.rotation.x = u < 0.3 ? 0.4 * wind : 0.4 * (1 - k);
+        L.hp.rotation.x = Rr.hp.rotation.x = u < 0.3 ? -0.25 * wind : -0.25 * (1 - k);
+        this.torso.rotation.x = -0.25 * k;
+        this.torso.rotation.y = -0.4 * k;
+        g.position.z = 0.12 * k;
+      }
+    }
+    if (this.hitT > 0) {
+      // reação de quem leva o soco: cabeça e tronco jogados pra trás
+      this.hitT -= dt;
+      const k = Math.sin(clamp(1 - this.hitT / 0.4, 0, 1) * Math.PI);
+      this.torso.rotation.x -= 0.45 * k; this.head.rotation.x -= 0.4 * k;
+      AL.sh.rotation.z += 0.5 * k; AR.sh.rotation.z -= 0.5 * k;
     }
     if (this.talk > 0) {
       this.talk -= dt;

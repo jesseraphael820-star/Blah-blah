@@ -102,7 +102,9 @@ const HELP = {
   <tr><td>Mergulhar (na água)</td><td>Ctrl / Z</td><td>LB</td><td>🤿</td></tr>
   <tr><td>Soco</td><td>Clique</td><td>B</td><td>👊</td></tr>
   <tr><td>Entrar/sair do veículo</td><td>F</td><td>Y</td><td>🚗</td></tr>
-  <tr><td>Buzina / rádio</td><td>H / R</td><td>L3 / D-pad ←</td><td>📻</td></tr>
+  <tr><td>Buzina / rádio</td><td>H / R</td><td>L3 / D-pad ←</td><td>📯 / 📻</td></tr>
+  <tr><td>Farol liga/desliga</td><td>L</td><td>D-pad ↑</td><td>💡</td></tr>
+  <tr><td>Soco em combo (jab, direto, gancho)</td><td>Clique no ritmo</td><td>B no ritmo</td><td>👊 no ritmo</td></tr>
   <tr><td>Mapa / pausa</td><td>M / Esc</td><td>Back / Start</td><td>🗺 / ⏸</td></tr>
   <tr><td>Marchas (manual)</td><td>E / Q</td><td>RB / LB</td><td>—</td></tr>
   </table>`,
@@ -116,7 +118,9 @@ const HELP = {
   <tr><td>Dive (in water)</td><td>Ctrl / Z</td><td>LB</td><td>🤿</td></tr>
   <tr><td>Punch</td><td>Click</td><td>B</td><td>👊</td></tr>
   <tr><td>Enter/exit vehicle</td><td>F</td><td>Y</td><td>🚗</td></tr>
-  <tr><td>Horn / radio</td><td>H / R</td><td>L3 / D-pad ←</td><td>📻</td></tr>
+  <tr><td>Horn / radio</td><td>H / R</td><td>L3 / D-pad ←</td><td>📯 / 📻</td></tr>
+  <tr><td>Headlights on/off</td><td>L</td><td>D-pad ↑</td><td>💡</td></tr>
+  <tr><td>Punch combo (jab, cross, uppercut)</td><td>Click in rhythm</td><td>B in rhythm</td><td>👊 in rhythm</td></tr>
   <tr><td>Map / pause</td><td>M / Esc</td><td>Back / Start</td><td>🗺 / ⏸</td></tr>
   <tr><td>Gears (manual)</td><td>E / Q</td><td>RB / LB</td><td>—</td></tr>
   </table>`,

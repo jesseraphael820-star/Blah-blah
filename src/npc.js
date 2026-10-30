@@ -232,6 +232,19 @@ export class Peds {
     this.g.addWanted(strong ? 0.6 : 0.25);
   }
 
+  // soco: dois primeiros cambaleiam, o gancho (ou o 3º golpe) derruba
+  punched(p, fx, fz, type) {
+    if (p.state === 'down') return;
+    p.hits = (p.hits || 0) + 1;
+    if (type === 2 || p.hits >= 3) { this.knock(p, fx * (type === 2 ? 4 : 2.5), fz * (type === 2 ? 4 : 2.5), type === 2); p.hits = 0; return; }
+    p.ch.hitT = 0.4;
+    p.pos.x += fx * 0.45; p.pos.z += fz * 0.45;
+    p.heading = Math.atan2(-fx, -fz);
+    p.state = 'flee'; p.t = 4; p.from = { x: p.pos.x - fx * 3, z: p.pos.z - fz * 3 };
+    this.say(p, 'hit');
+    this.g.addWanted(0.15);
+  }
+
   scare(x, z, r = 25) {
     for (const p of this.list) if (p.state !== 'down' && Math.hypot(p.pos.x - x, p.pos.z - z) < r) { p.state = 'flee'; p.t = 5 + Math.random() * 3; p.from = { x, z }; }
   }

@@ -112,6 +112,9 @@ export class FX {
   smoke(x, y, z, dark, wind) {
     this.sprite(x + (Math.random() - 0.5) * 0.4, y, z + (Math.random() - 0.5) * 0.4, { color: dark ? 0x222222 : 0x9a9a9a, op: 0.5, size: 0.6, life: 2.5, vy: 1.6, vx: wind.x * 0.25, vz: wind.y * 0.25, grow: 2.2 });
   }
+  tireSmoke(x, y, z) {
+    this.sprite(x, y, z, { color: 0xd8d8d8, op: 0.35, size: 0.7, life: 1.6, vy: 0.8, grow: 2.4 });
+  }
   fire(x, y, z) {
     this.sprite(x + (Math.random() - 0.5) * 0.8, y, z + (Math.random() - 0.5) * 0.8, { color: Math.random() < 0.5 ? 0xff7a1a : 0xffc040, op: 0.9, add: true, size: 0.9, life: 0.6, vy: 2.5, grow: 0.8 });
   }

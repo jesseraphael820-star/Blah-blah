@@ -18,6 +18,7 @@ import { Missions } from './missions.js';
 import { LINES, ui } from './i18n.js';
 import { Police } from './police.js';
 import { FX } from './fx.js';
+import { Skids } from './skids.js';
 import { Air } from './air.js';
 import { Shops } from './shops.js';
 import { periodAt } from './sky.js';
@@ -176,6 +177,7 @@ const game = {
     }
     v.driver = 'player';
     v.sleeping = false;
+    if (!v.lightTouched && !v.t.pedal) v.headOn = env.lightsOn;
     v.traffic = false;
     p.vehicle = v;
     scene.remove(p.char.root);
@@ -193,7 +195,7 @@ const game = {
     if (this.world.col.resolveCircle(tmp, 0.4, v.pos.y)) d = v.doorPoint(-1);
     v.setRider(null);
     v.driver = null;
-    v.lights = false;
+    game.lastCar = v;
     p.vehicle = null;
     p.pos.set(d.x, groundAt(d.x, d.z), d.z);
     p.vel.copy(v.vel).multiplyScalar(0.5);
@@ -211,6 +213,7 @@ const input = (game.input = new Input(settings, renderer.domElement));
 const audio = (game.audio = new Audio(settings));
 let env, hud, voice, traffic, peds, missions, police, air, shops;
 const fx = (game.fx = new FX(scene));
+const skids = new Skids(scene);
 
 // luzes dinâmicas: postes próximos e farol do jogador
 const lampLights = [];
@@ -303,16 +306,33 @@ function updateOnFoot(dt, inp) {
   }
   p.speed = Math.hypot(p.vel.x, p.vel.z);
   // soco
-  if (free && inp.punch && p.onGround && ch.punchT <= 0) {
-    ch.punchT = 0.35;
+  if (free && inp.punch && p.onGround && !p.swim && ch.punchT <= 0.06) {
+    // combo jab -> direto -> gancho se apertar no ritmo
+    game.combo = game.simTime - (game.lastPunch ?? -9) < 0.8 ? ((game.combo || 0) + 1) % 3 : 0;
+    game.lastPunch = game.simTime;
+    const type = game.combo;
+    // vira na direção do pedestre mais próximo à frente
+    let best = null, bd = 2.6;
+    for (const q of peds.list) {
+      if (q.state === 'down') continue;
+      const d = Math.hypot(q.pos.x - p.pos.x, q.pos.z - p.pos.z);
+      const dot = ((q.pos.x - p.pos.x) * Math.sin(p.heading) + (q.pos.z - p.pos.z) * Math.cos(p.heading)) / (d || 1);
+      if (d < bd && dot > 0.2) { bd = d; best = q; }
+    }
+    if (best) p.heading = Math.atan2(best.pos.x - p.pos.x, best.pos.z - p.pos.z);
+    ch.punchType = type; ch.punchDur = type === 2 ? 0.5 : 0.3; ch.punchT = ch.punchDur; ch.guard = 3;
+    p.vel.x += Math.sin(p.heading) * (type === 1 ? 1.5 : 0.8); p.vel.z += Math.cos(p.heading) * (type === 1 ? 1.5 : 0.8);
+    audio.burst(0.12, 1800, 0.08, 'bandpass');
     setTimeout(() => {
       const fx = Math.sin(p.heading), fz = Math.cos(p.heading);
+      let hit = false;
       for (const q of peds.list) {
         const dx = q.pos.x - p.pos.x, dz = q.pos.z - p.pos.z, d = Math.hypot(dx, dz);
-        if (d < 1.5 && (dx * fx + dz * fz) / (d || 1) > 0.4) { peds.knock(q, fx * 2.5, fz * 2.5, false); audio.punch(); input.rumble(0.3, 0.5, 90); peds.scare(p.pos.x, p.pos.z, 15); }
+        if (d < 1.6 && (dx * fx + dz * fz) / (d || 1) > 0.35) { peds.punched(q, fx, fz, type); hit = true; }
       }
-      if (police.punch(p.pos.x, p.pos.z, fx, fz)) { audio.punch(); input.rumble(0.3, 0.5, 90); }
-    }, 150);
+      if (police.punch(p.pos.x, p.pos.z, fx, fz)) hit = true;
+      if (hit) { audio.punch(); input.rumble(type === 2 ? 0.7 : 0.35, 0.5, type === 2 ? 160 : 90); game.cam.shake = Math.max(game.cam.shake, type === 2 ? 0.12 : 0.05); peds.scare(p.pos.x, p.pos.z, 15); }
+    }, ch.punchDur * 400);
   }
   let mode = p.swim ? (p.under ? 'swimUnder' : p.speed > 0.4 ? 'swim' : 'tread') : p.onGround ? 'ground' : 'air';
   if (!p.swim && !p.onGround) {
@@ -447,7 +467,12 @@ function tick() {
       shiftUp: inp.shiftUp, shiftDown: inp.shiftDown,
     } : { throttle: 0, brake: 0.5, steer: 0, handbrake: true };
     v.ctrl = ctrl;
-    v.lights = env.lightsOn && !v.t.pedal;
+    if (free && inp.lights && !v.t.pedal) {
+      v.headOn = !v.headOn; v.lightTouched = true;
+      hud.hint(settings.get('lang') === 'pt' ? (v.headOn ? 'Farol ligado' : 'Farol desligado') : v.headOn ? 'Headlights on' : 'Headlights off', 1500);
+      audio.tone(900, 900, 0.05, 0.08, 'square');
+    }
+    v.lights = !!v.headOn;
     if (free && inp.enter) game.exitVehicle();
     if (free && inp.radio && !v.t.twoWheel) {
       const st = audio.cycleRadio();
@@ -473,6 +498,7 @@ function tick() {
     else if (car.driver === 'ai') ctrl = { throttle: 0, brake: 0.6, steer: 0, handbrake: true };
     if (car.ai && !car.lights) car.lights = env.lightsOn;
     car.update(dt, ctrl, env, car === p.vehicle && settings.get('gearbox') === 'manual');
+    if (d < 220) skids.track(car, dt, (x, y, z) => fx.tireSmoke(x, y, z));
     if (!car.sleeping || car === p.vehicle) car.collideWorld(world.col);
     awake.push(car);
     // estrago progressivo: peças caem, fumaça, fogo e explosão
@@ -488,6 +514,7 @@ function tick() {
       }
     } else if (car.exploded && Math.random() < dt * 3 && d < 200) fx.smoke(car.pos.x, car.pos.y + 1, car.pos.z, true, env.wind);
   }
+  skids.flush();
   collideVehicles(awake, (A, B, vn) => {
     if ((A === p.vehicle && B.police) || (B === p.vehicle && A.police)) game.addWanted(vn > 4 ? 1 : 0.4);
     if (A === p.vehicle || B === p.vehicle) { audio.crash(vn); input.rumble(clamp(vn / 12, 0.2, 1), 0.5, 220); game.cam.shake = Math.max(game.cam.shake, vn * 0.05); if (vn > 6) game.addWanted(0.15); }
@@ -559,7 +586,9 @@ function tick() {
     lampLights.forEach((L, i) => { const b = best[i]; if (b) L.position.set(b[1].lx, b[1].ly - 0.3, b[1].lz); L.userData.on = !!b; });
   }
   for (const L of lampLights) L.intensity = L.userData.on ? lit * 55 : 0;
-  if (v && v.lights) {
+  const lc = v || (game.lastCar && game.lastCar.lights && game.lastCar.pos.distanceTo(camera.position) < 150 ? game.lastCar : null);
+  if (lc && lc.lights) {
+    const v = lc;
     const sh = Math.sin(v.heading), ch = Math.cos(v.heading);
     headlight.position.set(v.pos.x + sh * v.t.length * 0.5, v.pos.y + v.t.wheelR + 0.5, v.pos.z + ch * v.t.length * 0.5);
     headlight.target.position.set(v.pos.x + sh * 30, v.pos.y - 1, v.pos.z + ch * 30);
