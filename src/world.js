@@ -720,7 +720,7 @@ export class World {
           for (let i = 0; i < fp.count; i++) { const zz = fp.getZ(i); fp.setY(i, fp.getY(i) + zz * 0.35 - (zz / 4.2) ** 2 * 2.0); fp.setX(i, fp.getX(i) * (1 - zz / 5.5)); }
           f.computeVertexNormals();
           f.rotateY((k / 8) * Math.PI * 2 + 0.3).translate(0.9, 8.5, 0);
-          fr.push(f);
+          fr.push(f.toNonIndexed());
         }
         fr.push(new THREE.IcosahedronGeometry(0.45, 0).translate(0.9, 8.3, 0));
         return { t, l: mergeGeometries(fr), ref: 8.5, col: [0x4f7a2a, 0x648c34, 0x3f6a22], sway: 0.45, trunkMat: palmTrunkMat };
