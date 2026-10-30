@@ -32,10 +32,13 @@ const M = {
   rim: new THREE.MeshStandardMaterial({ color: 0xb8b8b8, metalness: 0.9, roughness: 0.3 }),
   frame: new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.5, roughness: 0.4 }),
   seat: new THREE.MeshStandardMaterial({ color: 0x2a1d17, roughness: 0.8 }),
+  cabin: new THREE.MeshStandardMaterial({ color: 0x0b0d10, roughness: 0.6 }),
 };
 
+// caixas subdivididas para a lataria poder amassar localmente
+const seg = (v) => Math.max(1, Math.min(10, Math.ceil(v / 0.3)));
 function addBox(parent, w, h, d, x, y, z, mat, cast = true) {
-  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d, seg(w), seg(h), seg(d)), mat);
   m.position.set(x, y, z);
   m.castShadow = cast;
   m.receiveShadow = true;
@@ -95,15 +98,18 @@ function buildMesh(t, color) {
   const ww = W / 2 - 0.13;
   mkWheel(ww, a, true); mkWheel(-ww, a, true); mkWheel(ww, -b, false); mkWheel(-ww, -b, false);
   const sh = t.shape;
-  let siren = null;
+  let siren = null, cab, top, bodyY, bodyH, hood = null, trunk = null, doorMat = paint;
   if (sh === 'sedan' || sh === 'taxi' || sh === 'police') {
     addBox(body, W, 0.55, L, 0, r + 0.32, 0, paint);
-    addBox(body, W * 0.92, 0.5, L * 0.47, 0, r + 0.84, -L * 0.06, M.glass);
+    cab = [W * 0.92, 0.5, L * 0.47, r + 0.84, -L * 0.06];
+    top = r + 0.595; bodyY = r + 0.32; bodyH = 0.55;
+    addBox(body, ...cab.slice(0, 3), 0, cab[3], cab[4], M.cabin);
     addBox(body, W * 0.9, 0.06, L * 0.42, 0, r + 1.11, -L * 0.07, paint);
     addBox(body, W * 0.93, 0.36, 0.08, 0, r + 0.77, -L * 0.06, paint).scale.set(1, 1, 1);
     if (sh === 'police') {
       const white = new THREE.MeshPhysicalMaterial({ color: 0xf2f2f2, metalness: 0.4, roughness: 0.35, clearcoat: 1 });
       addBox(body, W + 0.01, 0.4, L * 0.42, 0, r + 0.36, -L * 0.03, white);
+      doorMat = white;
       const red = new THREE.MeshStandardMaterial({ color: 0x550000, emissive: 0xff1010, emissiveIntensity: 0 });
       const blue = new THREE.MeshStandardMaterial({ color: 0x000055, emissive: 0x1040ff, emissiveIntensity: 0 });
       addBox(body, 0.5, 0.14, 0.25, 0.3, r + 1.2, -L * 0.07, red, false);
@@ -117,30 +123,48 @@ function buildMesh(t, color) {
     }
   } else if (sh === 'sport') {
     addBox(body, W, 0.42, L, 0, r + 0.2, 0, paint);
-    addBox(body, W * 0.96, 0.18, L * 0.32, 0, r + 0.48, L * 0.3, paint);
-    addBox(body, W * 0.8, 0.36, L * 0.36, 0, r + 0.58, -L * 0.08, M.glass);
+    hood = addBox(body, W * 0.96, 0.18, L * 0.32, 0, r + 0.48, L * 0.3, paint);
+    cab = [W * 0.8, 0.36, L * 0.36, r + 0.58, -L * 0.08];
+    top = r + 0.41; bodyY = r + 0.2; bodyH = 0.42;
+    addBox(body, ...cab.slice(0, 3), 0, cab[3], cab[4], M.cabin);
     addBox(body, W * 0.78, 0.05, L * 0.28, 0, r + 0.78, -L * 0.1, paint);
-    addBox(body, W * 0.95, 0.06, 0.35, 0, r + 0.72, -L * 0.47, M.black);
+    trunk = addBox(body, W * 0.95, 0.06, 0.35, 0, r + 0.72, -L * 0.47, M.black);
     addBox(body, 0.06, 0.28, 0.1, W * 0.35, r + 0.55, -L * 0.46, M.black);
     addBox(body, 0.06, 0.28, 0.1, -W * 0.35, r + 0.55, -L * 0.46, M.black);
     addBox(body, 0.3, 0.02, L * 0.98, 0, r + 0.42, 0, new THREE.MeshStandardMaterial({ color: 0xf2f2f2, roughness: 0.4 }));
   } else if (sh === 'pickup') {
     addBox(body, W, 0.7, L, 0, r + 0.42, 0, paint);
-    addBox(body, W * 0.92, 0.6, L * 0.3, 0, r + 1.07, L * 0.1, M.glass);
+    cab = [W * 0.92, 0.6, L * 0.3, r + 1.07, L * 0.1];
+    top = r + 0.77; bodyY = r + 0.42; bodyH = 0.7;
+    addBox(body, ...cab.slice(0, 3), 0, cab[3], cab[4], M.cabin);
     addBox(body, W * 0.9, 0.06, L * 0.27, 0, r + 1.39, L * 0.1, paint);
-    addBox(body, W, 0.35, 0.08, 0, r + 0.95, -L * 0.48, paint);
+    trunk = addBox(body, W, 0.35, 0.08, 0, r + 0.95, -L * 0.48, paint);
     addBox(body, 0.08, 0.35, L * 0.4, W / 2 - 0.04, r + 0.95, -L * 0.28, paint);
     addBox(body, 0.08, 0.35, L * 0.4, -W / 2 + 0.04, r + 0.95, -L * 0.28, paint);
     addBox(body, W * 1.02, 0.16, 0.2, 0, r + 0.18, L / 2, M.chrome);
   }
   const ly = sh === 'sport' ? r + 0.3 : r + 0.42;
+  const P = {};
   for (const s of [1, -1]) {
-    addBox(body, 0.4, 0.14, 0.06, s * (W / 2 - 0.3), ly, L / 2, headMat, false);
-    addBox(body, 0.36, 0.14, 0.06, s * (W / 2 - 0.28), ly + 0.05, -L / 2, tailMat, false);
+    const k = s > 0 ? 'L' : 'R';
+    P['head' + k] = addBox(body, 0.4, 0.14, 0.06, s * (W / 2 - 0.3), ly, L / 2, headMat, false);
+    P['tail' + k] = addBox(body, 0.36, 0.14, 0.06, s * (W / 2 - 0.28), ly + 0.05, -L / 2, tailMat, false);
   }
-  const bumperF = addBox(body, W * 0.98, 0.14, 0.12, 0, r + 0.1, L / 2 - 0.02, M.black);
-  const bumperR = addBox(body, W * 0.98, 0.14, 0.12, 0, r + 0.1, -L / 2 + 0.02, M.black);
-  return { root, body, wheels, headMat, tailMat, paint, siren, parts: [bumperF, bumperR] };
+  P.bumperF = addBox(body, W * 0.98, 0.14, 0.12, 0, r + 0.1, L / 2 - 0.02, M.black);
+  P.bumperR = addBox(body, W * 0.98, 0.14, 0.12, 0, r + 0.1, -L / 2 + 0.02, M.black);
+  // vidros, capô, porta-malas e portas como peças separadas
+  const [cw, ch, cd, cy, cz] = cab;
+  P.paneF = addBox(body, cw * 0.94, ch * 0.85, 0.03, 0, cy, cz + cd / 2 + 0.012, M.glass, false);
+  P.paneB = addBox(body, cw * 0.94, ch * 0.85, 0.03, 0, cy, cz - cd / 2 - 0.012, M.glass, false);
+  P.paneL = addBox(body, 0.03, ch * 0.8, cd * 0.9, cw / 2 + 0.012, cy, cz, M.glass, false);
+  P.paneR = addBox(body, 0.03, ch * 0.8, cd * 0.9, -cw / 2 - 0.012, cy, cz, M.glass, false);
+  const fz0 = cz + cd / 2, bz0 = cz - cd / 2;
+  P.hood = hood || addBox(body, W * 0.94, 0.04, L / 2 - fz0 - 0.08, 0, top + 0.02, (fz0 + L / 2 - 0.08) / 2, paint);
+  P.trunk = trunk || addBox(body, W * 0.94, 0.04, bz0 + L / 2 - 0.08, 0, top + 0.02, (bz0 - L / 2 + 0.08) / 2, paint);
+  P.doorL = addBox(body, 0.04, bodyH * 0.8, cd, W / 2 + 0.02, bodyY + 0.03, cz, doorMat);
+  P.doorR = addBox(body, 0.04, bodyH * 0.8, cd, -W / 2 - 0.02, bodyY + 0.03, cz, doorMat);
+  const deform = body.children.filter((m) => m.isMesh && m.material !== headMat && m.material !== tailMat && !(siren && (m.material === siren.red || m.material === siren.blue)));
+  return { root, body, wheels, headMat, tailMat, paint, siren, parts: P, deform };
 }
 
 let uid = 1;
@@ -174,6 +198,7 @@ export class Vehicle {
     this.lights = false;
     this.impact = 0;
     this.radius = this.t.width / 2;
+    this.zones = { front: 0, rear: 0, left: 0, right: 0 };
     this.syncMesh();
   }
 
@@ -411,17 +436,84 @@ export class Vehicle {
       this.vel.x += (j * n.x) / t.mass; this.vel.z += (j * n.z) / t.mass;
       this.yawRate += (rn * j) / t.I;
       this.vel.x *= 0.92; this.vel.z *= 0.92;
-      worst = Math.max(worst, -vn);
+      if (-vn > worst) { worst = -vn; this._hit = [cx - n.x * r, cz - n.z * r, n.x, n.z]; }
       this.sleeping = false;
     }
-    if (worst > 1.5) this.damage(worst);
+    if (worst > 1.5) this.damage(worst, ...this._hit);
     return worst;
   }
 
-  damage(v) {
+  // dano localizado: (cx,cz) ponto de contato no mundo, (nx,nz) direção do empurrão
+  damage(v, cx, cz, nx, nz) {
     this.impact = Math.max(this.impact, v);
     this.health -= v * v * 1.2;
-    if (Vehicle.onDamage) Vehicle.onDamage(this, v);
+    if (Vehicle.onDamage) Vehicle.onDamage(this, v, cx, cz);
+    if (cx === undefined || !this.deform) return;
+    const sh = Math.sin(this.heading), ch = Math.cos(this.heading);
+    const dx = cx - this.pos.x, dz = cz - this.pos.z;
+    const lz = dx * sh + dz * ch, lx = dx * ch - dz * sh;
+    const dX = nx * ch - nz * sh, dZ = nx * sh + nz * ch;
+    const L = this.t.length, W = this.t.width;
+    const zf = lz / (L / 2), zs = lx / (W / 2);
+    const zone = Math.abs(zf) > Math.abs(zs) * 0.9 ? (zf > 0 ? 'front' : 'rear') : zs > 0 ? 'left' : 'right';
+    this.zones[zone] += v * v * 1.2;
+    this.dent(clamp(lx, -W / 2, W / 2), clamp(lz, -L / 2, L / 2), dX, dZ, v);
+    this.breakZone(zone, lx);
+  }
+
+  dent(cx, cz, dX, dZ, v) {
+    const amt = Math.min(0.26, v * 0.028), R = Math.min(1.8, 0.5 + v * 0.08);
+    const dl = Math.hypot(dX, dZ) || 1; dX /= dl; dZ /= dl;
+    for (const m of this.deform) {
+      if (!m.visible) continue;
+      const pos = m.geometry.attributes.position;
+      const o = m.userData.orig || (m.userData.orig = pos.array.slice());
+      let changed = false;
+      for (let i = 0; i < pos.count; i++) {
+        const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+        const d = Math.hypot(x + m.position.x - cx, z + m.position.z - cz);
+        if (d >= R) continue;
+        const k = amt * (1 - d / R) ** 2;
+        let nx = x + dX * k, nz = z + dZ * k;
+        const ox = o[i * 3], oz = o[i * 3 + 2], ex = nx - ox, ez = nz - oz, D = Math.hypot(ex, ez);
+        if (D > 0.5) { nx = ox + (ex / D) * 0.5; nz = oz + (ez / D) * 0.5; }
+        pos.setXYZ(i, nx, y > 0 ? Math.max(o[i * 3 + 1] - 0.15, y - k * 0.3) : y, nz);
+        changed = true;
+      }
+      if (changed) { pos.needsUpdate = true; m.geometry.computeVertexNormals(); m.geometry.computeBoundingSphere(); }
+    }
+  }
+
+  breakZone(zone, lx) {
+    const z = this.zones[zone], P = this.parts, side = lx > 0 ? 'L' : 'R', fx = Vehicle.fx;
+    if (!fx) return;
+    const glass = (m) => m && m.visible && fx.glass(this, m);
+    const part = (m) => m && m.visible && fx.detach(this, m);
+    if (zone === 'front') {
+      if (z > 140) glass(P['head' + side]);
+      if (z > 300) part(P.bumperF);
+      if (z > 420) glass(P.paneF);
+      if (z > 700) part(P.hood);
+      if (z > 900) { glass(P.headL); glass(P.headR); }
+    } else if (zone === 'rear') {
+      if (z > 140) glass(P['tail' + side]);
+      if (z > 300) part(P.bumperR);
+      if (z > 420) glass(P.paneB);
+      if (z > 700) part(P.trunk);
+    } else {
+      const S = zone === 'left' ? 'L' : 'R';
+      if (z > 320) glass(P['pane' + S]);
+      if (z > 700) part(P['door' + S]);
+    }
+  }
+
+  repairVisual() {
+    for (const m of this.deform) {
+      m.visible = true;
+      if (m.userData.orig) { m.geometry.attributes.position.array.set(m.userData.orig); m.geometry.attributes.position.needsUpdate = true; m.geometry.computeVertexNormals(); }
+    }
+    for (const k in this.parts) this.parts[k].visible = true;
+    this.zones = { front: 0, rear: 0, left: 0, right: 0 };
   }
 
   circles(out) {
@@ -477,7 +569,7 @@ export function collideVehicles(list, onHit) {
         A.vel.x += (jj * nx) / ma; A.vel.z += (jj * nz) / ma; A.yawRate += (rna * jj) / A.t.I;
         B.vel.x -= (jj * nx) / mb; B.vel.z -= (jj * nz) / mb; B.yawRate -= (rnb * jj) / B.t.I;
         A.sleeping = B.sleeping = false;
-        if (-vn > 2) { A.damage(-vn * 0.7); B.damage(-vn * 0.7); }
+        if (-vn > 2) { A.damage(-vn * 0.7, cx, cz, nx, nz); B.damage(-vn * 0.7, cx, cz, -nx, -nz); }
         if (onHit) onHit(A, B, -vn);
       }
     }

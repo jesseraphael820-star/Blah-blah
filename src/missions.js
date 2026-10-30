@@ -166,7 +166,7 @@ export class Missions {
   async race() {
     const g = this.g, car = this.faisca, of = g.world.oficina;
     if (car.health <= 0 || car.pos.distanceTo(g.player.pos) > 200) {
-      car.health = 1000; car.pos.set(of.carX, 3, of.carZ); car.heading = Math.PI; car.vel.set(0, 0, 0); car.yawRate = 0;
+      car.health = 1000; car.dead = false; car.burnT = 0; car.repairVisual(); car.pos.set(of.carX, 3, of.carZ); car.heading = Math.PI; car.vel.set(0, 0, 0); car.yawRate = 0;
     }
     if (g.player.vehicle && g.player.vehicle !== car) g.exitVehicle(true);
     car.locked = false;

@@ -50,12 +50,14 @@ export class FX {
   }
 
   // batida: lascas da lataria e vidro voando do ponto de impacto
-  impact(v, strength) {
+  impact(v, strength, cx, cz) {
     const n = Math.min(14, Math.floor(strength * 0.8));
     const sh = Math.sin(v.heading), ch = Math.cos(v.heading);
     const sp = v.speed || 1;
-    const dx = sp > 1 ? v.vel.x / sp : sh, dz = sp > 1 ? v.vel.z / sp : ch;
-    const x = v.pos.x + dx * v.t.length * 0.45, z = v.pos.z + dz * v.t.length * 0.45, y = v.pos.y + v.t.wheelR + 0.4;
+    let dx = sp > 1 ? v.vel.x / sp : sh, dz = sp > 1 ? v.vel.z / sp : ch;
+    let x = v.pos.x + dx * v.t.length * 0.45, z = v.pos.z + dz * v.t.length * 0.45;
+    if (cx !== undefined) { x = cx; z = cz; const d = Math.hypot(cx - v.pos.x, cz - v.pos.z) || 1; dx = (cx - v.pos.x) / d; dz = (cz - v.pos.z) / d; }
+    const y = v.pos.y + v.t.wheelR + 0.4;
     for (let k = 0; k < n; k++) {
       const glass = Math.random() < 0.4;
       const s = glass ? 0.06 + Math.random() * 0.08 : 0.08 + Math.random() * 0.2;
@@ -79,6 +81,19 @@ export class FX {
     const p = this.pieces[(this.cursor - 1 + this.N) % this.N];
     p.r.set(0, v.heading, 0); p.w.multiplyScalar(0.3);
     void sh; void ch;
+  }
+
+  // vidro/farol estilhaçando: some a peça e voam cacos
+  glass(v, mesh) {
+    mesh.visible = false;
+    const wp = new THREE.Vector3();
+    mesh.getWorldPosition(wp);
+    const red = mesh.material.emissive && mesh.material.emissive.r > 0.9 && mesh.material.emissive.g < 0.3;
+    const col = red ? 0xff3020 : mesh.material.emissive && mesh.material.emissive.r > 0.9 ? 0xfff4d0 : 0xcfeaff;
+    for (let k = 0; k < 12; k++) {
+      const s = 0.04 + Math.random() * 0.09;
+      this.piece(wp.x + (Math.random() - 0.5) * 0.6, wp.y, wp.z + (Math.random() - 0.5) * 0.6, v.vel.x * 0.4 + (Math.random() - 0.5) * 4, 1 + Math.random() * 3, v.vel.z * 0.4 + (Math.random() - 0.5) * 4, s, 0.01, s, col, 30);
+    }
   }
 
   sprite(x, y, z, o) {

@@ -141,7 +141,7 @@ const game = {
   explode(v) {
     v.exploded = true; v.health = -1; v.dead = true;
     v.paint.color.setHex(0x161616); v.paint.clearcoat = 0; v.paint.metalness = 0.1; v.paint.roughness = 1;
-    for (const part of v.parts || []) part.visible = false;
+    for (const k in v.parts || {}) if (v.parts[k].visible && Math.random() < 0.6) (k.startsWith('pane') || k.startsWith('head') || k.startsWith('tail') ? fx.glass(v, v.parts[k]) : fx.detach(v, v.parts[k]));
     fx.explode(v.pos.x, v.pos.y, v.pos.z, v.color);
     audio.boom();
     v.vy = 7; v.onGround = false; v.yawRate += (Math.random() - 0.5) * 3;
@@ -476,8 +476,6 @@ function tick() {
     if (!car.sleeping || car === p.vehicle) car.collideWorld(world.col);
     awake.push(car);
     // estrago progressivo: peças caem, fumaça, fogo e explosão
-    if (car.health < 700 && car.parts && car.parts[0].visible) fx.detach(car, car.parts[0]);
-    if (car.health < 420 && car.parts && car.parts[1].visible) fx.detach(car, car.parts[1]);
     if (!car.exploded && d < 260) {
       const hx = car.pos.x + Math.sin(car.heading) * car.t.length * 0.35, hz = car.pos.z + Math.cos(car.heading) * car.t.length * 0.35, hy = car.pos.y + car.t.height * 0.7;
       if (car.health < 450 && Math.random() < dt * (car.health < 250 ? 14 : 6)) fx.smoke(hx, hy, hz, car.health < 250, env.wind);
@@ -568,6 +566,15 @@ function tick() {
     headlight.intensity = 180;
   } else headlight.intensity = 0;
 
+  // oficina conserta o carro (só amassados e peças; carcaça explodida não tem conserto)
+  if (v && !v.exploded && v.health < 1000 && v.speed < 1.5 && world.oficina) {
+    const of = world.oficina;
+    if (Math.hypot(v.pos.x - of.carX, v.pos.z - of.carZ) < 8) {
+      v.health = 1000; v.dead = false; v.burnT = 0; v.repairVisual?.();
+      game.money = Math.max(0, game.money - 50);
+      audio.jingle(); hud.hint(settings.get('lang') === 'pt' ? 'Oficina Vargas: carro consertado (-$50).' : 'Vargas Garage: car repaired (-$50).', 3000);
+    }
+  }
   // período do dia
   const per = periodAt(env.time);
   if (per !== game.period) { if (game.period && !game.locked) hud.hint(ui('period', settings.get('lang'), { n: per[settings.get('lang')] }), 3500); game.period = per; }
@@ -611,8 +618,9 @@ async function boot() {
   shops = game.shops = new Shops(game);
   game.setPlayerLook(shops.data.look, shops.data.muscle);
   player.stamina = shops.sprintMax; player.breath = shops.breathMax;
-  Vehicle.onDamage = (v, strength) => {
-    if (strength > 2.5 && v.pos.distanceTo(camera.position) < 150) fx.impact(v, strength);
+  Vehicle.fx = fx;
+  Vehicle.onDamage = (v, strength, cx, cz) => {
+    if (strength > 2.5 && v.pos.distanceTo(camera.position) < 150) fx.impact(v, strength, cx, cz);
   };
   // carros estacionados pelas cidades
   const types = ['sedan', 'sedan', 'pickup', 'sport', 'moto', 'taxi', 'sedan', 'pickup'];
