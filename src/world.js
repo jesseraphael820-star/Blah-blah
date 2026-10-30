@@ -202,12 +202,13 @@ export class Collision {
       for (let j = Math.floor((z - r) / c); j <= Math.floor((z + r) / c); j++) {
         const a = this.map.get(this.key(i, j));
         if (!a) continue;
-        for (const b of a) if (b.s !== s) { b.s = s; out.push(b); }
+        for (const b of a) if (b.s !== s && !b.gone) { b.s = s; out.push(b); }
       }
     return out;
   }
   // empurra um círculo pra fora das caixas; retorna normal do maior impacto (ou null)
-  resolveCircle(p, r, y, outN) {
+  // brk(b, nx, nz): caixa de objeto quebrável (poste, hidrante...) — se retornar true o objeto quebrou e não empurra
+  resolveCircle(p, r, y, outN, brk) {
     const list = this.query(p.x, p.z, r + 1, this._tmp || (this._tmp = []));
     let hit = false;
     for (const b of list) {
@@ -216,17 +217,20 @@ export class Collision {
       let dx = p.x - cx, dz = p.z - cz;
       let d = Math.hypot(dx, dz);
       if (d >= r) continue;
+      let px, pz;
       if (d < 1e-4) {
         const l = p.x - b.x0, rr = b.x1 - p.x, t = p.z - b.z0, bb = b.z1 - p.z;
         const m = Math.min(l, rr, t, bb);
         dx = m === l ? -1 : m === rr ? 1 : 0; dz = m === t ? -1 : m === bb ? 1 : 0;
         if (dx && dz) dz = 0;
         d = 0;
-        p.x += dx * (r + (m === l || m === rr ? m : 0)); p.z += dz * (r + (m === t || m === bb ? m : 0));
+        px = dx * (r + (m === l || m === rr ? m : 0)); pz = dz * (r + (m === t || m === bb ? m : 0));
       } else {
         dx /= d; dz /= d;
-        p.x += dx * (r - d); p.z += dz * (r - d);
+        px = dx * (r - d); pz = dz * (r - d);
       }
+      if (b.prop && brk && brk(b, dx, dz)) continue;
+      p.x += px; p.z += pz;
       if (outN) { outN.x = dx; outN.z = dz; }
       hit = true;
     }
@@ -806,7 +810,9 @@ export class World {
   }
 
   addBox(x0, x1, z0, z1, y0, y1) {
-    this.col.add({ x0, x1, z0, z1, y0, y1 });
+    const b = { x0, x1, z0, z1, y0, y1 };
+    this.col.add(b);
+    return b;
   }
 
   buildLamps() {
@@ -823,10 +829,12 @@ export class World {
       m.compose(p.set(l.x, l.y, l.z), q, s);
       pole.setMatrixAt(i, m); arm.setMatrixAt(i, m); head.setMatrixAt(i, m);
       l.lx = l.x + Math.sin(l.rot) * -1.6; l.lz = l.z + Math.cos(l.rot) * -1.6; l.ly = l.y + 7.1;
-      this.addBox(l.x - 0.15, l.x + 0.15, l.z - 0.15, l.z + 0.15, l.y, l.y + 7);
+      l.box = this.addBox(l.x - 0.15, l.x + 0.15, l.z - 0.15, l.z + 0.15, l.y, l.y + 7);
     });
     pole.castShadow = true;
     for (const im of [pole, arm, head]) this.scene.add(im);
+    this.lampIM = [pole, arm, head];
+    this.lampGeo = { parts: [[poleG, metal], [armG, metal], [headG, new THREE.MeshStandardMaterial({ color: 0xd8d2c0, roughness: 0.4 })]] };
   }
 
   // ---------------- árvores
@@ -916,7 +924,7 @@ export class World {
         const k = Math.floor((it[0] + HALF) / TILE) + ',' + Math.floor((it[2] + HALF) / TILE);
         if (!tiles.has(k)) tiles.set(k, []);
         tiles.get(k).push(it);
-        if (type !== 'shrub') this.addBox(it[0] - 0.35, it[0] + 0.35, it[2] - 0.35, it[2] + 0.35, it[1], it[1] + 6);
+        if (type !== 'shrub') this.addBox(it[0] - 0.35, it[0] + 0.35, it[2] - 0.35, it[2] + 0.35, it[1], it[1] + 6).prop = { kind: 'tree', type, x: it[0], z: it[2], y: it[1], s: it[3] };
       }
       for (const [, arr] of tiles) {
         const tr = new THREE.InstancedMesh(g.t, tm, arr.length), lf = new THREE.InstancedMesh(g.l, lm, arr.length);
@@ -1152,8 +1160,9 @@ export class World {
     }
     const n = poles.length;
     const metal = new THREE.MeshStandardMaterial({ color: 0x2a2c2e, metalness: 0.5, roughness: 0.5 });
-    const pole = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.07, 0.09, 4.2, 6).translate(0, 2.1, 0), metal, n);
-    const head = new THREE.InstancedMesh(new THREE.BoxGeometry(0.34, 0.95, 0.26).translate(0, 4.55, 0), metal, n);
+    const poleG = new THREE.CylinderGeometry(0.07, 0.09, 4.2, 6).translate(0, 2.1, 0), headG = new THREE.BoxGeometry(0.34, 0.95, 0.26).translate(0, 4.55, 0);
+    const pole = new THREE.InstancedMesh(poleG, metal, n);
+    const head = new THREE.InstancedMesh(headG, metal, n);
     const bulbs = new THREE.InstancedMesh(new THREE.CircleGeometry(0.1, 10), new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false }), n * 3);
     const m = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), one = new THREE.Vector3(1, 1, 1), p = new THREE.Vector3(), col = new THREE.Color(0, 0, 0);
     poles.forEach((P, k) => {
@@ -1166,11 +1175,11 @@ export class World {
         bulbs.setMatrixAt(k * 3 + b, m);
         bulbs.setColorAt(k * 3 + b, col);
       }
-      this.addBox(P.x - 0.12, P.x + 0.12, P.z - 0.12, P.z + 0.12, P.y, P.y + 4.2);
+      P.box = this.addBox(P.x - 0.12, P.x + 0.12, P.z - 0.12, P.z + 0.12, P.y, P.y + 4.2);
     });
     pole.castShadow = head.castShadow = true;
     this.scene.add(pole, head, bulbs);
-    this.lights = { poles, bulbs, last: -1 };
+    this.lights = { poles, bulbs, pole, head, last: -1, geo: { parts: [[poleG, metal], [headG, metal]] } };
   }
   updateTrafficLights(t) {
     const L = this.lights;

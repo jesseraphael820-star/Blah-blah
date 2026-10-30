@@ -41,6 +41,8 @@ export class Audio {
     this.tire = noiseChain('bandpass', 1700, 6);
     this.road = noiseChain('lowpass', 180, 0.5);
     this.hiss = noiseChain('highpass', 3200, 0.7); // pneu no asfalto molhado
+    this.scrape = noiseChain('bandpass', 2600, 3); // lataria raspando na parede
+    this.gush = noiseChain('bandpass', 900, 0.6); // hidrante jorrando
     // motor
     this.eg = C.createGain(); this.eg.gain.value = 0;
     this.ef = C.createBiquadFilter(); this.ef.type = 'lowpass'; this.ef.frequency.value = 900; this.ef.Q.value = 3;
@@ -102,6 +104,18 @@ export class Audio {
     if (type === 'shotgun') { this.burst(0.5, 700, 0.9 * v); this.burst(0.18, 3500, 0.5 * v, 'highpass'); this.tone(80, 40, 0.25, 0.5 * v); }
     else { this.burst(0.22, 1600, 0.7 * v); this.burst(0.08, 5000, 0.4 * v, 'highpass'); this.tone(150, 60, 0.1, 0.3 * v); }
   }
+  // poste de metal: badalada metálica com parciais inarmônicas
+  clang(dist = 0, v = 0.6) {
+    if (!this.ctx) return;
+    const k = clamp(1 - dist / 140, 0, 1) * v;
+    if (k < 0.01) return;
+    const f = 380 + Math.random() * 120;
+    this.tone(f, f * 0.97, 1.1, k * 0.22, 'triangle'); this.tone(f * 2.76, f * 2.7, 0.7, k * 0.12); this.tone(f * 5.4, f * 5.3, 0.4, k * 0.06);
+    this.burst(0.12, 2600, k * 0.5, 'bandpass');
+  }
+  bin(dist = 0) { if (!this.ctx) return; const k = clamp(1 - dist / 90, 0, 1); if (k < 0.01) return; this.burst(0.25, 700, k * 0.5); this.tone(240, 160, 0.2, k * 0.25, 'square'); this.burst(0.35, 3500, k * 0.12, 'highpass'); }
+  thud(dist = 0, v = 6) { if (!this.ctx) return; const k = clamp(1 - dist / 100, 0, 1) * clamp(v / 15, 0.2, 1); if (k < 0.01) return; this.tone(90, 45, 0.35, k * 0.6); this.burst(0.5, 4000, k * 0.15, 'highpass'); }
+  setGush(v) { if (!this.ctx) return; this.set(this.gush.g, v * 0.25, 0.3); }
   click() { if (!this.ctx) return; this.tone(1800, 1200, 0.04, 0.15, 'square'); }
   swing() { if (!this.ctx) return; this.burst(0.18, 1400, 0.25, 'bandpass'); }
   bark(dist = 0) {
@@ -140,6 +154,8 @@ export class Audio {
     this.set(this.rain.g, st.rain * 0.16 * (st.indoor ? 0.4 : 1), 0.4);
     this.set(this.tire.g, st.slip * 0.18);
     this.set(this.road.g, st.engine ? clamp(st.speed / 40, 0, 1) * 0.12 : 0);
+    this.set(this.scrape.g, (st.scrape || 0) * 0.35, 0.03);
+    this.scrape.fl.frequency.setTargetAtTime(1800 + (st.scrape || 0) * 2200 + Math.random() * 600, now, 0.02);
     this.set(this.hiss.g, st.engine ? (st.wet || 0) * clamp(st.speed / 30, 0, 1) * 0.11 : 0, 0.15);
     if (st.engine) {
       const f = 28 + st.rpmN * 150;

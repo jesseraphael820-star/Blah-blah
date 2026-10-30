@@ -23,6 +23,7 @@ import { Air } from './air.js';
 import { Shops, PLACES } from './shops.js';
 import { Combat } from './combat.js';
 import { Animals } from './animals.js';
+import { Props } from './props.js';
 import { periodAt } from './sky.js';
 
 const settings = new Settings();
@@ -235,7 +236,7 @@ const player = (game.player = new Player());
 const world = (game.world = new World(scene, Q));
 const input = (game.input = new Input(settings, renderer.domElement));
 const audio = (game.audio = new Audio(settings));
-let env, hud, voice, traffic, peds, missions, police, air, shops, combat, animals;
+let env, hud, voice, traffic, peds, missions, police, air, shops, combat, animals, props;
 const fx = (game.fx = new FX(scene));
 const skids = new Skids(scene);
 
@@ -767,6 +768,19 @@ function tick() {
     if (d < 140 && env.wetness > 0.3) wetTires(car, dt, car === p.vehicle);
     if (!car.sleeping || car === p.vehicle) car.collideWorld(world.col);
     awake.push(car);
+    // raspando na parede: faíscas e chiado de metal
+    car.scrape = Math.max(car.scrapeNow || 0, (car.scrape || 0) * Math.exp(-dt * 10));
+    if (car.scrapeNow > 2.5 && d < 120 && car._scr && Math.random() < dt * 40) fx.sparks(car._scr[0], car.pos.y + 0.45, car._scr[1], 3);
+    // moto/bicicleta batendo forte: o piloto voa por cima do guidão
+    if (car === p.vehicle && car.t.twoWheel && !car.t.boat && car.hitV > 7) {
+      const pv = car.preVel.clone();
+      game.bailOut();
+      p.vel.set(pv.x * 0.75, 0, pv.z * 0.75);
+      p.vy = 3.5 + car.hitV * 0.15;
+      p.tumble.dmg = Math.min(70, car.hitV * 3.2);
+      p.heading = Math.atan2(pv.x, pv.z);
+      car.coastT = 0;
+    }
     // estrago progressivo: peças caem, fumaça, fogo e explosão
     if (!car.exploded && d < 260) {
       const hx = car.pos.x + Math.sin(car.heading) * car.t.length * 0.35, hz = car.pos.z + Math.cos(car.heading) * car.t.length * 0.35, hy = car.pos.y + car.t.height * 0.7;
@@ -795,6 +809,7 @@ function tick() {
   police.update(dt);
   air.update(dt);
   animals.update(dt);
+  props.update(dt);
   world.updateTrafficLights(game.simTime);
   redLightCheck(dt);
   gangZoneHint();
@@ -850,6 +865,7 @@ function tick() {
     const cx = camera.position.x, cz = camera.position.z;
     const best = [];
     if (lit > 0.05) for (const l of world.lamps) {
+      if (l.off) continue;
       const d = (l.lx - cx) ** 2 + (l.lz - cz) ** 2;
       if (d > 120 * 120) continue;
       best.push([d, l]);
@@ -894,6 +910,7 @@ function tick() {
   audio.update({
     wind: env.windSpeed, speed: pv ? pv.speed : p.speed, rain: env.p.rain, indoor: !!pv && !pv.t.twoWheel, wet: pv && (pv.surface === 'road' || pv.surface === 'walk') ? env.wetness : 0,
     slip: pv && pv.onGround && !pv.t.pedal ? clamp(pv.slip * 1.4, 0, 1) : 0,
+    scrape: pv ? clamp((pv.scrape || 0) / 12, 0, 1) : 0,
     engine: !!pv && !pv.t.pedal && pv.health > 0, rpmN: pv && !pv.t.pedal ? (pv.rpm - pv.t.idle) / (pv.t.redline - pv.t.idle) : 0, throttle: pv ? pv.thr || 0 : 0,
   });
   hud.update(dt, game);
@@ -985,6 +1002,8 @@ async function boot() {
   shops = game.shops = new Shops(game);
   combat = game.combat = new Combat(game);
   animals = game.animals = new Animals(game);
+  props = game.props = new Props(game);
+  Vehicle.props = props;
   game.vtypes = VTYPES; game.gangs = GANGS;
   Vehicle.world = world;
   game.setPlayerLook(shops.data.look, shops.data.muscle);

@@ -255,6 +255,7 @@ export class Vehicle {
     this.impact = 0;
     this.radius = this.t.width / 2;
     this.zones = { front: 0, rear: 0, left: 0, right: 0 };
+    this.toe = 0;
     this.syncMesh();
   }
 
@@ -279,13 +280,15 @@ export class Vehicle {
 
   update(dt, ctrl, env, manual = false) {
     const t = this.t;
+    this.px = this.pos.x; this.pz = this.pos.z;
     if (t.boat) { this.updateBoat(dt, ctrl, env); return; }
     if (ctrl && (ctrl.throttle > 0.02 || ctrl.brake > 0.02 || Math.abs(ctrl.steer) > 0.02)) this.sleeping = false;
     if (this.sleeping && !this.driver) { this.syncMesh(); return; }
     ctrl = ctrl || { throttle: 0, brake: 0, steer: 0, handbrake: this.driver ? false : true };
     const speed = this.speed;
     const maxSteer = t.steer / (1 + speed * t.steerFall);
-    const target = clamp(ctrl.steer, -1, 1) * maxSteer;
+    // frente batida desalinha a direção: o carro puxa de leve pra um lado
+    const target = clamp(ctrl.steer, -1, 1) * maxSteer + (this.driver ? this.toe : 0);
     const rate = ctrl.analog ? 6 : 2.6;
     const back = Math.sign(target) !== Math.sign(this.steer) || Math.abs(target) < Math.abs(this.steer) ? 1.6 : 1;
     this.steer += clamp(target - this.steer, -rate * back * dt, rate * back * dt);
@@ -605,33 +608,71 @@ export class Vehicle {
     this.tailMat.emissiveIntensity = this.brakeOn && this.driver ? 5 : this.lights ? 1.4 : 0.1;
   }
 
-  // colisão com prédios: três círculos ao longo do carro
+  // colisão com prédios: três círculos ao longo do carro; em alta velocidade testa o caminho em passos (não atravessa poste fino)
   collideWorld(col) {
     const t = this.t;
     const r = Math.max(0.3, t.width / 2);
+    const ex = this.pos.x, ez = this.pos.z, px = this.px ?? ex, pz = this.pz ?? ez;
+    const steps = Math.min(8, Math.max(1, Math.ceil(Math.hypot(ex - px, ez - pz) / (r * 0.6))));
+    this.preVel = this.preVel || new THREE.Vector3();
+    this.preVel.copy(this.vel);
+    let worst = 0;
+    this.scrapeNow = 0;
+    for (let k = 1; k <= steps; k++) {
+      if (steps > 1) { this.pos.x = px + ((ex - px) * k) / steps; this.pos.z = pz + ((ez - pz) * k) / steps; }
+      const w = this.collideStep(col, r);
+      if (w < 0) continue;
+      worst = Math.max(worst, w);
+      break;
+    }
+    if (worst > 1.5) this.damage(worst, ...this._hit);
+    this.hitV = worst;
+    return worst;
+  }
+
+  // -1 = sem contato; senão velocidade normal do pior impacto
+  collideStep(col, r) {
+    const t = this.t;
     const off = Math.max(0, t.length / 2 - r);
     const sh = Math.sin(this.heading), ch = Math.cos(this.heading);
-    let worst = 0;
+    let worst = -1;
     const p = this._p || (this._p = { x: 0, z: 0 }), n = this._n || (this._n = { x: 0, z: 0 });
+    const brk = Vehicle.props ? (this._brk || (this._brk = (b, nx, nz) => Vehicle.props.hit(this, b, nx, nz, this._cx - nx * r, this._cz - nz * r))) : null;
     for (const s of [-1, 0, 1]) {
       const cx = this.pos.x + sh * off * s, cz = this.pos.z + ch * off * s;
-      p.x = cx; p.z = cz;
-      if (!col.resolveCircle(p, r, this.pos.y + 0.3, n)) continue;
+      p.x = cx; p.z = cz; this._cx = cx; this._cz = cz;
+      if (!col.resolveCircle(p, r, this.pos.y + 0.3, n, brk)) continue;
+      if (worst < 0) worst = 0;
       this.pos.x += p.x - cx; this.pos.z += p.z - cz;
       const rx = cx - this.pos.x, rz = cz - this.pos.z;
       const vcx = this.vel.x + this.yawRate * rz, vcz = this.vel.z - this.yawRate * rx;
       const vn = vcx * n.x + vcz * n.z;
       if (vn >= 0) continue;
+      // quique baixo quando a batida é forte (energia vai pra amassar a lataria)
+      const e = clamp(0.3 - -vn * 0.012, 0.06, 0.3);
       const rn = rz * n.x - rx * n.z;
-      const j = (-(1 + 0.25) * vn) / (1 / t.mass + (rn * rn) / t.I);
-      this.vel.x += (j * n.x) / t.mass; this.vel.z += (j * n.z) / t.mass;
-      this.yawRate += (rn * j) / t.I;
-      this.vel.x *= 0.92; this.vel.z *= 0.92;
+      const j = (-(1 + e) * vn) / (1 / t.mass + (rn * rn) / t.I);
+      // atrito de raspão na parede (Coulomb): desliza encostado em vez de grudar
+      const tx = -n.z, tz = n.x, vt = vcx * tx + vcz * tz, rt = rz * tx - rx * tz;
+      const jt = clamp(-vt / (1 / t.mass + (rt * rt) / t.I), -0.35 * j, 0.35 * j);
+      this.vel.x += (j * n.x + jt * tx) / t.mass; this.vel.z += (j * n.z + jt * tz) / t.mass;
+      this.yawRate += (rn * j + rt * jt) / t.I;
+      this.jolt((j * n.x + jt * tx) / t.mass, (j * n.z + jt * tz) / t.mass);
+      if (Math.abs(vt) > 2.5) { this.scrapeNow = Math.max(this.scrapeNow, Math.abs(vt)); this._scr = [cx - n.x * r, cz - n.z * r]; }
       if (-vn > worst) { worst = -vn; this._hit = [cx - n.x * r, cz - n.z * r, n.x, n.z]; }
       this.sleeping = false;
     }
-    if (worst > 1.5) this.damage(worst, ...this._hit);
     return worst;
+  }
+
+  // tranco na carroceria (mola da suspensão) a partir de uma variação de velocidade no mundo
+  jolt(dvx, dvz) {
+    if (this.t.twoWheel || this.t.boat) return;
+    const sh = Math.sin(this.heading), ch = Math.cos(this.heading);
+    const df = dvx * sh + dvz * ch, dl = dvx * ch - dvz * sh;
+    this.sPv += clamp(-df * 0.09, -1.6, 1.6);
+    this.sRv += clamp(dl * 0.08, -1.4, 1.4);
+    this.sHv -= Math.min(0.8, Math.hypot(df, dl) * 0.025);
   }
 
   // dano localizado: (cx,cz) ponto de contato no mundo, (nx,nz) direção do empurrão
@@ -648,6 +689,7 @@ export class Vehicle {
     const zf = lz / (L / 2), zs = lx / (W / 2);
     const zone = Math.abs(zf) > Math.abs(zs) * 0.9 ? (zf > 0 ? 'front' : 'rear') : zs > 0 ? 'left' : 'right';
     this.zones[zone] += v * v * 1.2;
+    if (zone === 'front' && v > 5) this.toe = clamp(this.toe + (lx > 0 ? 1 : -1) * v * 0.0007, -0.035, 0.035);
     this.dent(clamp(lx, -W / 2, W / 2), clamp(lz, -L / 2, L / 2), dX, dZ, v);
     this.breakZone(zone, lx);
   }
@@ -705,6 +747,7 @@ export class Vehicle {
     }
     for (const k in this.parts) this.parts[k].visible = true;
     this.zones = { front: 0, rear: 0, left: 0, right: 0 };
+    this.toe = 0;
   }
 
   circles(out) {
@@ -756,9 +799,15 @@ export function collideVehicles(list, onHit) {
         const vn = (vax - vbx) * nx + (vaz - vbz) * nz;
         if (vn >= 0) continue;
         const rna = raz * nx - rax * nz, rnb = rbz * nx - rbx * nz;
-        const jj = (-(1 + 0.3) * vn) / (1 / ma + 1 / mb + (rna * rna) / A.t.I + (rnb * rnb) / B.t.I);
-        A.vel.x += (jj * nx) / ma; A.vel.z += (jj * nz) / ma; A.yawRate += (rna * jj) / A.t.I;
-        B.vel.x -= (jj * nx) / mb; B.vel.z -= (jj * nz) / mb; B.yawRate -= (rnb * jj) / B.t.I;
+        const e = clamp(0.35 - -vn * 0.015, 0.08, 0.35);
+        const jj = (-(1 + e) * vn) / (1 / ma + 1 / mb + (rna * rna) / A.t.I + (rnb * rnb) / B.t.I);
+        // atrito entre as latarias: batida de lado gira os dois carros
+        const tx = -nz, tz = nx, vt = (vax - vbx) * tx + (vaz - vbz) * tz, rta = raz * tx - rax * tz, rtb = rbz * tx - rbx * tz;
+        const jt = clamp(-vt / (1 / ma + 1 / mb + (rta * rta) / A.t.I + (rtb * rtb) / B.t.I), -0.4 * jj, 0.4 * jj);
+        const Jx = jj * nx + jt * tx, Jz = jj * nz + jt * tz;
+        A.vel.x += Jx / ma; A.vel.z += Jz / ma; A.yawRate += (rna * jj + rta * jt) / A.t.I;
+        B.vel.x -= Jx / mb; B.vel.z -= Jz / mb; B.yawRate -= (rnb * jj + rtb * jt) / B.t.I;
+        A.jolt(Jx / ma, Jz / ma); B.jolt(-Jx / mb, -Jz / mb);
         A.sleeping = B.sleeping = false;
         if (-vn > 2) { A.damage(-vn * 0.7, cx, cz, nx, nz); B.damage(-vn * 0.7, cx, cz, -nx, -nz); }
         if (onHit) onHit(A, B, -vn);
