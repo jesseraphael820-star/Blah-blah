@@ -23,6 +23,8 @@ Ou publique a pasta no GitHub Pages / Netlify. É preciso internet na primeira v
 - **NPCs**: pedestres andam pelas calçadas, atravessam a rua, fogem, reclamam e caem. O trânsito anda pela mão direita, para diante de obstáculos, buzina e desencalha sozinho. Dá para roubar carros.
 - **Dublagem** em português do Brasil e inglês (voz sintetizada do navegador), com legendas independentes do idioma da voz.
 - **Rádio** com 3 estações procedurais: G-Funk, Funk Carioca e Bossa Lo-fi.
+- **Câmera em 1ª ou 3ª pessoa**: `C` / R3 / 👁 alterna entre terceira pessoa, terceira pessoa de longe e primeira pessoa (também dá pra escolher em Configurações). Em primeira pessoa a pé o personagem olha pra onde você mira. No carro a câmera fica nos olhos do motorista, com painel, volante que gira e vidros por onde dá pra ver; o olhar volta pra frente sozinho quando você solta a câmera.
+- **Tela de toque organizada**: cada botão só aparece quando dá pra usar. O 🚗 só aparece com um carro (ou loja aberta) perto, o 🤿 só na água, o soco some quando você está nadando, buzina, rádio e farol somem na bicicleta, e o ⏭ só aparece durante falas e cenas.
 - **Chuva no chão**: o asfalto e as calçadas escurecem e ficam brilhando quando molham, e se formam poças que crescem com a chuva. As gotas abrem anéis nas poças e respingam no chão. Postes, faróis e lanternas se refletem na rua molhada, em faixas compridas no asfalto e como espelho nas poças. Os pneus levantam névoa atrás do carro, passar na poça espirra água para os lados, pisar na poça a pé também espirra, e dá para ouvir o chiado do pneu no molhado. Com chuva ou neblina, o facho do farol aparece no ar.
 - **Física mais real**:
   - suspensão com mola e amortecedor: o carro mergulha ao frear, agacha ao acelerar, inclina na curva e quica ao cair de um salto;
@@ -56,6 +58,7 @@ Ou publique a pasta no GitHub Pages / Netlify. É preciso internet na primeira v
 | Soco | Clique | B | 👊 |
 | Entrar/sair | F | Y | 🚗 |
 | Rádio / buzina | R / H | D-pad ← / L3 | 📻 📯 |
+| 1ª / 3ª pessoa | C | R3 | 👁 |
 | Mapa / pausa | M / Esc | Back / Start | 🗺 ⏸ |
 
 Em **Configurações** você escolhe o esquema de controle (automático, teclado, controle analógico ou toque), se o analógico também acelera e freia, a sensibilidade, a zona morta, o câmbio, a dublagem, as legendas, os volumes, a qualidade gráfica, as sombras, o bloom, a distância de visão, o clima e a velocidade do relógio.

@@ -10,6 +10,7 @@ export const DEFAULTS = {
   gearbox: 'auto',
   vibration: true,
   camAuto: true,
+  view: 'third', // third | far | first
   lang: 'pt',
   dub: 'pt',
   subs: true,
@@ -58,6 +59,7 @@ const TABS = [
       { k: 'invertY', label: L('Inverter eixo Y', 'Invert Y axis'), type: 'check' },
       { k: 'deadzone', label: L('Zona morta do analógico', 'Stick deadzone'), type: 'range', min: 0, max: 0.4, step: 0.01 },
       { k: 'gearbox', label: L('Câmbio', 'Gearbox'), type: 'select', opts: [['auto', L('Automático', 'Automatic')], ['manual', L('Manual (Q/E · LB/RB)', 'Manual (Q/E · LB/RB)')]] },
+      { k: 'view', label: L('Câmera (C · R3 · 👁)', 'Camera (C · R3 · 👁)'), type: 'select', opts: [['third', L('Terceira pessoa', 'Third person')], ['far', L('Terceira pessoa (longe)', 'Third person (far)')], ['first', L('Primeira pessoa', 'First person')]] },
       { k: 'camAuto', label: L('Câmera segue o carro', 'Camera follows car'), type: 'check' },
       { k: 'vibration', label: L('Vibração do controle', 'Gamepad vibration'), type: 'check' },
     ],
@@ -96,6 +98,7 @@ const HELP = {
   <tr><th></th><th>Teclado/Mouse</th><th>Controle</th><th>Toque</th></tr>
   <tr><td>Andar / dirigir</td><td>W A S D</td><td>Analógico esquerdo</td><td>Analógico virtual</td></tr>
   <tr><td>Câmera</td><td>Mouse</td><td>Analógico direito</td><td>Arrastar à direita</td></tr>
+  <tr><td>1ª pessoa / 3ª pessoa</td><td>C</td><td>R3</td><td>👁</td></tr>
   <tr><td>Acelerar / frear</td><td>W / S</td><td>RT / LT (analógico)</td><td>Botões ▲ ▼ ou analógico</td></tr>
   <tr><td>Correr / freio de mão</td><td>Shift / Espaço</td><td>A (segurar)</td><td>Botões</td></tr>
   <tr><td>Pular / subir na água</td><td>Espaço</td><td>X</td><td>⤒</td></tr>
@@ -112,6 +115,7 @@ const HELP = {
   <tr><th></th><th>Keyboard/Mouse</th><th>Gamepad</th><th>Touch</th></tr>
   <tr><td>Walk / drive</td><td>W A S D</td><td>Left stick</td><td>Virtual stick</td></tr>
   <tr><td>Camera</td><td>Mouse</td><td>Right stick</td><td>Drag on right side</td></tr>
+  <tr><td>1st person / 3rd person</td><td>C</td><td>R3</td><td>👁</td></tr>
   <tr><td>Throttle / brake</td><td>W / S</td><td>RT / LT (analog)</td><td>▲ ▼ buttons or stick</td></tr>
   <tr><td>Sprint / handbrake</td><td>Shift / Space</td><td>A (hold)</td><td>Buttons</td></tr>
   <tr><td>Jump / swim up</td><td>Space</td><td>X</td><td>⤒</td></tr>

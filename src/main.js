@@ -80,6 +80,7 @@ const game = {
   vehicles: [], blips: [], markers: [], actors: [], waiters: [],
   money: 0, wanted: 0, wantedFlash: 0, crimeT: 0,
   simTime: 0, playing: false, paused: false, mapOpen: false, locked: false,
+  ui: { nearCar: false }, // o que a tela de toque precisa mostrar agora
   cine: null, cam: { yaw: Math.PI, pitch: 0.22, dist: 4.5, shake: 0, pos: new THREE.Vector3() },
   focus: new THREE.Vector3(), camForward: new THREE.Vector3(0, 0, 1),
   token: null, failReason: '',
@@ -294,7 +295,8 @@ function updateOnFoot(dt, inp) {
   let top = p.swim ? (p.under ? 2.1 : sprinting ? 3.4 : 2.3) : sprinting ? 7.4 : 4.6;
   if (!inp.analog && !inp.walk) mag = mag > 0 ? 1 : 0;
   const speed = top * mag;
-  if (wl > 0.01) p.heading += clamp(angleDiff(p.heading, Math.atan2(wx, wz)), -dt * 11, dt * 11);
+  if (settings.get('view') === 'first' && !p.swim && p.down <= 0) p.heading += clamp(angleDiff(p.heading, yaw), -dt * 14, dt * 14);
+  else if (wl > 0.01) p.heading += clamp(angleDiff(p.heading, Math.atan2(wx, wz)), -dt * 11, dt * 11);
   const k = 1 - Math.exp(-dt * (p.onGround || p.swim ? (p.swim ? 4 : 12) : 1.5));
   p.vel.x = lerp(p.vel.x, wx * speed, k);
   p.vel.z = lerp(p.vel.z, wz * speed, k);
@@ -409,6 +411,7 @@ function updateOnFoot(dt, inp) {
   }
   if (near && free && !game.hintShown) { hud.hint(ui('enterHint', settings.get('lang'), { k: input.scheme === 'gamepad' ? 'Y' : input.scheme === 'touch' ? '🚗' : 'F' }), 1500); game.hintShown = true; }
   if (!near) game.hintShown = false;
+  game.ui.nearCar = !!near && free;
   if (near && free && inp.enter) game.enterVehicle(near);
 }
 
@@ -424,6 +427,7 @@ function camBlocked(x, y, z) {
 function updateCamera(dt, inp) {
   const c = game.cam, v = player.vehicle;
   if (game.cine) {
+    player.char.head.visible = true;
     const C = game.cine;
     C.t = Math.min(C.dur, C.t + dt);
     const k = smoothstep(0, 1, C.t / C.dur);
@@ -434,11 +438,21 @@ function updateCamera(dt, inp) {
     camera.updateProjectionMatrix();
     return;
   }
+  // C / R3 / 👁 alterna: terceira pessoa → terceira (longe) → primeira pessoa
+  if (inp.cam) {
+    const order = ['third', 'far', 'first'], next = order[(order.indexOf(settings.get('view')) + 1) % 3];
+    settings.set('view', next);
+    hud.hint(ui('view_' + next, settings.get('lang')), 1200);
+  }
+  const fp = settings.get('view') === 'first' && !game.shops.open;
+  player.char.head.visible = !fp;
   if (!game.locked) {
     c.yaw -= inp.lookX;
-    c.pitch = clamp(c.pitch + inp.lookY, -0.45, 1.25);
+    c.pitch = clamp(c.pitch + inp.lookY, fp ? -1.2 : -0.45, fp ? 1.3 : 1.25);
   }
   const sinceLook = (performance.now() - input.lastLook) / 1000;
+  if (fp) { firstPerson(dt, c, v, sinceLook); return; }
+  if (camera.near !== 0.3) { camera.near = 0.3; camera.updateProjectionMatrix(); }
   let dist;
   if (v) {
     camTarget.set(v.pos.x, v.pos.y + v.t.height * 0.85 + 0.6, v.pos.z);
@@ -455,8 +469,7 @@ function updateCamera(dt, inp) {
     camTarget.set(player.pos.x, player.pos.y + 1.55, player.pos.z);
     dist = player.swim ? 5 : 4.4;
   }
-  if (inp.cam) c.far = !c.far;
-  if (c.far) dist *= 1.6;
+  if (settings.get('view') === 'far') dist *= 1.6;
   c.dist = lerp(c.dist, dist, 1 - Math.exp(-dt * 4));
   const cp = Math.cos(c.pitch), sp = Math.sin(c.pitch);
   ray.set(-Math.sin(c.yaw) * cp, sp, -Math.cos(c.yaw) * cp);
@@ -474,6 +487,34 @@ function updateCamera(dt, inp) {
   if (c.shake > 0.005) camera.position.add(new THREE.Vector3((Math.random() - 0.5) * c.shake, (Math.random() - 0.5) * c.shake, (Math.random() - 0.5) * c.shake));
   camera.lookAt(camTarget);
   const fov = 62 + (v ? clamp(v.speed - 12, 0, 40) * 0.32 : 0);
+  if (Math.abs(camera.fov - fov) > 0.05) { camera.fov = lerp(camera.fov, fov, 1 - Math.exp(-dt * 3)); camera.updateProjectionMatrix(); }
+}
+
+// primeira pessoa: câmera nos olhos do personagem (a cabeça some para não atrapalhar)
+const eye = new THREE.Vector3(), look = new THREE.Vector3();
+function firstPerson(dt, c, v, sinceLook) {
+  if (camera.near !== 0.08) { camera.near = 0.08; camera.updateProjectionMatrix(); }
+  const ch = player.char;
+  if (v && v.parts && v.parts.eye) { v.body.updateMatrixWorld(true); eye.copy(v.parts.eye); v.body.localToWorld(eye); }
+  else { ch.root.updateMatrixWorld(true); ch.head.getWorldPosition(eye); eye.y += 0.12; }
+  if (v) {
+    // no carro o olhar volta para a frente sozinho quando você solta a câmera
+    if (sinceLook > 1.0) {
+      c.yaw += angleDiff(c.yaw, v.heading) * Math.min(1, dt * 3);
+      c.pitch = lerp(c.pitch, 0.06, dt * 3);
+    }
+  }
+  const cp = Math.cos(c.pitch);
+  look.set(Math.sin(c.yaw) * cp, -Math.sin(c.pitch), Math.cos(c.yaw) * cp);
+  eye.addScaledVector(look, v ? 0.05 : 0.14);
+  if (!v && player.swim && !player.under) eye.y = Math.max(eye.y, 0.12);
+  c.pos.copy(eye); c.init = true; c.dist = 0.5;
+  camera.position.copy(eye);
+  c.shake *= Math.exp(-dt * 6);
+  if (v) c.shake = Math.max(c.shake, v.impact * 0.04);
+  if (c.shake > 0.005) camera.position.add(new THREE.Vector3((Math.random() - 0.5) * c.shake, (Math.random() - 0.5) * c.shake, (Math.random() - 0.5) * c.shake));
+  camera.lookAt(camTarget.copy(camera.position).add(look));
+  const fov = 72 + (v ? clamp(v.speed - 12, 0, 40) * 0.2 : 0);
   if (Math.abs(camera.fov - fov) > 0.05) { camera.fov = lerp(camera.fov, fov, 1 - Math.exp(-dt * 3)); camera.updateProjectionMatrix(); }
 }
 

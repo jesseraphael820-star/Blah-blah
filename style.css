@@ -86,9 +86,10 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #000; color:
 #touch .foot, #touch .car { right: 18px; bottom: 18px; grid-template-columns: repeat(2, 64px); }
 #touch .car { grid-template-columns: repeat(3, 64px); }
 #touch .car .gas { width: 64px; height: 90px; border-radius: 18px; }
-#touch .top { top: 250px; right: 18px; grid-template-columns: repeat(3, 48px); }
+#touch .top { top: 250px; right: 18px; grid-template-columns: repeat(4, 48px); }
 #touch .top button { width: 48px; height: 48px; font-size: 20px; }
 #touch .car { display: none; }
+#touch .btns button.off { display: none; } /* botão só aparece quando dá pra usar */
 #touch.driving .car { display: grid; }
 #touch.driving .foot { display: none; }
 

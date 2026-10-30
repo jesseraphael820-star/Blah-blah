@@ -25,7 +25,7 @@ const SURF = {
 export const CAR_COLORS = [0xb3201c, 0x1d3f8a, 0xe8e8e8, 0x151515, 0x2f6b3a, 0xc9a227, 0x6d6f73, 0x7a1f4d, 0x2a8fbd, 0xd9661f, 0x9c9c9c, 0x40251a];
 
 const M = {
-  glass: new THREE.MeshPhysicalMaterial({ color: 0x0e1620, metalness: 0.1, roughness: 0.05, clearcoat: 1, clearcoatRoughness: 0.02 }),
+  glass: new THREE.MeshPhysicalMaterial({ color: 0x0e1620, metalness: 0.1, roughness: 0.05, clearcoat: 1, clearcoatRoughness: 0.02, transparent: true, opacity: 0.42 }),
   black: new THREE.MeshStandardMaterial({ color: 0x141414, roughness: 0.7 }),
   chrome: new THREE.MeshStandardMaterial({ color: 0xdddddd, metalness: 1, roughness: 0.18 }),
   tire: new THREE.MeshStandardMaterial({ color: 0x161616, roughness: 0.95 }),
@@ -175,6 +175,13 @@ function buildMesh(t, color) {
   P.paneL = addBox(body, 0.03, ch * 0.8, cd * 0.9, cw / 2 + 0.012, cy, cz, M.glass, false);
   P.paneR = addBox(body, 0.03, ch * 0.8, cd * 0.9, -cw / 2 - 0.012, cy, cz, M.glass, false);
   const fz0 = cz + cd / 2, bz0 = cz - cd / 2;
+  // painel e volante (aparecem na primeira pessoa)
+  addBox(body, cw * 0.92, 0.16, 0.42, 0, cy - ch / 2 + 0.02, fz0 - 0.2, M.black, false);
+  const sw = new THREE.Mesh(new THREE.TorusGeometry(0.15, 0.02, 6, 18), M.black);
+  sw.position.set(t.seat[0], cy - ch / 2 - 0.02, fz0 - 0.45); sw.rotation.x = -0.35;
+  body.add(sw); P.wheelS = sw;
+  // olhos do motorista para a câmera em primeira pessoa
+  P.eye = new THREE.Vector3(t.seat[0], cy + ch * 0.1, cz + cd * 0.08);
   P.hood = hood || addBox(body, W * 0.94, 0.04, L / 2 - fz0 - 0.08, 0, top + 0.02, (fz0 + L / 2 - 0.08) / 2, paint);
   P.trunk = trunk || addBox(body, W * 0.94, 0.04, bz0 + L / 2 - 0.08, 0, top + 0.02, (bz0 - L / 2 + 0.08) / 2, paint);
   P.doorL = addBox(body, 0.04, bodyH * 0.8, cd, W / 2 + 0.02, bodyY + 0.03, cz, doorMat);
@@ -495,6 +502,7 @@ export class Vehicle {
       if (!(w.front ? this.lockF : this.lockR)) w.spin.rotation.x += (vx / t.wheelR + (drv ? (this.slipR || 0) * 60 * Math.sign(this.thr || 0) : 0)) * dt;
     }
     if (this.inWater) this.root.position.y -= 0.3;
+    if (this.parts && this.parts.wheelS) this.parts.wheelS.rotation.z = -this.steer * 6;
     this.headMat.emissiveIntensity = this.lights ? 4 : 0.15;
     if (this.parts && this.parts.beamL) this.parts.beamL.visible = this.parts.beamR.visible = this.lights && BEAM.uBeam.value > 0.005;
     this.tailMat.emissiveIntensity = this.brakeOn && this.driver ? 5 : this.lights ? 1.4 : 0.1;

@@ -178,7 +178,28 @@ export class HUD {
     }
     this.el.touch.classList.toggle('hidden', g.input.scheme !== 'touch' || !g.playing);
     this.el.touch.classList.toggle('driving', !!v);
+    if (g.input.scheme === 'touch') this.touchButtons(g);
     this.drawMini(g, dt);
+  }
+
+  // tela de toque organizada: cada botão só aparece quando tem uso agora
+  touchButtons(g) {
+    const p = g.player, v = p.vehicle, shop = g.shops && g.shops.open;
+    const talking = !!g.cine || !!(g.voice && g.voice.cur);
+    const show = {
+      enter: v ? true : g.ui.nearCar || (g.shops && g.shops.nearShop) || shop,
+      jump: !(p.swim && p.under) || shop,
+      punch: !p.swim && !shop,
+      sprint: !shop,
+      dive: p.swim,
+      radio: v && !v.t.pedal, lights: v && !v.t.pedal, horn: v && !v.t.pedal,
+      skip: talking || shop,
+    };
+    if (!this.tbtn) this.tbtn = [...this.el.touch.querySelectorAll('[data-k]')];
+    for (const b of this.tbtn) {
+      const k = b.dataset.k;
+      if (k in show) b.classList.toggle('off', !show[k]);
+    }
   }
 
   worldToMini(x, z, px, pz, ang, zoom, R) {

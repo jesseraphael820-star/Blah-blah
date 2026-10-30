@@ -167,7 +167,7 @@ export class Input {
       st.enter = st.enter || tp('enter'); st.retry = st.retry || tp('enter');
       st.lights = st.lights || tp('lights');
       st.map = st.map || tp('map'); st.pause = st.pause || tp('pause'); st.radio = st.radio || tp('radio');
-      st.skip = st.skip || tp('skip');
+      st.skip = st.skip || tp('skip'); st.cam = st.cam || tp('cam');
       st.horn = st.horn || b('horn');
       T.tap.clear();
     }

@@ -86,11 +86,13 @@ export class Shops {
     }
     for (const m of this.permanent || []) m.children[1].position.y = 0.2 + Math.sin(g.simTime * 3) * 0.15;
     if (this.open) { this.menuInput(dt, inp); return true; }
+    this.nearShop = false;
     if (g.player.vehicle || g.locked) return false;
     for (const p of PLACES) {
       const d = Math.hypot(g.player.pos.x - p.x, g.player.pos.z - p.z);
       if (d > 1.6) continue;
       if (!this.data.unlocked[p.id]) { if (!this._closedHint) { g.hud.hint(ui('closed', this.lang(), { n: p.name }), 3000); this._closedHint = true; } continue; }
+      this.nearShop = true;
       if (!this._hint) { g.hud.hint(ui('enterShop', this.lang(), { n: p.name, k: g.input.scheme === 'gamepad' ? 'Y' : g.input.scheme === 'touch' ? '🚗' : 'F' }), 2500); this._hint = true; }
       if (inp.enter) { inp.enter = false; this.show(p); return true; }
       return false;
