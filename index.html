@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+  <title>FTA 1</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Pirata+One&family=Bebas+Neue&family=Oswald:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <div id="app"></div>
+
+  <div id="hud" class="hidden">
+    <div id="topright">
+      <canvas id="minimap" width="440" height="440"></canvas>
+      <div id="stats">
+        <div id="clock">00:00</div>
+        <div id="weather"></div>
+        <div id="money">$00000000</div>
+        <div class="bar"><div id="hp"></div></div>
+        <div id="stars"></div>
+      </div>
+    </div>
+    <div id="objective"></div>
+    <div id="timer" class="hidden"></div>
+    <div id="zone"></div>
+    <div id="vehname"></div>
+    <div id="radio"></div>
+    <div id="speedo" class="hidden">
+      <div class="num"><span id="kmh">0</span><span id="unit">km/h</span></div>
+      <div class="rpmbar"><div id="rpm"></div></div>
+      <div id="gear">N</div>
+    </div>
+    <div id="hint"></div>
+  </div>
+
+  <div id="letterbox"><div class="lb top"></div><div class="lb bottom"></div></div>
+  <div id="cinetitle"></div>
+  <div id="subtitle"></div>
+  <div id="bigmsg"></div>
+  <canvas id="fullmap" class="hidden"></canvas>
+
+  <div id="touch" class="hidden">
+    <div id="stick"><div id="knob"></div></div>
+    <div class="btns foot">
+      <button data-k="enter">🚗</button>
+      <button data-k="jump">⤒</button>
+      <button data-k="punch">👊</button>
+      <button data-k="sprint">🏃</button>
+    </div>
+    <div class="btns car">
+      <button data-k="enter">🚪</button>
+      <button data-k="hand">FM</button>
+      <button data-k="brake">▼</button>
+      <button data-k="gas" class="gas">▲</button>
+      <button data-k="horn">📯</button>
+      <button data-k="radio">📻</button>
+    </div>
+    <div class="btns top">
+      <button data-k="map">🗺</button>
+      <button data-k="pause">⏸</button>
+      <button data-k="skip">⏭</button>
+    </div>
+  </div>
+
+  <div id="title">
+    <div class="logo">
+      <div class="fta">FTA<span>1</span></div>
+      <div class="sub">PORTO SERENO · SÃO CRUZEIRO · VILA POEIRA · PEDRA ALTA</div>
+    </div>
+    <div class="loading"><div class="track"><div id="loadbar"></div></div><div id="loadtxt">Carregando...</div></div>
+    <div id="menu" class="hidden">
+      <button id="btnNew">Novo Jogo</button>
+      <button id="btnCont" class="hidden">Continuar</button>
+      <button id="btnSet">Configurações</button>
+    </div>
+    <div id="titleSettings" class="settings hidden"></div>
+    <div class="credit">um jogo de mundo aberto feito em JavaScript · fone de ouvido recomendado</div>
+  </div>
+
+  <div id="pause" class="hidden">
+    <div class="ptitle">PAUSA</div>
+    <div id="pauseSettings" class="settings"></div>
+    <button id="btnResume">Voltar ao jogo</button>
+  </div>
+
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>

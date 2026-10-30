@@ -1,0 +1,173 @@
+import * as THREE from 'three';
+import { clamp, lerp } from './util.js';
+
+const geoCache = new Map(), matCache = new Map();
+function box(w, h, d) {
+  const k = `${w}_${h}_${d}`;
+  if (!geoCache.has(k)) geoCache.set(k, new THREE.BoxGeometry(w, h, d));
+  return geoCache.get(k);
+}
+function mat(c, r = 0.8) {
+  const k = `${c}_${r}`;
+  if (!matCache.has(k)) matCache.set(k, new THREE.MeshStandardMaterial({ color: c, roughness: r }));
+  return matCache.get(k);
+}
+function part(parent, geo, m, x, y, z) {
+  const me = new THREE.Mesh(geo, m);
+  me.position.set(x, y, z);
+  me.castShadow = true;
+  parent.add(me);
+  return me;
+}
+function pivot(parent, x, y, z) {
+  const g = new THREE.Group();
+  g.position.set(x, y, z);
+  parent.add(g);
+  return g;
+}
+
+export const SKINS = [0x8d5524, 0xc68642, 0xe0ac69, 0xf1c27d, 0x5c3a1e, 0x3d2412, 0xa86b3c];
+export const SHIRTS = [0xffffff, 0x1f4e8c, 0xb3261e, 0x2f6b3a, 0xf0b429, 0x6a2c70, 0x222222, 0xd9661f, 0x7fb3d5, 0xe8d5b0];
+export const PANTS = [0x2b3a67, 0x1b1b1b, 0x5a4632, 0x7a7a7a, 0x3d5a40, 0xc8b88a];
+export const HAIRS = [0x111111, 0x2b1a10, 0x5a3a1e, 0x8a6a3a, 0x9a9a9a];
+
+export function randomLook(r = Math.random) {
+  const p = (a) => a[Math.floor(r() * a.length)];
+  return { skin: p(SKINS), shirt: p(SHIRTS), pants: p(PANTS), hair: p(HAIRS), cap: r() < 0.2 ? p(SHIRTS) : null, scale: 0.92 + r() * 0.14, long: r() < 0.3 };
+}
+
+export class Character {
+  constructor(o = {}) {
+    const skin = o.skin ?? 0x8d5524, shirt = o.shirt ?? 0xffffff, pants = o.pants ?? 0x2b3a67, shoes = o.shoes ?? 0x151515, hair = o.hair ?? 0x111111;
+    this.root = new THREE.Group();
+    this.g = pivot(this.root, 0, 0, 0);
+    this.g.scale.setScalar(o.scale ?? 1);
+    const hips = (this.hips = pivot(this.g, 0, 0.95, 0));
+    part(hips, box(0.36, 0.16, 0.22), mat(pants), 0, 0.02, 0);
+    const torso = (this.torso = pivot(hips, 0, 0.08, 0));
+    part(torso, box(0.42, 0.5, 0.24), mat(shirt), 0, 0.27, 0);
+    if (o.chain) part(torso, box(0.2, 0.02, 0.02), mat(0xd4af37, 0.3), 0, 0.42, 0.125);
+    const neck = pivot(torso, 0, 0.54, 0);
+    part(neck, box(0.1, 0.06, 0.1), mat(skin), 0, 0.0, 0);
+    const head = (this.head = pivot(neck, 0, 0.03, 0));
+    part(head, box(0.22, 0.26, 0.24), mat(skin), 0, 0.13, 0);
+    part(head, box(0.235, 0.07, 0.25), mat(hair), 0, 0.27, -0.005);
+    part(head, box(0.235, 0.18, 0.06), mat(hair), 0, 0.18, -0.1);
+    if (o.long) part(head, box(0.24, 0.28, 0.08), mat(hair), 0, 0.05, -0.11);
+    part(head, box(0.045, 0.03, 0.01), mat(0x111111), 0.055, 0.16, 0.121);
+    part(head, box(0.045, 0.03, 0.01), mat(0x111111), -0.055, 0.16, 0.121);
+    part(head, box(0.05, 0.05, 0.03), mat(skin), 0, 0.1, 0.13);
+    if (o.cap) {
+      part(head, box(0.25, 0.07, 0.27), mat(o.cap), 0, 0.29, 0);
+      part(head, box(0.22, 0.02, 0.12), mat(o.cap), 0, 0.27, 0.17);
+    }
+    this.arms = [];
+    this.legs = [];
+    for (const side of [1, -1]) {
+      const sh = pivot(torso, side * 0.27, 0.48, 0);
+      part(sh, box(0.12, 0.17, 0.13), mat(shirt), 0, -0.07, 0);
+      part(sh, box(0.1, 0.15, 0.11), mat(o.sleeves ? shirt : skin), 0, -0.22, 0);
+      const el = pivot(sh, 0, -0.3, 0);
+      part(el, box(0.1, 0.27, 0.11), mat(o.sleeves ? shirt : skin), 0, -0.13, 0);
+      part(el, box(0.09, 0.09, 0.1), mat(skin), 0, -0.31, 0);
+      this.arms.push({ sh, el });
+      const hp = pivot(hips, side * 0.11, -0.02, 0);
+      part(hp, box(0.15, 0.45, 0.17), mat(pants), 0, -0.22, 0);
+      const kn = pivot(hp, 0, -0.45, 0);
+      part(kn, box(0.13, 0.43, 0.15), mat(o.shorts ? skin : pants), 0, -0.21, 0);
+      part(kn, box(0.13, 0.07, 0.26), mat(shoes), 0, -0.45, 0.05);
+      this.legs.push({ hp, kn });
+    }
+    this.phase = Math.random() * 6;
+    this.punchT = 0;
+    this.talk = 0;
+    this.t = Math.random() * 10;
+  }
+
+  animate(dt, speed, mode = 'ground') {
+    this.t += dt;
+    const [L, Rr] = this.legs, [AL, AR] = this.arms;
+    const g = this.g;
+    g.rotation.set(0, 0, 0);
+    g.position.set(0, 0, 0);
+    this.hips.position.y = 0.95;
+    this.torso.rotation.set(0, 0, 0);
+    this.head.rotation.set(0, 0, 0);
+    for (const a of this.arms) { a.sh.rotation.set(0, 0, 0); a.el.rotation.set(0, 0, 0); }
+    for (const l of this.legs) { l.hp.rotation.set(0, 0, 0); l.kn.rotation.set(0, 0, 0); }
+
+    if (mode === 'ground' || mode === 'air') {
+      const run = clamp((speed - 2) / 5, 0, 1);
+      const freq = speed < 0.15 ? 0 : 1.3 + speed * 0.5;
+      this.phase += dt * freq * Math.PI;
+      const amp = clamp(speed / 4, 0, 1) * 0.55 + run * 0.35;
+      const s = Math.sin(this.phase), c = Math.cos(this.phase);
+      if (mode === 'air') {
+        L.hp.rotation.x = -0.7; L.kn.rotation.x = 1.1; Rr.hp.rotation.x = 0.2; Rr.kn.rotation.x = 0.5;
+        AL.sh.rotation.x = -0.6; AR.sh.rotation.x = -0.9; AL.sh.rotation.z = 0.4; AR.sh.rotation.z = -0.4;
+      } else {
+        L.hp.rotation.x = -s * amp; Rr.hp.rotation.x = s * amp;
+        L.kn.rotation.x = Math.max(0, c) * amp * 1.5 + 0.05;
+        Rr.kn.rotation.x = Math.max(0, -c) * amp * 1.5 + 0.05;
+        AL.sh.rotation.x = s * amp * 0.9; AR.sh.rotation.x = -s * amp * 0.9;
+        AL.el.rotation.x = AR.el.rotation.x = -0.25 - run * 1.0;
+        AL.sh.rotation.z = 0.07; AR.sh.rotation.z = -0.07;
+        this.hips.position.y = 0.95 - run * 0.05 + Math.abs(c) * 0.04 * amp;
+        this.torso.rotation.x = run * 0.22;
+        this.torso.rotation.y = s * amp * 0.12;
+        if (speed < 0.15) {
+          const b = Math.sin(this.t * 1.7);
+          this.torso.rotation.x = b * 0.012;
+          AL.sh.rotation.z = 0.08 + b * 0.02; AR.sh.rotation.z = -0.08 - b * 0.02;
+          this.head.rotation.y = Math.sin(this.t * 0.31) * 0.25;
+        }
+      }
+    } else if (mode === 'drive') {
+      for (const l of this.legs) { l.hp.rotation.x = -1.45; l.kn.rotation.x = 0.9; }
+      AL.sh.rotation.x = AR.sh.rotation.x = -1.05;
+      AL.el.rotation.x = AR.el.rotation.x = -0.35;
+      AL.sh.rotation.z = -0.15; AR.sh.rotation.z = 0.15;
+    } else if (mode === 'bike') {
+      this.phase += dt * speed * 1.4;
+      const s = Math.sin(this.phase);
+      L.hp.rotation.x = -0.95 + s * 0.45; L.kn.rotation.x = 1.0 - s * 0.35;
+      Rr.hp.rotation.x = -0.95 - s * 0.45; Rr.kn.rotation.x = 1.0 + s * 0.35;
+      this.torso.rotation.x = 0.4;
+      AL.sh.rotation.x = AR.sh.rotation.x = -1.2;
+      AL.el.rotation.x = AR.el.rotation.x = -0.1;
+      this.hips.position.y = 0.95;
+    } else if (mode === 'moto') {
+      for (const l of this.legs) { l.hp.rotation.x = -1.1; l.kn.rotation.x = 1.4; }
+      L.hp.rotation.z = 0.25; Rr.hp.rotation.z = -0.25;
+      this.torso.rotation.x = 0.35;
+      AL.sh.rotation.x = AR.sh.rotation.x = -1.1;
+    } else if (mode === 'down') {
+      g.rotation.x = -Math.PI / 2;
+      g.position.y = 0.12;
+      g.position.z = -0.9;
+      AL.sh.rotation.z = 0.8; AR.sh.rotation.z = -0.6;
+      L.hp.rotation.z = 0.15; Rr.kn.rotation.x = 0.6;
+    } else if (mode === 'swim') {
+      this.phase += dt * 4;
+      g.rotation.x = Math.PI / 2 * 0.85;
+      g.position.y = -0.55;
+      AL.sh.rotation.x = Math.sin(this.phase) * 1.6 - 1.5;
+      AR.sh.rotation.x = Math.sin(this.phase + Math.PI) * 1.6 - 1.5;
+      L.hp.rotation.x = Math.sin(this.phase * 2) * 0.3; Rr.hp.rotation.x = -Math.sin(this.phase * 2) * 0.3;
+    }
+    if (this.punchT > 0) {
+      this.punchT -= dt;
+      const k = Math.sin(clamp(1 - this.punchT / 0.35, 0, 1) * Math.PI);
+      AR.sh.rotation.x = lerp(AR.sh.rotation.x, -1.55, k);
+      AR.el.rotation.x = lerp(-1.2, 0, k);
+      AL.sh.rotation.x = -0.9; AL.el.rotation.x = -1.6;
+      this.torso.rotation.y = -0.35 * k;
+    }
+    if (this.talk > 0) {
+      this.talk -= dt;
+      this.head.rotation.x = Math.sin(this.t * 9) * 0.06;
+      AR.sh.rotation.x += Math.sin(this.t * 3) * 0.15 - 0.2;
+      AR.el.rotation.x -= 0.5;
+    }
+  }
+}

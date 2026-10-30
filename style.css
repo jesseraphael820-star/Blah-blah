@@ -1,0 +1,139 @@
+:root {
+  --gold: #f0c419;
+  --ink: #0d0d0d;
+  --paper: #f4f1e8;
+  --blue: #5fa8ff;
+  --red: #e04040;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: #000; color: #fff; font-family: 'Oswald', 'Arial Narrow', sans-serif; user-select: none; touch-action: none; }
+#app canvas { display: block; width: 100vw; height: 100vh; }
+.hidden { display: none !important; }
+
+/* ---------- HUD ---------- */
+#hud { position: fixed; inset: 0; pointer-events: none; }
+#topright { position: absolute; top: 16px; right: 16px; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+#minimap { width: 220px; height: 220px; filter: drop-shadow(0 3px 6px rgba(0, 0, 0, .6)); }
+#stats { text-align: right; text-shadow: 2px 2px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; }
+#clock { font-family: 'Bebas Neue', sans-serif; font-size: 34px; line-height: 1; letter-spacing: 2px; }
+#weather { font-size: 15px; opacity: .9; }
+#money { font-family: 'Bebas Neue', sans-serif; font-size: 34px; color: #4cc35a; letter-spacing: 1px; line-height: 1.1; }
+.bar { width: 150px; height: 11px; background: #3a0b0b; border: 2px solid #000; margin-left: auto; }
+#hp { height: 100%; width: 100%; background: linear-gradient(#ff5a4a, #b8231a); transition: width .3s; }
+#stars { font-size: 26px; letter-spacing: 2px; margin-top: 2px; }
+#stars span { color: rgba(0, 0, 0, .35); -webkit-text-stroke: 1px #000; text-shadow: none; }
+#stars span.on { color: var(--gold); }
+#stars.flash span.on { animation: blink .4s steps(2) infinite; }
+@keyframes blink { 50% { opacity: .2; } }
+
+#objective, #hint {
+  position: absolute; left: 50%; transform: translateX(-50%); max-width: min(760px, 90vw); text-align: center;
+  font-size: 22px; text-shadow: 2px 2px 0 #000, -1px -1px 0 #000; opacity: 0; transition: opacity .4s;
+}
+#objective { bottom: 92px; }
+#hint { top: 18px; left: 22px; transform: none; text-align: left; background: rgba(0, 0, 0, .65); padding: 10px 14px; border-radius: 4px; font-size: 17px; max-width: 360px; text-shadow: none; }
+#objective.show, #hint.show { opacity: 1; }
+#timer { position: absolute; right: 22px; top: 380px; font-family: 'Bebas Neue'; font-size: 44px; text-shadow: 2px 2px 0 #000; }
+#timer.low { color: var(--red); animation: blink .6s steps(2) infinite; }
+
+#zone, #vehname, #radio { position: absolute; opacity: 0; text-shadow: 3px 3px 0 #000, -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000; }
+#zone { right: 28px; bottom: 26px; font-family: 'Pirata One', serif; font-size: 56px; color: #fff; }
+#vehname { right: 28px; bottom: 92px; font-family: 'Pirata One', serif; font-size: 38px; color: var(--blue); }
+#radio { top: 22px; left: 50%; transform: translateX(-50%); font-family: 'Bebas Neue'; font-size: 34px; color: var(--gold); letter-spacing: 1px; }
+#zone.show, #vehname.show, #radio.show { animation: fadeinout 4s forwards; }
+@keyframes fadeinout { 0% { opacity: 0; } 10% { opacity: 1; } 75% { opacity: 1; } 100% { opacity: 0; } }
+
+#speedo { position: absolute; left: 24px; bottom: 24px; width: 190px; padding: 10px 14px; background: rgba(0, 0, 0, .55); border-left: 4px solid var(--gold); }
+#speedo .num { display: flex; align-items: baseline; gap: 6px; }
+#kmh { font-family: 'Bebas Neue'; font-size: 52px; line-height: 1; }
+#unit { font-size: 15px; opacity: .8; }
+.rpmbar { height: 8px; background: #222; margin: 6px 0 2px; }
+#rpm { height: 100%; width: 0; background: linear-gradient(90deg, #4cc35a, var(--gold)); }
+#rpm.red { background: var(--red); }
+#gear { position: absolute; right: 14px; top: 8px; font-family: 'Bebas Neue'; font-size: 40px; color: var(--gold); }
+
+#subtitle {
+  position: fixed; left: 50%; bottom: 150px; transform: translateX(-50%); max-width: min(900px, 92vw); text-align: center; z-index: 6;
+  font-size: 23px; line-height: 1.3; text-shadow: 2px 2px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; opacity: 0; transition: opacity .25s; pointer-events: none;
+}
+#subtitle b { color: var(--gold); }
+#subtitle.show { opacity: 1; }
+#bigmsg { position: fixed; top: 32%; left: 0; right: 0; text-align: center; opacity: 0; pointer-events: none; z-index: 6; }
+#bigmsg .t { font-family: 'Pirata One', serif; font-size: clamp(44px, 8vw, 92px); color: var(--gold); text-shadow: 4px 4px 0 #000, -2px -2px 0 #000; }
+#bigmsg .s { font-family: 'Bebas Neue'; font-size: 36px; text-shadow: 2px 2px 0 #000; }
+#bigmsg.fail .t { color: var(--red); }
+#bigmsg.show { animation: fadeinout 4s forwards; }
+
+#letterbox .lb { position: fixed; left: 0; right: 0; height: 0; background: #000; transition: height .8s; z-index: 5; pointer-events: none; }
+#letterbox .top { top: 0; }
+#letterbox .bottom { bottom: 0; }
+#letterbox.on .lb { height: 11vh; }
+#cinetitle { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; opacity: 0; transition: opacity 1.4s; pointer-events: none; z-index: 6; }
+#cinetitle.show { opacity: 1; }
+#cinetitle .a { font-family: 'Bebas Neue'; font-size: clamp(90px, 18vw, 220px); line-height: .9; letter-spacing: 6px; background: linear-gradient(#fff 30%, #f0c419 70%, #b5710f); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(5px 5px 0 #000); }
+#cinetitle .b { font-family: 'Pirata One'; font-size: clamp(28px, 4vw, 52px); text-shadow: 3px 3px 0 #000; }
+
+#fullmap { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); border: 6px solid #111; box-shadow: 0 0 0 100vmax rgba(0, 0, 0, .75); z-index: 8; }
+
+/* ---------- toque ---------- */
+#touch { position: fixed; inset: 0; z-index: 4; }
+#stick { position: absolute; width: 120px; height: 120px; border-radius: 50%; border: 3px solid rgba(255, 255, 255, .35); background: rgba(0, 0, 0, .2); display: none; pointer-events: none; }
+#stick.on { display: block; }
+#knob { position: absolute; left: 35px; top: 35px; width: 50px; height: 50px; border-radius: 50%; background: rgba(255, 255, 255, .55); }
+#touch .btns { position: absolute; display: grid; gap: 10px; }
+#touch .btns button { width: 64px; height: 64px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, .5); background: rgba(0, 0, 0, .4); color: #fff; font-size: 24px; font-family: 'Bebas Neue'; }
+#touch .btns button.down { background: rgba(240, 196, 25, .6); }
+#touch .foot, #touch .car { right: 18px; bottom: 18px; grid-template-columns: repeat(2, 64px); }
+#touch .car { grid-template-columns: repeat(3, 64px); }
+#touch .car .gas { width: 64px; height: 90px; border-radius: 18px; }
+#touch .top { top: 250px; right: 18px; grid-template-columns: repeat(3, 48px); }
+#touch .top button { width: 48px; height: 48px; font-size: 20px; }
+#touch .car { display: none; }
+#touch.driving .car { display: grid; }
+#touch.driving .foot { display: none; }
+
+/* ---------- título / menus ---------- */
+#title { position: fixed; inset: 0; z-index: 10; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 28px; background: radial-gradient(ellipse at center, rgba(0, 0, 0, .25), rgba(0, 0, 0, .8)); }
+.logo { text-align: center; }
+.fta { font-family: 'Bebas Neue'; font-size: clamp(110px, 22vw, 260px); line-height: .85; letter-spacing: 8px; background: linear-gradient(#fff 25%, #f0c419 65%, #a8650c); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(6px 6px 0 #000); }
+.fta span { margin-left: 10px; }
+.logo .sub { font-family: 'Pirata One'; font-size: clamp(14px, 2.2vw, 26px); letter-spacing: 2px; text-shadow: 2px 2px 0 #000; }
+.loading { width: min(420px, 80vw); text-align: center; }
+.track { height: 6px; background: rgba(255, 255, 255, .15); }
+#loadbar { height: 100%; width: 0; background: var(--gold); transition: width .3s; }
+#loadtxt { margin-top: 8px; font-size: 15px; opacity: .85; }
+#menu { display: flex; flex-direction: column; gap: 10px; }
+#menu button, #btnResume, .settings .close {
+  font-family: 'Pirata One', serif; font-size: 34px; color: #fff; background: none; border: none; cursor: pointer; text-shadow: 3px 3px 0 #000; padding: 2px 18px; transition: color .15s, transform .15s;
+}
+#menu button:hover, #btnResume:hover, .settings .close:hover { color: var(--gold); transform: scale(1.06); }
+.credit { position: absolute; bottom: 14px; font-size: 13px; opacity: .6; }
+
+#pause { position: fixed; inset: 0; z-index: 9; background: rgba(5, 8, 12, .82); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 16px; }
+.ptitle { font-family: 'Pirata One'; font-size: 64px; color: var(--gold); text-shadow: 3px 3px 0 #000; }
+.settings { width: min(720px, 100%); max-height: 70vh; overflow: auto; background: rgba(0, 0, 0, .7); border: 2px solid #333; padding: 14px; }
+#titleSettings { position: absolute; z-index: 11; }
+.tabs { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 10px; }
+.tabs button { flex: 1 1 auto; font-family: 'Bebas Neue'; font-size: 22px; letter-spacing: 1px; padding: 6px 10px; background: #1b1b1b; color: #bbb; border: 1px solid #333; cursor: pointer; }
+.tabs button.on { background: var(--gold); color: #000; }
+.tabbody .row { display: flex; align-items: center; gap: 12px; padding: 8px 4px; border-bottom: 1px solid #222; font-size: 17px; }
+.tabbody .row span { flex: 1; }
+.tabbody select, .tabbody input[type=range] { font-family: 'Oswald'; font-size: 16px; background: #111; color: #fff; border: 1px solid #444; padding: 4px; min-width: 180px; }
+.tabbody input[type=checkbox] { width: 22px; height: 22px; accent-color: var(--gold); }
+.tabbody em { width: 40px; text-align: right; font-style: normal; opacity: .7; }
+.tabbody table { width: 100%; border-collapse: collapse; font-size: 15px; }
+.tabbody td, .tabbody th { border-bottom: 1px solid #262626; padding: 6px; text-align: left; }
+.tabbody th { color: var(--gold); }
+.settings .close { display: block; margin: 10px auto 0; font-size: 28px; }
+
+@media (max-width: 760px) {
+  #minimap { width: 150px; height: 150px; }
+  #clock, #money { font-size: 26px; }
+  #zone { font-size: 38px; bottom: 170px; }
+  #vehname { font-size: 28px; bottom: 210px; }
+  #speedo { left: auto; right: 220px; bottom: 12px; width: 150px; }
+  #kmh { font-size: 38px; }
+  #subtitle { font-size: 17px; bottom: 120px; }
+  #touch .top { top: 220px; }
+  #timer { top: 300px; }
+}

@@ -1,0 +1,70 @@
+export const UI = {
+  newGame: { pt: 'Novo Jogo', en: 'New Game' },
+  cont: { pt: 'Continuar', en: 'Continue' },
+  settings: { pt: 'Configurações', en: 'Settings' },
+  resume: { pt: 'Voltar ao jogo', en: 'Resume' },
+  enterHint: { pt: 'Aperte {k} para entrar no veículo', en: 'Press {k} to enter the vehicle' },
+  missionPassed: { pt: 'MISSÃO CUMPRIDA!', en: 'MISSION PASSED!' },
+  missionFailed: { pt: 'MISSÃO FRACASSADA', en: 'MISSION FAILED' },
+  respect: { pt: 'Respeito +', en: 'Respect +' },
+  wasted: { pt: 'APAGOU', en: 'WASTED' },
+  objBike: { pt: 'Pegue a ~y~bicicleta~w~.', en: 'Get on the ~y~bike~w~.' },
+  objFollow: { pt: 'Siga o ~b~Duda~w~ até a oficina.', en: 'Follow ~b~Duda~w~ to the garage.' },
+  losing: { pt: 'Você está perdendo o ~b~Duda~w~!', en: "You're losing ~b~Duda~w~!" },
+  lostDuda: { pt: 'Você perdeu o Duda de vista.', en: 'You lost Duda.' },
+  objGarage: { pt: 'Vá até a ~y~oficina~w~.', en: 'Go to the ~y~garage~w~.' },
+  objCar: { pt: 'Entre no ~b~Faísca GT~w~.', en: 'Get in the ~b~Faísca GT~w~.' },
+  objRace: { pt: 'Passe pelos ~r~checkpoints~w~ até ~y~São Cruzeiro~w~!', en: 'Hit the ~r~checkpoints~w~ to ~y~São Cruzeiro~w~!' },
+  timeUp: { pt: 'O tempo acabou!', en: 'Time is up!' },
+  carWrecked: { pt: 'O carro foi destruído.', en: 'The car was wrecked.' },
+  freeRoam: { pt: 'Explore ~y~Porto Sereno~w~, ~y~São Cruzeiro~w~, ~y~Vila Poeira~w~ e ~y~Pedra Alta~w~. Aperte ~y~M~w~ para o mapa.', en: 'Explore ~y~Porto Sereno~w~, ~y~São Cruzeiro~w~, ~y~Vila Poeira~w~ and ~y~Pedra Alta~w~. Press ~y~M~w~ for the map.' },
+  retry: { pt: 'Aperte {k} para tentar de novo', en: 'Press {k} to retry' },
+  skip: { pt: 'Enter: pular fala', en: 'Enter: skip line' },
+  mapClose: { pt: 'M / Esc para fechar', en: 'M / Esc to close' },
+  radioOff: { pt: 'Rádio desligado', en: 'Radio off' },
+};
+
+export function ui(key, lang, vars = {}) {
+  let s = (UI[key] && (UI[key][lang] || UI[key].pt)) || key;
+  for (const k in vars) s = s.replace(`{${k}}`, vars[k]);
+  return s;
+}
+
+// falas dubladas (pt-BR / en)
+export const SPEAKERS = {
+  leo: { name: 'Léo', pitch: 0.85, rate: 1.0, g: 'm', seed: 0 },
+  duda: { name: 'Duda', pitch: 1.2, rate: 1.1, g: 'm', seed: 1 },
+  taxi: { name: 'Taxista', pitch: 0.7, rate: 0.95, g: 'm', seed: 2 },
+  nando: { name: 'Nando', pitch: 0.75, rate: 0.92, g: 'm', seed: 3 },
+  dj: { name: 'DJ Maré', pitch: 1.05, rate: 1.15, g: 'f', seed: 4 },
+  pedM: { name: 'Pedestre', pitch: 1.0, rate: 1.05, g: 'm', seed: 5 },
+  pedF: { name: 'Pedestre', pitch: 1.2, rate: 1.05, g: 'f', seed: 6 },
+};
+
+export const LINES = {
+  intro1: { pt: 'Cinco anos fora... e Porto Sereno continua com o mesmo cheiro de maresia e gasolina.', en: 'Five years gone... and Porto Sereno still smells like sea salt and gasoline.' },
+  intro2: { pt: 'São quarenta pratas, chefia. Taxa de bagagem e de saudade.', en: "That's forty bucks, boss. Luggage fee plus nostalgia fee." },
+  intro3: { pt: 'Quarenta? Você rodou três quarteirões!', en: 'Forty? You drove three blocks!' },
+  intro4: { pt: 'Bem-vindo de volta, parceiro! Ha!', en: 'Welcome back, pal! Ha!' },
+  duda1: { pt: 'LÉO! Não acredito, irmão! Você voltou mesmo!', en: 'LEO! No way, bro! You actually came back!' },
+  leo1: { pt: 'Duda... que história é essa dos Corvos mexendo com a oficina do pai?', en: "Duda... what's this about the Crows messing with dad's garage?" },
+  duda2: { pt: 'Longa história. Pega aquela bike ali e cola em mim. Te explico no caminho!', en: "Long story. Grab that bike over there and stay on my tail. I'll explain on the way!" },
+  ride1: { pt: 'Os Corvos chegaram faz dois anos. Hoje mandam em metade do porto.', en: 'The Crows showed up two years ago. Now they run half the harbor.' },
+  ride2: { pt: 'Ô, pedala direito aí! Parece que esqueceu como anda de bike!', en: 'Hey, pedal properly! Looks like you forgot how to ride a bike!' },
+  ride3: { pt: 'Faz cinco anos, Duda. Me dá um desconto.', en: "It's been five years, Duda. Cut me some slack." },
+  ride4: { pt: 'Quando o pai adoeceu, eles apareceram com papel, advogado, tudo. Levaram as ferramentas e os carros.', en: 'When dad got sick, they showed up with papers, lawyers, everything. Took the tools and the cars.' },
+  dudaFar: { pt: 'Ô Léo, vem logo, cara!', en: 'Yo Leo, hurry up, man!' },
+  arrive1: { pt: 'Olha só quem apareceu! O filho pródigo de Porto Sereno!', en: "Look who showed up! Porto Sereno's prodigal son!" },
+  arrive2: { pt: 'Nando. Cadê as ferramentas, os carros... cadê tudo?', en: "Nando. Where are the tools, the cars... where's everything?" },
+  arrive3: { pt: 'Os Corvos levaram. Mas esqueceram o melhor: o Faísca GT do seu pai.', en: "The Crows took it. But they forgot the best one: your dad's Faísca GT." },
+  arrive4: { pt: 'Tem um racha rolando até São Cruzeiro. Ganha e a gente tem grana pra recomeçar.', en: "There's a street race to São Cruzeiro. Win it and we've got cash to start over." },
+  arrive5: { pt: 'Então liga esse motor.', en: 'Then fire up that engine.' },
+  raceWin: { pt: 'Ainda sei dirigir. Porto Sereno, eu voltei.', en: 'Still know how to drive. Porto Sereno, I\'m back.' },
+  bump: [{ pt: 'Ei, olha por onde anda!', en: "Hey, watch where you're going!" }, { pt: 'Qual é, mano?!', en: "What's your problem, man?!" }, { pt: 'Sai da frente!', en: 'Get outta my way!' }],
+  jack: [{ pt: 'Ei! Meu carro!', en: 'Hey! My car!' }, { pt: 'Socorro! Ladrão!', en: 'Help! Thief!' }, { pt: 'Pode levar, pode levar!', en: 'Take it, take it!' }],
+  hit: [{ pt: 'Aaai!', en: 'Ow!' }, { pt: 'Tá maluco?!', en: 'Are you crazy?!' }, { pt: 'Chama a polícia!', en: 'Call the cops!' }],
+  miss: [{ pt: 'Vai devagar, doido!', en: 'Slow down, maniac!' }, { pt: 'Quase me atropelou!', en: 'You almost ran me over!' }],
+  idle: [{ pt: 'Que calor hoje, hein?', en: 'Hot one today, huh?' }, { pt: 'Já viu o pôr do sol da Costa Esmeralda?', en: 'Ever seen the sunset at Costa Esmeralda?' }, { pt: 'Esse bairro já foi melhor...', en: 'This neighborhood used to be better...' }],
+  idleRain: [{ pt: 'Que chuva, meu Deus.', en: 'What a downpour.' }, { pt: 'Esqueci o guarda-chuva de novo.', en: 'Forgot my umbrella again.' }],
+  dj: [{ pt: 'Você tá ligado na Rádio Sereno, noventa e três ponto nove! Só os sons da quebrada.', en: "You're tuned to Radio Sereno, ninety-three point nine! Only street sounds." }, { pt: 'Batida FM! Cento e um! O baile não para!', en: 'Batida FM! One-oh-one! The party never stops!' }],
+};
