@@ -4,7 +4,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { clamp, lerp, smoothstep, angleDiff } from './util.js';
-import { World, groundAt, heightAt, zoneName, cityAt } from './world.js';
+import { World, groundAt, heightAt, zoneName, cityAt, puddleAt, LIGHTS_N } from './world.js';
 import { Vehicle, collideVehicles } from './vehicle.js';
 import { Character } from './character.js';
 import { Traffic, Peds } from './npc.js';
@@ -224,7 +224,50 @@ for (let i = 0; i < 6; i++) {
 }
 const headlight = new THREE.SpotLight(0xfff1d6, 0, 70, 0.55, 0.45, 1.3);
 scene.add(headlight, headlight.target);
-let lampTimer = 0;
+let lampTimer = 0, lampNear = [];
+
+// pneus no molhado: névoa atrás das rodas e água espirrando quando passa na poça
+function wetTires(car, dt, mine) {
+  const sp = car.speed, t = car.t;
+  if (!car.onGround || car.inWater || sp < 5 || (car.surface !== 'road' && car.surface !== 'walk')) return;
+  const sh = Math.sin(car.heading), ch = Math.cos(car.heading), hw = t.twoWheel ? 0 : t.width / 2 - 0.13;
+  const y = car.pos.y + 0.25;
+  const amt = env.wetness * Math.min(1, sp / 22);
+  for (const s of t.twoWheel ? [0] : [1, -1]) {
+    const x = car.pos.x + ch * hw * s - sh * (t.b + 0.3), z = car.pos.z - sh * hw * s - ch * (t.b + 0.3);
+    if (Math.random() < dt * sp * 0.9) fx.spray(x, y, z, car.vel.x, car.vel.z, amt);
+  }
+  car._pudT = (car._pudT || 0) - dt;
+  for (const [s, pd] of [[1, car.pudL], [-1, car.pudR]]) {
+    if (pd < 0.35 || car._pudT > 0) continue;
+    const x = car.pos.x + ch * hw * s + sh * t.a, z = car.pos.z - sh * hw * s + ch * t.a;
+    fx.puddle(x, car.pos.y + 0.15, z, ch * s, -sh * s, car.vel.x, car.vel.z, sp);
+    car._pudT = 0.12;
+    if (mine) { audio.splash(false); if (car.aqua > 0.25) input.rumble(0.25, 0.4, 120); }
+  }
+}
+
+// luzes que se refletem no chão molhado (postes próximos + faróis e lanternas dos carros perto da câmera)
+function updateWetLights(lit) {
+  const U = world.wetU, L = U.uL.value, C = U.uLC.value;
+  let n = 0;
+  const put = (x, y, z, w, r, g, b) => { if (n < LIGHTS_N) { L[n].set(x, y, z, w); C[n].setRGB(r, g, b); n++; } };
+  if (env.wetness > 0.05) {
+    for (const l of lampNear) put(l.lx, l.ly, l.lz, lit * 7, 1, 0.78, 0.45);
+    const cx = camera.position.x, cz = camera.position.z;
+    const cars = game.vehicles.filter((c) => (c.lights || (c.brakeOn && c.driver)) && !c.exploded && Math.abs(c.pos.x - cx) + Math.abs(c.pos.z - cz) < 90)
+      .sort((a, b) => a.pos.distanceToSquared(camera.position) - b.pos.distanceToSquared(camera.position));
+    for (const c of cars) {
+      const sh = Math.sin(c.heading), ch = Math.cos(c.heading), t = c.t, y = c.pos.y + t.wheelR + 0.45;
+      const fx = c.pos.x + sh * t.length * 0.5, fz = c.pos.z + ch * t.length * 0.5;
+      const bx = c.pos.x - sh * t.length * 0.5, bz = c.pos.z - ch * t.length * 0.5;
+      const ox = ch * t.width * 0.33, oz = -sh * t.width * 0.33;
+      if (c.lights) { put(fx + ox, y, fz + oz, 8, 1, 0.95, 0.82); if (!t.twoWheel) put(fx - ox, y, fz - oz, 8, 1, 0.95, 0.82); }
+      put(bx, y, bz, c.brakeOn && c.driver ? 6 : 2, 1, 0.08, 0.03);
+    }
+  }
+  for (let i = n; i < LIGHTS_N; i++) L[i].w = 0;
+}
 
 // ---------------------------------------------------------------- atualização do jogador a pé
 const tmpP = { x: 0, z: 0 };
@@ -257,6 +300,17 @@ function updateOnFoot(dt, inp) {
   p.vel.z = lerp(p.vel.z, wz * speed, k);
   const ox = p.pos.x, oz = p.pos.z;
   p.pos.x += p.vel.x * dt; p.pos.z += p.vel.z * dt;
+  // pisando em poça: espirra água a cada passo
+  const hs = Math.hypot(p.vel.x, p.vel.z);
+  if (!p.swim && p.onGround && hs > 1.2 && env.wetness > 0.3) {
+    p.stepT = (p.stepT || 0) - dt * hs * 0.6;
+    if (p.stepT <= 0) {
+      p.stepT = 1;
+      if (puddleAt(p.pos.x, p.pos.z, env.wetness) > 0.3) {
+        for (let k = 0; k < 5; k++) fx.sprite(p.pos.x, p.pos.y + 0.05, p.pos.z, { color: 0xdfe8ef, op: 0.45, size: 0.1, life: 0.35, vx: (Math.random() - 0.5) * 2 + p.vel.x * 0.3, vy: 1 + Math.random() * 1.5, vz: (Math.random() - 0.5) * 2 + p.vel.z * 0.3, g: 12, grow: 1.5 });
+      }
+    }
+  }
   if (!p.swim && p.onGround && groundAt(p.pos.x, p.pos.z) - p.pos.y > 0.6) { p.pos.x = ox; p.pos.z = oz; }
   if (p.swim) {
     p.onGround = false;
@@ -499,6 +553,7 @@ function tick() {
     if (car.ai && !car.lights) car.lights = env.lightsOn;
     car.update(dt, ctrl, env, car === p.vehicle && settings.get('gearbox') === 'manual');
     if (d < 220) skids.track(car, dt, (x, y, z) => fx.tireSmoke(x, y, z));
+    if (d < 140 && env.wetness > 0.3) wetTires(car, dt, car === p.vehicle);
     if (!car.sleeping || car === p.vehicle) car.collideWorld(world.col);
     awake.push(car);
     // estrago progressivo: peças caem, fumaça, fogo e explosão
@@ -528,6 +583,7 @@ function tick() {
   traffic.update(dt);
   police.update(dt);
   air.update(dt);
+  fx.light = 0.1 + 0.9 * (env.day ?? 1);
   fx.update(dt, camera.position);
   peds.update(dt);
   for (const a of game.actors) { a.ch.root.position.copy(a.pos); a.ch.root.rotation.y = a.heading; a.ch.animate(dt, 0, 'ground'); }
@@ -584,7 +640,9 @@ function tick() {
     }
     best.sort((a, b) => a[0] - b[0]);
     lampLights.forEach((L, i) => { const b = best[i]; if (b) L.position.set(b[1].lx, b[1].ly - 0.3, b[1].lz); L.userData.on = !!b; });
+    lampNear = best.slice(0, 6).map((b) => b[1]);
   }
+  updateWetLights(lit);
   for (const L of lampLights) L.intensity = L.userData.on ? lit * 55 : 0;
   const lc = v || (game.lastCar && game.lastCar.lights && game.lastCar.pos.distanceTo(camera.position) < 150 ? game.lastCar : null);
   if (lc && lc.lights) {

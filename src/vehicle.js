@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import { clamp, lerp } from './util.js';
-import { heightAt, surfaceAt } from './world.js';
+import { clamp, lerp, smoothstep } from './util.js';
+import { heightAt, surfaceAt, puddleAt } from './world.js';
 
 // massa kg, medidas m, torque N·m, CdA m²
 export const VTYPES = {
@@ -9,7 +9,7 @@ export const VTYPES = {
   sedan: { name: 'Prima', shape: 'sedan', mass: 1300, wheelbase: 2.7, width: 1.8, length: 4.5, height: 1.45, cgh: 0.55, wheelR: 0.32, torque: 220, idle: 850, redline: 6300, gears: [3.4, 2.1, 1.45, 1.05, 0.82], final: 3.9, grip: 1.0, CdA: 0.68, brakeF: 14900, steer: 0.6, steerFall: 0.03, drive: 'rear', seat: [0.38, 0.2, -0.25] },
   taxi: { name: 'Táxi Prima', shape: 'taxi', mass: 1330, wheelbase: 2.7, width: 1.8, length: 4.5, height: 1.45, cgh: 0.55, wheelR: 0.32, torque: 220, idle: 850, redline: 6300, gears: [3.4, 2.1, 1.45, 1.05, 0.82], final: 3.9, grip: 1.0, CdA: 0.7, brakeF: 14900, steer: 0.6, steerFall: 0.03, drive: 'rear', seat: [0.38, 0.2, -0.25] },
   police: { name: 'Viatura', shape: 'police', mass: 1450, wheelbase: 2.8, width: 1.85, length: 4.7, height: 1.5, cgh: 0.55, wheelR: 0.33, torque: 360, idle: 800, redline: 6200, gears: [3.3, 2.1, 1.5, 1.12, 0.86], final: 3.7, grip: 1.12, CdA: 0.7, brakeF: 20200, steer: 0.6, steerFall: 0.028, drive: 'rear', seat: [0.4, 0.2, -0.25] },
-  sport: { name: 'Faísca GT', shape: 'sport', mass: 1250, wheelbase: 2.55, width: 1.95, length: 4.4, height: 1.15, cgh: 0.45, wheelR: 0.33, torque: 520, idle: 950, redline: 7900, gears: [3.1, 2.2, 1.65, 1.28, 1.02, 0.84], final: 3.5, grip: 1.25, CdA: 0.6, brakeF: 21600, steer: 0.55, steerFall: 0.03, drive: 'awd', seat: [0.4, -0.1, -0.35] },
+  sport: { name: 'Faísca GT', shape: 'sport', mass: 1250, wheelbase: 2.55, width: 1.95, length: 4.4, height: 1.15, cgh: 0.45, wheelR: 0.33, torque: 520, idle: 950, redline: 7900, gears: [3.1, 2.2, 1.65, 1.28, 1.02, 0.84], final: 3.5, grip: 1.25, CdA: 0.6, ClA: 0.45, brakeF: 21600, steer: 0.55, steerFall: 0.03, drive: 'awd', seat: [0.4, -0.1, -0.35] },
   pickup: { name: 'Touro', shape: 'pickup', mass: 1900, wheelbase: 3.1, width: 2.0, length: 5.2, height: 1.85, cgh: 0.78, wheelR: 0.39, torque: 430, idle: 700, redline: 5200, gears: [3.6, 2.2, 1.45, 1.0, 0.76], final: 3.7, grip: 0.95, CdA: 1.1, brakeF: 20200, steer: 0.55, steerFall: 0.03, drive: 'rear', seat: [0.42, 0.45, 0.4] },
 };
 for (const t of Object.values(VTYPES)) {
@@ -187,6 +187,9 @@ export class Vehicle {
     this.ax = 0; this.ay = 0;
     this.vy = 0; this.onGround = true; this.lastGy = this.pos.y;
     this.pitch = 0; this.roll = 0; this.lean = 0;
+    // suspensão (massa suspensa): arfagem, rolagem e altura com mola + amortecedor
+    this.sP = 0; this.sPv = 0; this.sR = 0; this.sRv = 0; this.sH = 0; this.sHv = 0;
+    this.gradeF = 0; this.gradeL = 0; this.aqua = 0; this.pudL = 0; this.pudR = 0;
     this.health = 1000;
     this.driver = null;
     this.ai = null;
@@ -260,6 +263,26 @@ export class Vehicle {
     }
     this.shiftT -= dt;
 
+    // inclinação do chão (gravidade na ladeira) e poças embaixo das rodas
+    {
+      const sh = Math.sin(this.heading), ch = Math.cos(this.heading);
+      const hf = heightAt(this.pos.x + sh * t.a, this.pos.z + ch * t.a), hb = heightAt(this.pos.x - sh * t.b, this.pos.z - ch * t.b);
+      this.gradeF = (hf - hb) / t.wheelbase;
+      if (!t.twoWheel) {
+        const hw = t.width / 2;
+        this.gradeL = (heightAt(this.pos.x + ch * hw, this.pos.z - sh * hw) - heightAt(this.pos.x - ch * hw, this.pos.z + sh * hw)) / t.width;
+      } else this.gradeL = 0;
+      const wet = env.wetness;
+      if (wet > 0.25 && this.speed > 3) {
+        const hw = t.width / 2 - 0.13, fx = this.pos.x + sh * t.a, fz = this.pos.z + ch * t.a;
+        this.pudL = puddleAt(fx + ch * hw, fz - sh * hw, wet);
+        this.pudR = t.twoWheel ? this.pudL : puddleAt(fx - ch * hw, fz + sh * hw, wet);
+      } else this.pudL = this.pudR = 0;
+      // aquaplanagem: lâmina d'água + velocidade alta → o pneu flutua e perde aderência
+      const film = Math.max(this.pudL, this.pudR) * 0.85 + (wet > 0.6 ? (wet - 0.6) * 0.25 : 0);
+      this.aqua = film * smoothstep(15, 27, this.speed);
+    }
+
     const n = 4, h = dt / n;
     for (let i = 0; i < n; i++) this.step(h, ctrl, thr, brk, env);
 
@@ -286,9 +309,14 @@ export class Vehicle {
     const surf = this.inWater ? 'water' : surfaceAt(this.pos.x, this.pos.z);
     const S = SURF[surf];
     const wetF = surf === 'road' || surf === 'walk' ? 1 - 0.3 * env.wetness : 1 - 0.15 * env.wetness;
-    const mu = t.grip * S.mu * wetF;
-    let NF = (m * g * b) / L - (m * this.ax * t.cgh) / L;
-    let NR = (m * g * a) / L + (m * this.ax * t.cgh) / L;
+    const mu0 = t.grip * S.mu * wetF * (1 - 0.8 * this.aqua);
+    // asa/difusor: carga aerodinâmica cresce com v²
+    const down = t.ClA ? 0.5 * 1.2 * t.ClA * vx * vx : 0;
+    let NF = (m * g * b) / L - (m * this.ax * t.cgh) / L + down * 0.45;
+    let NR = (m * g * a) / L + (m * this.ax * t.cgh) / L + down * 0.55;
+    // sensibilidade à carga: a transferência lateral tira aderência do eixo (mais na frente → sai de frente no limite)
+    const q = t.twoWheel ? 0 : Math.min(1, Math.abs(this.ay) * t.cgh / (g * t.width * 0.5));
+    const mu = mu0, muFy = mu0 * (1 - 0.16 * q * q), muRy = mu0 * (1 - 0.09 * q * q);
     NF = Math.max(NF, m * g * 0.08); NR = Math.max(NR, m * g * 0.08);
 
     let Fdrive = 0;
@@ -322,8 +350,8 @@ export class Vehicle {
     const alphaF = Math.atan2(vy + this.yawRate * a, absvx) - d * sg;
     const alphaR = Math.atan2(vy - this.yawRate * b, absvx);
     const tire = (al) => Math.sin(1.55 * Math.atan(8.5 * al));
-    let FyF = -mu * NF * tire(alphaF);
-    let FyR = -mu * NR * tire(alphaR);
+    let FyF = -muFy * NF * tire(alphaF);
+    let FyR = -muRy * NR * tire(alphaR);
     // pneu travado desliza: atrito cinético contra a velocidade do ponto de contato (não esterça)
     const muK = mu * 0.78;
     if (lockF) {
@@ -351,10 +379,16 @@ export class Vehicle {
     const k = 0.5 * 1.2 * t.CdA * rv;
     const dF = -k * (rvx * fx + rvz * fz), dL = -k * (rvx * lx + rvz * lz);
     const Froll = -S.rr * m * g * clamp(vx * 2, -1, 1);
-    let Fx = FxR + FxF * cd - FyF * sd + dF + Froll;
-    let Fy = FyR + FyF * cd + FxF * sd + dL * (t.twoWheel ? 0.4 : 1);
-    let Tz = a * (FyF * cd + FxF * sd) - b * FyR;
+    // água da poça segura a roda: lado com mais água puxa o carro
+    const pk = m * 0.03, dPL = -this.pudL * pk * vx, dPR = -this.pudR * pk * vx;
+    // gravidade na ladeira (ao longo e de lado)
+    const gF = -m * g * this.gradeF / Math.sqrt(1 + this.gradeF * this.gradeF);
+    const gL = -m * g * this.gradeL / Math.sqrt(1 + this.gradeL * this.gradeL);
+    let Fx = FxR + FxF * cd - FyF * sd + dF + Froll + dPL + dPR + gF;
+    let Fy = FyR + FyF * cd + FxF * sd + dL * (t.twoWheel ? 0.4 : 1) + gL;
+    let Tz = a * (FyF * cd + FxF * sd) - b * FyR + (dPL - dPR) * (t.width / 2);
     if (!this.onGround) { Fx = dF; Fy = dL; Tz = 0; }
+    this.FxNet = Fx; this.FyNet = Fy;
     if (this.inWater) { Fx -= vx * m * 1.2; Fy -= vy * m * 1.2; Tz -= this.yawRate * t.I * 1.5; }
 
     this.vel.x += ((fx * Fx + lx * Fy) / m) * dt;
@@ -386,6 +420,7 @@ export class Vehicle {
     if (this.pos.y <= gy) {
       const rate = (gy - this.lastGy) / dt;
       if (!this.onGround && this.vy < -5) this.impact = Math.max(this.impact, -this.vy * 0.25);
+      if (!this.onGround && this.vy < -1.5) this.sHv += this.vy * 0.6;
       this.pos.y = gy;
       this.vy = Math.max(this.vy, Math.min(rate, 25));
       this.onGround = true;
@@ -421,13 +456,27 @@ export class Vehicle {
       this.root.rotation.set(this.pitch, this.heading, this.roll + this.lean, 'YXZ');
     } else {
       this.root.rotation.set(this.pitch, this.heading, this.roll, 'YXZ');
-      this.body.rotation.x = lerp(this.body.rotation.x, clamp(-this.ax * 0.006, -0.06, 0.06), 0.2);
-      this.body.rotation.z = lerp(this.body.rotation.z, clamp(this.ay * 0.008, -0.08, 0.08), 0.2);
+      if (dt > 0) {
+        // mola ~1,3 Hz, amortecimento ~0,35 do crítico; mergulha ao frear, agacha ao acelerar, inclina na curva
+        const w2 = 66, c = 5.6, sub = Math.min(4, Math.ceil(dt / 0.01)), h = dt / sub;
+        const tp = clamp(-this.ax * 0.0075, -0.075, 0.075), tr = clamp(this.ay * 0.0095, -0.095, 0.095);
+        for (let i = 0; i < sub; i++) {
+          this.sPv += (w2 * (tp - this.sP) - c * this.sPv) * h; this.sP += this.sPv * h;
+          this.sRv += (w2 * (tr - this.sR) - c * this.sRv) * h; this.sR += this.sRv * h;
+          this.sHv += (w2 * 1.3 * -this.sH - c * 1.2 * this.sHv) * h; this.sH += this.sHv * h;
+        }
+        this.sH = clamp(this.sH, -0.14, 0.1);
+      }
+      this.body.rotation.x = this.sP;
+      this.body.rotation.z = this.sR;
+      this.body.position.y = this.sH;
     }
     const vx = this.fwdSpeed;
     for (const w of this.wheels) {
       if (w.front) w.piv.rotation.y = this.steer;
-      if (!(w.front ? this.lockF : this.lockR)) w.spin.rotation.x += (vx / t.wheelR) * dt;
+      // roda travada não gira; roda motriz patinando gira mais rápido que o chão
+      const drv = t.drive === 'awd' || (t.drive === 'front') === w.front;
+      if (!(w.front ? this.lockF : this.lockR)) w.spin.rotation.x += (vx / t.wheelR + (drv ? (this.slipR || 0) * 60 * Math.sign(this.thr || 0) : 0)) * dt;
     }
     if (this.inWater) this.root.position.y -= 0.3;
     this.headMat.emissiveIntensity = this.lights ? 4 : 0.15;

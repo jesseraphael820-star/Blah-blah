@@ -33,6 +33,7 @@ export class FX {
     scene.add(this.deb);
     this.tex = softTex();
     this.sprites = [];
+    this.light = 1; // fumaça/borrifo não brilham no escuro
     this.flash = new THREE.PointLight(0xffa040, 0, 60, 1.5);
     scene.add(this.flash);
     this._m = new THREE.Matrix4(); this._q = new THREE.Quaternion(); this._e = new THREE.Euler(); this._s = new THREE.Vector3(); this._c = new THREE.Color();
@@ -97,7 +98,7 @@ export class FX {
   }
 
   sprite(x, y, z, o) {
-    const m = new THREE.SpriteMaterial({ map: this.tex, color: o.color, transparent: true, opacity: o.op, depthWrite: false, blending: o.add ? THREE.AdditiveBlending : THREE.NormalBlending, fog: true });
+    const m = new THREE.SpriteMaterial({ map: this.tex, color: o.add ? o.color : this._c.set(o.color).multiplyScalar(this.light), transparent: true, opacity: o.op, depthWrite: false, blending: o.add ? THREE.AdditiveBlending : THREE.NormalBlending, fog: true });
     const s = new THREE.Sprite(m);
     s.position.set(x, y, z);
     s.scale.setScalar(o.size);
@@ -124,6 +125,18 @@ export class FX {
     for (let k = 0; k < n; k++) {
       const a = Math.random() * 6.28, r = Math.random() * (big ? 4 : 2);
       this.sprite(x, y, z, { color: 0xe8f4ff, op: 0.8, size: 0.35, life: 0.9, vx: Math.cos(a) * r, vy: 3 + Math.random() * (big ? 6 : 3), vz: Math.sin(a) * r, g: 12, grow: 1.6 });
+    }
+  }
+  // borrifo dos pneus no asfalto molhado (névoa atrás do carro)
+  spray(x, y, z, vx, vz, amt) {
+    this.sprite(x + (Math.random() - 0.5) * 0.3, y, z + (Math.random() - 0.5) * 0.3, { color: 0xc9d2da, op: 0.16 * amt, size: 0.5, life: 0.7 + Math.random() * 0.5, vx: vx * 0.35 + (Math.random() - 0.5), vy: 0.6 + Math.random() * 0.8, vz: vz * 0.35 + (Math.random() - 0.5), grow: 3 });
+  }
+  // roda passando na poça: lençol d'água para os lados
+  puddle(x, y, z, sx, sz, vx, vz, spd) {
+    const n = Math.min(14, 4 + spd * 0.4);
+    for (let k = 0; k < n; k++) {
+      const out = 1.5 + Math.random() * spd * 0.22;
+      this.sprite(x, y, z, { color: 0xdfe8ef, op: 0.5, size: 0.22 + Math.random() * 0.2, life: 0.5 + Math.random() * 0.4, vx: sx * out + vx * 0.5, vy: 1.5 + Math.random() * (1 + spd * 0.12), vz: sz * out + vz * 0.5, g: 11, grow: 2.2 });
     }
   }
   bubbles(x, y, z) {

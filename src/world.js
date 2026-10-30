@@ -333,6 +333,93 @@ export function addWind(mat, windU, { sway = 0.3, flutter = 0.03, ref = 6 } = {}
   return mat;
 }
 
+// ---------------------------------------------------------------- chão molhado e poças
+// mesma fórmula na CPU (aquaplanagem/respingos) e no shader
+export function puddleField(x, z) {
+  return Math.sin(x * 0.21 + Math.sin(z * 0.13) * 1.7) * Math.sin(z * 0.19 + Math.sin(x * 0.11) * 1.9)
+    + 0.5 * Math.sin((x + z) * 0.37 + Math.sin(x * 0.05) * 3) * Math.sin((x - z) * 0.29);
+}
+export function puddleAt(x, z, wet) {
+  if (wet < 0.25) return 0;
+  const s = surfaceAt(x, z);
+  if (s !== 'road' && s !== 'walk') return 0;
+  return smoothstep(1.3 - 0.45 * wet, 1.42 - 0.4 * wet, puddleField(x, z)) * smoothstep(0.25, 0.7, wet);
+}
+export const LIGHTS_N = 12;
+const WET_GLSL = `
+uniform float uWet, uRain, uTime;
+uniform vec4 uL[${12}];
+uniform vec3 uLC[${12}];
+varying vec3 vWP;
+varying vec3 vWN;
+float pudF(vec2 p) {
+  return sin(p.x * 0.21 + sin(p.y * 0.13) * 1.7) * sin(p.y * 0.19 + sin(p.x * 0.11) * 1.9)
+    + 0.5 * sin((p.x + p.y) * 0.37 + sin(p.x * 0.05) * 3.0) * sin((p.x - p.y) * 0.29);
+}
+// anéis das gotas caindo na água (um por célula, fase aleatória)
+vec2 ripples(vec2 p, float t) {
+  vec2 g = vec2(0.0);
+  for (int i = 0; i < 3; i++) {
+    vec2 q = p * 2.3 + vec2(float(i) * 3.7, float(i) * 1.9);
+    vec2 c = floor(q), f = fract(q);
+    float h = fract(sin(dot(c + float(i) * 17.0, vec2(127.1, 311.7))) * 43758.5453);
+    float ph = fract(t * 1.25 + h);
+    vec2 o = vec2(0.3 + 0.4 * fract(h * 13.7), 0.3 + 0.4 * fract(h * 71.3));
+    vec2 d = f - o;
+    float r = length(d) + 1e-4;
+    float x = (r - ph * 0.38) * 42.0;
+    g += d / r * sin(x) * exp(-x * x * 0.12) * (1.0 - ph) * (1.0 - ph);
+  }
+  return g;
+}`;
+export function addWet(mat, U, { puddles = true, dark = 0.62 } = {}) {
+  mat.onBeforeCompile = (sh) => {
+    Object.assign(sh.uniforms, { uWet: U.uWet, uRain: U.uRain, uTime: U.uTime, uL: U.uL, uLC: U.uLC });
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vWP;\nvarying vec3 vWN;')
+      .replace('#include <project_vertex>', '#include <project_vertex>\nvWP = (modelMatrix * vec4(transformed, 1.0)).xyz;\nvWN = normalize(mat3(modelMatrix) * objectNormal);');
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', '#include <common>\n' + WET_GLSL)
+      .replace('#include <map_fragment>', `#include <map_fragment>
+        float up = smoothstep(0.7, 0.95, vWN.y);
+        float pud = ${puddles ? 'smoothstep(1.3 - 0.45 * uWet, 1.42 - 0.4 * uWet, pudF(vWP.xz)) * smoothstep(0.25, 0.7, uWet) * up' : '0.0'};
+        diffuseColor.rgb *= mix(1.0, ${dark.toFixed(2)}, uWet);
+        diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * 0.3 + vec3(0.008, 0.01, 0.013), pud);`)
+      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 0.025, pud);')
+      .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+        if (uRain > 0.02 && uWet > 0.1) {
+          vec2 gr = ripples(vWP.xz, uTime) * uRain * up * (pud * 0.55 + 0.06 * uWet);
+          normal = normalize(normal + (viewMatrix * vec4(gr.x, 0.0, gr.y, 0.0)).xyz);
+        }`)
+      .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+        // reflexo das luzes (postes, faróis) no chão molhado: alongado no asfalto, espelhado na poça
+        if (uWet > 0.05) {
+          vec3 nW = normalize((vec4(normal, 0.0) * viewMatrix).xyz);
+          vec3 V = normalize(vWP - cameraPosition);
+          vec3 Rf = reflect(V, nW);
+          vec3 side = normalize(cross(V, vec3(0.0, 1.0, 0.0)) + 1e-5);
+          float fres = 0.04 + 0.96 * pow(1.0 - clamp(dot(-V, nW), 0.0, 1.0), 5.0);
+          float wetK = uWet * up;
+          float k = mix(0.35, 9.0, pud), kh = mix(14.0, 1.0, pud);
+          vec3 acc = vec3(0.0);
+          for (int i = 0; i < ${12}; i++) {
+            if (uL[i].w <= 0.0) continue;
+            vec3 Ld = uL[i].xyz - vWP;
+            float D = length(Ld);
+            Ld /= D;
+            vec3 e = Ld - Rf;
+            float eh = dot(e, side);
+            vec3 ev = e - side * eh;
+            float d2 = (eh * eh * kh + dot(ev, ev)) * D * D * k;
+            acc += uLC[i] * uL[i].w * exp(-d2) / (1.0 + D * 0.04);
+          }
+          totalEmissiveRadiance += acc * fres * wetK * mix(0.5, 2.2, pud);
+        }`);
+  };
+  mat.customProgramCacheKey = () => `wet${puddles}_${dark}`;
+  return mat;
+}
+
 // ---------------------------------------------------------------- geometria auxiliar
 function colorize(g, col) {
   const n = g.attributes.position.count;
@@ -394,6 +481,11 @@ export class World {
     this.buildRects = [];
     this.parkSpots = [];
     this.windU = { uTime: { value: 0 }, uWind: { value: new THREE.Vector3(1, 0, 0.3) } };
+    this.wetU = {
+      uWet: { value: 0 }, uRain: { value: 0 }, uTime: this.windU.uTime,
+      uL: { value: Array.from({ length: LIGHTS_N }, () => new THREE.Vector4()) },
+      uLC: { value: Array.from({ length: LIGHTS_N }, () => new THREE.Color()) },
+    };
     this.R = rng(1993);
   }
 
@@ -476,7 +568,7 @@ export class World {
     geo.setAttribute('color', new THREE.BufferAttribute(cols, 3));
     const map = groundTex();
     map.repeat.set(380, 380);
-    this.terrainMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, map });
+    this.terrainMat = addWet(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, map }), this.wetU, { puddles: false, dark: 0.72 });
     this.wetMats.push({ m: this.terrainMat, dry: 0.95, wet: 0.7 });
     const mesh = new THREE.Mesh(geo, this.terrainMat);
     mesh.receiveShadow = true;
@@ -487,9 +579,9 @@ export class World {
   // ---------------- ruas
   buildRoads() {
     const rt = roadTex();
-    const roadMat = new THREE.MeshStandardMaterial({ map: rt, roughness: 0.85, metalness: 0.05, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+    const roadMat = addWet(new THREE.MeshStandardMaterial({ map: rt, roughness: 0.85, metalness: 0.05, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }), this.wetU, { dark: 0.55 });
     const at = asphaltTex(); at.repeat.set(60, 60);
-    const baseMat = new THREE.MeshStandardMaterial({ map: at, roughness: 0.88, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
+    const baseMat = addWet(new THREE.MeshStandardMaterial({ map: at, roughness: 0.88, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 }), this.wetU, { dark: 0.55 });
     this.wetMats.push({ m: roadMat, dry: 0.85, wet: 0.12 }, { m: baseMat, dry: 0.88, wet: 0.15 });
     const strips = [];
     for (const c of CITIES) {
@@ -552,7 +644,7 @@ export class World {
       return m;
     };
     const towerMat = mk(fac), houseMat = mk(facH);
-    const slabMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 });
+    const slabMat = addWet(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 }), this.wetU, { dark: 0.6 });
     const roofMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8 });
     this.wetMats.push({ m: slabMat, dry: 0.9, wet: 0.3 });
     const towers = [], houses = [], slabs = [], roofs = [];

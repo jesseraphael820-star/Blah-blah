@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { clamp, lerp, smoothstep } from './util.js';
+import { groundAt } from './world.js';
 
 export const WEATHERS = {
   clear: { pt: 'Ensolarado', en: 'Sunny', icon: '☀', cloud: 0.12, rain: 0, fog: 0.00042, wind: 3 },
@@ -38,6 +39,19 @@ function cloudTexture() {
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
   t.repeat.set(5, 5);
   return t;
+}
+
+// duas placas cruzadas (para o respingo aparecer de qualquer ângulo)
+function mergeCross(g) {
+  const a = g.clone(), b = g.clone().rotateY(Math.PI / 2);
+  const pos = new Float32Array([...a.attributes.position.array, ...b.attributes.position.array]);
+  const uv = new Float32Array([...a.attributes.uv.array, ...b.attributes.uv.array]);
+  const idx = [...a.index.array, ...[...b.index.array].map((i) => i + 4)];
+  const out = new THREE.BufferGeometry();
+  out.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  out.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  out.setIndex(idx);
+  return out;
 }
 
 export class Environment {
@@ -108,8 +122,73 @@ export class Environment {
     this.rain.frustumCulled = false;
     scene.add(this.rain);
 
+    // respingos das gotas no chão: coroinha vertical + anel que abre
+    this.SN = 700;
+    const ringTex = (() => {
+      const cv = document.createElement('canvas'); cv.width = cv.height = 64;
+      const g = cv.getContext('2d');
+      g.strokeStyle = 'rgba(255,255,255,1)'; g.lineWidth = 3;
+      g.beginPath(); g.arc(32, 32, 27, 0, Math.PI * 2); g.stroke();
+      return new THREE.CanvasTexture(cv);
+    })();
+    const crownTex = (() => {
+      const cv = document.createElement('canvas'); cv.width = cv.height = 64;
+      const g = cv.getContext('2d');
+      g.fillStyle = '#fff';
+      for (let k = 0; k < 7; k++) {
+        const a = -Math.PI / 2 + (k - 3) * 0.32, L = 18 + (k % 2) * 10;
+        g.beginPath(); g.arc(32 + Math.cos(a) * L * 0.9, 58 + Math.sin(a) * L, 2.2, 0, 7); g.fill();
+        g.globalAlpha = 0.5; g.fillRect(31 + Math.cos(a) * L * 0.45, 58 + Math.sin(a) * L * 0.5, 2, 4); g.globalAlpha = 1;
+      }
+      return new THREE.CanvasTexture(cv);
+    })();
+    const mkSplash = (geo, tex) => {
+      const m = new THREE.InstancedMesh(geo, new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: true }), this.SN);
+      m.frustumCulled = false;
+      m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      m.setColorAt(0, new THREE.Color());
+      scene.add(m);
+      return m;
+    };
+    this.rings = mkSplash(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), ringTex);
+    const cg = new THREE.PlaneGeometry(1, 1).translate(0, 0.5, 0);
+    this.crowns = mkSplash(mergeCross(cg), crownTex);
+    this.splash = Array.from({ length: this.SN }, () => ({ x: 0, y: -999, z: 0, age: 9, life: 0.3, s: 1 }));
+    this.si = 0;
+    this._m = new THREE.Matrix4(); this._c = new THREE.Color();
+
     this.sunDir = new THREE.Vector3();
     this.fogCol = new THREE.Color();
+  }
+
+  updateSplashes(dt, cam, rain, light) {
+    const n = rain > 0.05 ? rain * 1400 * dt : 0;
+    let spawn = Math.floor(n) + (Math.random() < n % 1 ? 1 : 0);
+    while (spawn-- > 0) {
+      const a = Math.random() * Math.PI * 2, r = 1.5 + Math.sqrt(Math.random()) * 26;
+      const x = cam.x + Math.cos(a) * r, z = cam.z + Math.sin(a) * r;
+      const y = groundAt(x, z);
+      if (y < -0.9) continue;
+      const S = this.splash[this.si];
+      this.si = (this.si + 1) % this.SN;
+      Object.assign(S, { x, y: y + 0.07, z, age: 0, life: 0.22 + Math.random() * 0.2, s: 0.7 + Math.random() * 0.6 });
+    }
+    const m = this._m, c = this._c, br = light * (0.35 + 0.65 * this.wetness);
+    for (let i = 0; i < this.SN; i++) {
+      const S = this.splash[i];
+      S.age += dt;
+      const k = S.age / S.life;
+      if (k >= 1) { m.makeScale(0, 0, 0); this.rings.setMatrixAt(i, m); this.crowns.setMatrixAt(i, m); continue; }
+      const rs = (0.05 + k * 0.32) * S.s;
+      m.makeScale(rs, 1, rs).setPosition(S.x, S.y, S.z);
+      this.rings.setMatrixAt(i, m);
+      this.rings.setColorAt(i, c.setScalar(br * (1 - k) * 0.55));
+      const ck = Math.min(1, k * 2.2), cs = (1 - ck) > 0 ? 0.11 * S.s : 0;
+      m.makeScale(cs * (0.6 + ck), cs * Math.sin(ck * Math.PI) * 1.4, cs * (0.6 + ck)).setPosition(S.x, S.y, S.z);
+      this.crowns.setMatrixAt(i, m);
+      this.crowns.setColorAt(i, c.setScalar(br * (1 - ck) * 0.9));
+    }
+    for (const im of [this.rings, this.crowns]) { im.instanceMatrix.needsUpdate = true; im.instanceColor.needsUpdate = true; im.visible = rain > 0.05 || this.splash.some((S) => S.age < S.life); }
   }
 
   spawnDrop(i, arr, c, any) {
@@ -121,7 +200,7 @@ export class Environment {
 
   setWeather(name, instant = false) {
     this.weather = name;
-    if (instant) Object.assign(this.p, WEATHERS[name]);
+    if (instant) { Object.assign(this.p, WEATHERS[name]); this.wetness = WEATHERS[name].rain > 0.15 ? 1 : 0; }
   }
 
   get windStrength() { return this.windSpeed / 8; }
@@ -219,6 +298,10 @@ export class Environment {
     }
     this.wetness = clamp(this.wetness + (rain > 0.15 ? rain * 0.05 : -0.008) * dt, 0, 1);
     for (const wm of this.world.wetMats) wm.m.roughness = lerp(wm.dry, wm.wet, this.wetness);
+    this.world.wetU.uWet.value = this.wetness;
+    this.world.wetU.uRain.value = rain;
+    this.day = day;
+    this.updateSplashes(dt, cam, rain, lerp(0.07, 0.6, day) + this.flash);
 
     if (this.weather === 'storm' && rain > 0.85 && Math.random() < dt * 0.09) {
       this.flash = 1;
