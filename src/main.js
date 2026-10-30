@@ -137,6 +137,7 @@ const game = {
   camYawTo(y) { this.cam.yaw = y; },
   setPlayerLook(look, muscle) {
     const p = this.player, old = p.char;
+    stopSmoking(this.player, false);
     const ch = new Character({ ...look, muscle, fat: this.shops ? this.shops.data.fat : 0 });
     if (this.combat) ch.setWeapon(this.combat.current);
     ch.root.position.copy(old.root.position); ch.root.rotation.copy(old.root.rotation);
@@ -161,12 +162,13 @@ const game = {
   },
   placePlayer(x, z, h) {
     const p = this.player;
-    p.swim = false; p.under = false; p.vy = 0; p.tumble = null; p.down = 0;
+    p.swim = false; p.under = false; p.vy = 0; p.tumble = null; p.down = 0; stopSmoking(p, false); p.idleT = 0;
     if (p.vehicle) this.exitVehicle(true);
     p.pos.set(x, groundAt(x, z), z); p.vel.set(0, 0, 0); p.heading = h; this.cam.yaw = h;
   },
 
   enterVehicle(v) {
+    stopSmoking(this.player, false);
     const p = this.player;
     if (v.police) { this.addWanted(2); v.police = false; if (v.siren) v.siren.red.emissiveIntensity = v.siren.blue.emissiveIntensity = 0; }
     if (v.driver === 'ai' && v.rider) {
@@ -341,6 +343,98 @@ function updateTumble(dt) {
 }
 const surfaceAtCached = (x, z) => surfaceAt(x, z);
 
+// parado um tempo: tira o cigarro do bolso, acende e fuma; perto da parede encosta com o pé nela
+const _tip = new THREE.Vector3(), _mouth = new THREE.Vector3(), colQ = [];
+function wallNear(p) {
+  let best = null;
+  for (let k = 0; k < 16; k++) {
+    const a = (k / 16) * Math.PI * 2, sx = Math.sin(a), sz = Math.cos(a);
+    for (const r of [0.45, 0.65, 0.85, 1.05]) {
+      const x = p.pos.x + sx * r, z = p.pos.z + sz * r;
+      const hit = world.col.query(x, z, 0.05, colQ).some((b) => x > b.x0 && x < b.x1 && z > b.z0 && z < b.z1 && b.y0 < p.pos.y + 1 && b.y1 > p.pos.y + 1.5);
+      if (hit) { if (!best || r < best.r) best = { r, a }; break; }
+    }
+  }
+  return best;
+}
+function stopSmoking(p, flick) {
+  const ch = p.char, S = p.smk;
+  if (!S) return;
+  if (flick && ch.cigTip && S.lit) {
+    ch.cigTip.getWorldPosition(_tip);
+    fx.sprite(_tip.x, _tip.y, _tip.z, { color: 0xff7a20, op: 1, add: true, size: 0.06, life: 0.7, vx: Math.sin(p.heading) * 2.5, vy: 1.5, vz: Math.cos(p.heading) * 2.5, g: 9, grow: 0.8 });
+  }
+  ch.setCig(false);
+  ch.idle = null;
+  p.smk = null;
+}
+function updateIdle(dt, inp, mode) {
+  const p = player, ch = p.char;
+  const calm = mode === 'ground' && p.speed < 0.15 && inp.mag < 0.05 && !inp.punch && !inp.jump && !inp.aim && !inp.enter && combat.current === 'fist'
+    && !shops.open && !game.locked && !game.cine && game.wanted < 0.5 && ch.punchT <= 0 && ch.guard <= 0 && p.health > 0;
+  if (!calm) { p.idleT = 0; if (p.smk) stopSmoking(p, true); return; }
+  p.idleT = (p.idleT || 0) + dt;
+  if (!p.smk) {
+    if (p.idleT < 7) return;
+    const w = wallNear(p);
+    p.smk = { t: 0, lit: false, cycle: 0, wall: w, lean: 0, exhaleT: -1, wispT: 0 };
+    ch.idle = { hand: 0, pocket: 0, glow: 0, puff: 0, lean: 0 };
+  }
+  const S = p.smk, I = ch.idle;
+  S.t += dt;
+  // encosta: vira de costas pra parede e chega rente a ela
+  if (S.wall) {
+    const a = S.wall.a, want = S.wall.r - 0.42;
+    p.heading += angleDiff(p.heading, a + Math.PI) * Math.min(1, dt * 4);
+    const mv = Math.min(dt * 0.8, Math.max(0, want - (S.moved || 0)));
+    S.moved = (S.moved || 0) + mv;
+    p.pos.x += Math.sin(a) * mv; p.pos.z += Math.cos(a) * mv;
+    I.lean = Math.min(1, I.lean + dt * 1.5);
+  }
+  const t = S.t;
+  I.pocket = 0; I.puff = 0;
+  if (t < 0.7) I.pocket = Math.sin((t / 0.7) * Math.PI);
+  else if (!ch.cig) ch.setCig(true);
+  if (t >= 0.7 && t < 2.9) {
+    // primeira tragada: leva à boca, acende com o isqueiro, puxa e abaixa
+    I.hand = t < 1.3 ? (t - 0.7) / 0.6 : t < 2.3 ? 1 : 1 - (t - 2.3) / 0.6;
+    if (t > 1.4 && !S.lit) {
+      S.lit = true; audio.click();
+      ch.cigTip.getWorldPosition(_tip);
+      for (let k = 0; k < 3; k++) fx.sprite(_tip.x, _tip.y, _tip.z + 0.02, { color: 0xffb040, op: 1, add: true, size: 0.07, life: 0.25, vy: 0.4, grow: 0.6 });
+    }
+    I.glow = S.lit && t < 2.3 ? 1 : Math.max(0, I.glow - dt * 2);
+    I.puff = t > 1.5 && t < 2.3 ? 0.4 : 0;
+    if (t > 2.6 && S.exhaleT < 0) S.exhaleT = 0;
+  } else if (t >= 2.9) {
+    // depois: tragada a cada ~6 s
+    const c = (t - 2.9) % 6.2;
+    I.hand = c < 0.7 ? c / 0.7 : c < 1.9 ? 1 : c < 2.5 ? 1 - (c - 1.9) / 0.6 : 0;
+    I.glow = c > 0.7 && c < 1.9 ? 1 : Math.max(0, I.glow - dt * 1.5);
+    I.puff = c > 0.8 && c < 1.9 ? 0.35 : 0;
+    const cyc = Math.floor((t - 2.9) / 6.2);
+    if (c > 2.6 && S.cycle <= cyc) { S.cycle = cyc + 1; S.exhaleT = 0; }
+  }
+  // fumaça soltando pela boca e pelo nariz depois da tragada
+  if (S.exhaleT >= 0) {
+    S.exhaleT += dt;
+    I.puff = Math.max(I.puff, 0.25);
+    ch.head.getWorldPosition(_mouth);
+    const fx_ = Math.sin(p.heading), fz_ = Math.cos(p.heading);
+    if (Math.random() < dt * 30) fx.sprite(_mouth.x + fx_ * 0.16, _mouth.y + 0.05, _mouth.z + fz_ * 0.16, { color: 0xd4d4d4, op: 0.32, size: 0.1, life: 2.4, vx: fx_ * 0.55 + env.wind.x * 0.06, vy: 0.22, vz: fz_ * 0.55 + env.wind.y * 0.06, grow: 2.6 });
+    if (S.exhaleT > 1.1) S.exhaleT = -1;
+  }
+  // fiozinho de fumaça subindo da ponta acesa
+  if (S.lit && ch.cigTip) {
+    S.wispT -= dt;
+    if (S.wispT <= 0) {
+      S.wispT = 0.12;
+      ch.cigTip.getWorldPosition(_tip);
+      fx.sprite(_tip.x, _tip.y + 0.02, _tip.z, { color: 0xc8c8c8, op: 0.18, size: 0.035, life: 2.2, vx: env.wind.x * 0.05 + (Math.random() - 0.5) * 0.05, vy: 0.35, vz: env.wind.y * 0.05 + (Math.random() - 0.5) * 0.05, grow: 2.2 });
+    }
+  }
+}
+
 function updateOnFoot(dt, inp) {
   const p = player, ch = p.char;
   if (p.tumble) { updateTumble(dt); return; }
@@ -472,6 +566,7 @@ function updateOnFoot(dt, inp) {
     p.down -= dt; mode = 'down';
     p.vel.multiplyScalar(Math.exp(-dt * 3));
   }
+  updateIdle(dt, inp, mode);
   ch.root.position.copy(p.pos);
   ch.root.rotation.y = p.heading;
   if (!game.shops.open) ch.animate(dt, p.speed, mode);

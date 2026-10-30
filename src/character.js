@@ -101,6 +101,22 @@ export class Character {
     this.weapon = null; this.aim = 0; this.aimPitch = 0; this.swingT = 0;
   }
 
+  // cigarro entre os dedos da mão direita (ponta em brasa)
+  setCig(on) {
+    if (on && !this.cig) {
+      const g = new THREE.Group();
+      const paper = part(g, box(0.014, 0.014, 0.075), mat(0xf2f2ea, 0.9), 0, 0, 0.03);
+      const filter = part(g, box(0.015, 0.015, 0.022), mat(0xd08a3a, 0.9), 0, 0, -0.018);
+      this.cigTip = new THREE.Mesh(box(0.016, 0.016, 0.008), new THREE.MeshStandardMaterial({ color: 0x331100, emissive: 0xff5a10, emissiveIntensity: 1 }));
+      this.cigTip.position.z = 0.07;
+      g.add(this.cigTip);
+      paper.castShadow = filter.castShadow = false;
+      g.position.set(0.03, -0.02, 0.04);
+      this.arms[1].hand.add(g);
+      this.cig = g;
+    } else if (!on && this.cig) { this.cig.parent.remove(this.cig); this.cig = null; this.cigTip = null; }
+  }
+
   // arma na mão direita: bat, knife, pistol, shotgun
   setWeapon(type) {
     if (this.weaponMesh) { this.weaponMesh.parent.remove(this.weaponMesh); this.weaponMesh = null; }
@@ -322,6 +338,26 @@ export class Character {
       const o = Math.max(0, Math.sin(this.t * 17) * 0.6 + Math.sin(this.t * 7.3 + 1) * 0.5);
       this.mouth.scale.set(1 - o * 0.25, 1 + o * 2.6, 1);
     } else this.mouth.scale.set(1, 1, 1);
+    // fumando: idle.hand 0 = braço abaixado, 1 = cigarro na boca; idle.lean encosta na parede com o pé nela
+    const I = this.idle;
+    if (I && mode === 'ground' && speed < 0.15) {
+      if (I.lean > 0) {
+        const w = I.lean;
+        g.rotation.x = lerp(0, -0.1, w);
+        Rr.hp.rotation.x = lerp(Rr.hp.rotation.x, -0.35, w); Rr.kn.rotation.x = lerp(Rr.kn.rotation.x, 1.75, w);
+        L.hp.rotation.x = lerp(L.hp.rotation.x, 0.08, w);
+        AL.sh.rotation.x = lerp(AL.sh.rotation.x, 0.25, w); AL.sh.rotation.z = lerp(AL.sh.rotation.z, 0.12, w); AL.el.rotation.x = lerp(AL.el.rotation.x, -0.3, w);
+        this.head.rotation.y = Math.sin(this.t * 0.25) * 0.35;
+      }
+      const h = I.hand;
+      // mão do lado do corpo → mão na boca
+      AR.sh.rotation.x = lerp(-0.25, -0.55, h); AR.sh.rotation.z = lerp(-0.12, 0.42, h); AR.el.rotation.x = lerp(-1.1, -2.35, h);
+      AR.sh.rotation.y = lerp(0, -0.25, h);
+      if (I.pocket > 0) { AR.sh.rotation.x = 0.25 * I.pocket; AR.sh.rotation.z = -0.2 * I.pocket; AR.el.rotation.x = -0.4 * I.pocket; }
+      this.head.rotation.x = lerp(this.head.rotation.x, -0.12, h);
+      if (this.cigTip) this.cigTip.material.emissiveIntensity = 0.8 + I.glow * 5;
+      this.mouth.scale.set(1 - I.puff * 0.3, 1 + I.puff * 1.2, 1);
+    }
     // mirando: braço direito (pistola) ou os dois (escopeta) apontados pra frente
     if (this.aim > 0 && (mode === 'ground' || mode === 'air')) {
       const w = Math.min(1, this.aim), p = this.aimPitch;
