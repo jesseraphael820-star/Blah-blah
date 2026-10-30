@@ -472,11 +472,12 @@ function updateOnFoot(dt, inp) {
   p.pos.x += p.vel.x * dt; p.pos.z += p.vel.z * dt;
   // pisando em poça: espirra água a cada passo
   const hs = Math.hypot(p.vel.x, p.vel.z);
-  if (!p.swim && p.onGround && hs > 1.2 && env.wetness > 0.3) {
+  const spotW = props ? props.wetAt(p.pos.x, p.pos.z) : 0;
+  if (!p.swim && p.onGround && hs > 1.2 && (env.wetness > 0.3 || spotW > 0.2)) {
     p.stepT = (p.stepT || 0) - dt * hs * 0.6;
     if (p.stepT <= 0) {
       p.stepT = 1;
-      if (puddleAt(p.pos.x, p.pos.z, env.wetness) > 0.3) {
+      if (puddleAt(p.pos.x, p.pos.z, env.wetness) > 0.3 || spotW > 0.35) {
         for (let k = 0; k < 5; k++) fx.sprite(p.pos.x, p.pos.y + 0.05, p.pos.z, { color: 0xdfe8ef, op: 0.45, size: 0.1, life: 0.35, vx: (Math.random() - 0.5) * 2 + p.vel.x * 0.3, vy: 1 + Math.random() * 1.5, vz: (Math.random() - 0.5) * 2 + p.vel.z * 0.3, g: 12, grow: 1.5 });
       }
     }
@@ -571,6 +572,9 @@ function updateOnFoot(dt, inp) {
   ch.root.position.copy(p.pos);
   ch.root.rotation.y = p.heading;
   if (!game.shops.open) ch.animate(dt, p.speed, mode);
+  // levando choque: corpo treme
+  if (p.shockT > 0) { p.shockT -= dt; ch.root.rotation.x = (Math.random() - 0.5) * 0.25; ch.root.rotation.z = (Math.random() - 0.5) * 0.25; ch.root.position.y += Math.random() * 0.05; }
+  else if (p.shockT !== undefined && p.shockT > -1) { p.shockT = -1; ch.root.rotation.x = ch.root.rotation.z = 0; }
   // entrar em veículo
   let near = null, nd = 1e9;
   for (const v of game.vehicles) {

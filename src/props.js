@@ -22,6 +22,13 @@ export class Props {
     this.bodies = [];
     this.wobbles = [];
     this.jets = [];
+    this.live = []; // tocos com fio desencapado soltando faísca
+    // luz azulada do curto-circuito (fica sempre na cena pra não recompilar os materiais)
+    this.zapL = new THREE.PointLight(0xa8d4ff, 0, 22, 1.6);
+    W.scene.add(this.zapL);
+    this.arcMat = new THREE.LineBasicMaterial({ color: 0xd8ecff, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false });
+    this.wireMat = new THREE.LineBasicMaterial({ color: 0x151515 });
+    this.stubMat = new THREE.MeshStandardMaterial({ color: 0x55585c, metalness: 0.6, roughness: 0.5 });
     W.lamps.forEach((l, i) => this.add('lamp', l.box, W.lampIM.map((im) => [im, i]), W.lampGeo, l.x, l.y, l.z, l.rot, { lamp: l }));
     if (W.lights) W.lights.poles.forEach((P, k) => this.add('tlight', P.box, [[W.lights.pole, k], [W.lights.head, k], [W.lights.bulbs, k * 3], [W.lights.bulbs, k * 3 + 1], [W.lights.bulbs, k * 3 + 2]], W.lights.geo, P.x, P.y, P.z, P.rot));
     this.buildStreet();
@@ -116,6 +123,7 @@ export class Props {
     const dist = v.pos.distanceTo(this.g.camera.position);
     // corpo rígido do pedaço: base levada pelo carro, topo atrasa (tomba por cima do capô)
     const body = this.makeBody(it);
+    if (it.kind === 'lamp' || it.kind === 'tlight') this.makeStub(it);
     const vx = v.vel.x, vz = v.vel.z, light = it.kind === 'bin' || it.kind === 'hydrant';
     // choque inelástico na altura do para-choque (0,5 m): o ponto batido sai com a velocidade do carro;
     // abaixo do centro de massa -> a base vai junto e o topo atrasa (tomba por cima do capô)
@@ -127,11 +135,11 @@ export class Props {
     if (dist < 160) {
       fx.sparks(cx, y, cz, it.kind === 'bin' ? 0 : 18);
       if (it.kind === 'lamp' || it.kind === 'tlight') {
-        audio.clang(dist, 0.9);
+        audio.clang(dist, 0.9); audio.zap(dist, 1);
         for (let i = 0; i < 6; i++) fx.piece(it.x, it.y + 0.1, it.z, (Math.random() - 0.5) * 4 + dx * sp * 0.2, 1 + Math.random() * 3, (Math.random() - 0.5) * 4 + dz * sp * 0.2, 0.06 + Math.random() * 0.1, 0.04, 0.08 + Math.random() * 0.1, 0x8a8a84, 30);
       } else if (it.kind === 'hydrant') {
         audio.clang(dist, 0.5); audio.crash(sp * 0.4);
-        this.jets.push({ x: it.x, y: it.y, z: it.z, t: 22, acc: 0 });
+        this.jets.push({ x: it.x, y: it.y, z: it.z, t: 22, acc: 0, r: 0.4, amt: 0 });
       } else {
         audio.bin(dist);
         // lixo voando
@@ -141,10 +149,165 @@ export class Props {
     }
   }
 
+  // toco que sobra no chão: base rasgada e fios desencapados que dão curto por um tempo
+  makeStub(it) {
+    const grp = new THREE.Group();
+    grp.position.set(it.x, it.y, it.z);
+    grp.rotation.y = it.rot;
+    const sg = new THREE.CylinderGeometry(0.1, 0.14, 0.4, 7, 1, true).translate(0, 0.2, 0);
+    const pos = sg.attributes.position;
+    for (let i = 0; i < pos.count; i++) if (pos.getY(i) > 0.3) pos.setY(i, 0.22 + Math.random() * 0.22);
+    sg.computeVertexNormals();
+    grp.add(new THREE.Mesh(sg, this.stubMat));
+    const tips = [];
+    for (let k = 0; k < 3; k++) {
+      const a = k * 2.1 + Math.random(), len = 0.35 + Math.random() * 0.4, pts = [];
+      for (let j = 0; j <= 6; j++) {
+        const u = j / 6;
+        pts.push(new THREE.Vector3(Math.cos(a) * (0.04 + u * len), 0.32 + Math.sin(u * 2.6) * 0.25 - u * u * 0.35, Math.sin(a) * (0.04 + u * len)));
+      }
+      grp.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), this.wireMat));
+      tips.push(pts[6].clone().applyAxisAngle(UP, it.rot).add(grp.position));
+    }
+    const arc = new THREE.Line(new THREE.BufferGeometry().setFromPoints(Array.from({ length: 12 }, () => new THREE.Vector3())), this.arcMat);
+    arc.frustumCulled = false; arc.visible = false;
+    this.W.scene.add(grp, arc);
+    it.stub = grp; it.arc = arc;
+    const L = { it, tips, arc, t: it.kind === 'lamp' ? 45 : 28, next: 0.15, burst: 0, shockCd: 0 };
+    this.live.push(L);
+  }
+
+  // arco elétrico em zigue-zague entre dois pontos
+  arcTo(L, a, b) {
+    const P = L.arc.geometry.attributes.position, n = P.count;
+    const d = a.distanceTo(b);
+    for (let i = 0; i < n; i++) {
+      const u = i / (n - 1), j = i === 0 || i === n - 1 ? 0 : d * 0.18;
+      P.setXYZ(i, a.x + (b.x - a.x) * u + (Math.random() - 0.5) * j, a.y + (b.y - a.y) * u + Math.sin(u * Math.PI) * d * 0.15 + (Math.random() - 0.5) * j, a.z + (b.z - a.z) * u + (Math.random() - 0.5) * j);
+    }
+    P.needsUpdate = true;
+    L.arc.visible = true;
+  }
+
+  // água do hidrante embaixo de um fio vivo: a poça toda fica eletrificada
+  wetSpotAt(x, z) {
+    for (const J of this.jets) if (J.amt > 0.3 && Math.hypot(x - J.x, z - J.z) < J.r * 0.85) return J;
+    return null;
+  }
+  wetAt(x, z) {
+    let w = 0;
+    for (const J of this.jets) { const d = Math.hypot(x - J.x, z - J.z) / J.r; if (d < 0.85) w = Math.max(w, J.amt * (1 - d / 0.85)); }
+    return w;
+  }
+
+  shock(target, x, z, isPlayer) {
+    const g = this.g, dx = target.pos.x - x, dz = target.pos.z - z, d = Math.hypot(dx, dz) || 1;
+    if (isPlayer) {
+      g.player.health -= 9;
+      g.player.shockT = 0.55; g.player.down = Math.max(g.player.down, 1.4);
+      g.player.vel.set((dx / d) * 2.5, 0, (dz / d) * 2.5);
+      g.cam.shake = Math.max(g.cam.shake, 0.35);
+      if (g.input && g.input.rumble) g.input.rumble(0.9, 0.9, 300);
+    } else if (g.peds) g.peds.damage(target, 30, dx / d, dz / d, false);
+    for (let i = 0; i < 10; i++) g.fx.sprite(target.pos.x + (Math.random() - 0.5) * 0.5, target.pos.y + 0.3 + Math.random() * 1.4, target.pos.z + (Math.random() - 0.5) * 0.5, { color: 0xb8dcff, op: 1, add: true, size: 0.12, life: 0.25, vx: (Math.random() - 0.5) * 4, vy: Math.random() * 3, vz: (Math.random() - 0.5) * 4, grow: 0.3 });
+  }
+
+  updateLive(dt) {
+    const g = this.g, fx = g.fx, cam = g.camera.position, P = g.player;
+    let best = null, bestD = 1e9;
+    for (let i = this.live.length - 1; i >= 0; i--) {
+      const L = this.live[i], it = L.it;
+      L.t -= dt; L.next -= dt; L.shockCd -= dt;
+      L.arc.visible = false;
+      if (L.t <= 0) { this.live.splice(i, 1); continue; }
+      const d = Math.hypot(it.x - cam.x, it.z - cam.z);
+      if (L.next <= 0) {
+        // nova descarga: curta e irregular, mais espaçada quando o fio vai morrendo
+        L.burst = 0.06 + Math.random() * (L.t < 10 ? 0.12 : 0.3);
+        L.next = L.burst + (0.35 + Math.random() * 2.2) * (L.t < 10 ? 2.2 : 1);
+        if (d < 120) g.audio.zap(d, 0.5 + Math.random() * 0.5);
+      }
+      if (L.burst <= 0) continue;
+      L.burst -= dt;
+      const wet = this.wetSpotAt(it.x, it.z);
+      if (d < 150) {
+        const a = L.tips[Math.floor(Math.random() * 3)], b = L.tips[Math.floor(Math.random() * 3)];
+        const gy = groundAt(a.x, a.z);
+        if (wet && Math.random() < 0.6) {
+          // arco correndo pela água
+          const ang = Math.random() * 6.28, r = Math.random() * wet.r * 0.8;
+          const px = wet.x + Math.cos(ang) * r, pz = wet.z + Math.sin(ang) * r;
+          this.arcTo(L, a, _v.set(px, groundAt(px, pz) + 0.03, pz));
+          fx.sprite(px, groundAt(px, pz) + 0.05, pz, { color: 0xbfe2ff, op: 1, add: true, size: 0.5, life: 0.15, grow: 0.5 });
+        } else this.arcTo(L, a, a === b ? _v.set(a.x + (Math.random() - 0.5) * 0.8, gy + 0.02, a.z + (Math.random() - 0.5) * 0.8) : b);
+        if (Math.random() < 0.7) {
+          const c = Math.random() < 0.6 ? 0xd2ecff : 0xffc060;
+          for (let k = 0; k < 3; k++) fx.sprite(a.x, a.y, a.z, { color: c, op: 1, add: true, size: 0.1, life: 0.3 + Math.random() * 0.4, vx: (Math.random() - 0.5) * 6, vy: Math.random() * 4, vz: (Math.random() - 0.5) * 6, g: 14, grow: 0.2 });
+        }
+        if (Math.random() < 0.3) fx.sprite(a.x, a.y + 0.1, a.z, { color: 0x666666, op: 0.25, size: 0.3, life: 1.2, vy: 0.6, grow: 2.5 });
+        if (d < bestD) { bestD = d; best = a; }
+      }
+      // choque: perto dos fios, ou em qualquer lugar da poça eletrificada
+      if (L.shockCd <= 0) {
+        const R2 = (x, z) => Math.hypot(x - it.x, z - it.z) < 1.3 || (wet && Math.hypot(x - wet.x, z - wet.z) < wet.r * 0.8);
+        if (!P.vehicle && P.onGround && !P.swim && R2(P.pos.x, P.pos.z)) { this.shock(P, it.x, it.z, true); L.shockCd = 0.6; g.audio.zap(0, 1); }
+        if (g.peds) for (const q of g.peds.list) if (q.state !== 'dead' && R2(q.pos.x, q.pos.z)) { this.shock(q, it.x, it.z, false); L.shockCd = 0.6; }
+      }
+    }
+    if (best) { this.zapL.position.set(best.x, best.y + 0.3, best.z); this.zapL.intensity = 6 + Math.random() * 16; } else this.zapL.intensity = 0;
+  }
+
+  // poça do hidrante: cresce enquanto jorra, depois seca devagar; vai pro shader do chão
+  updateWater(dt) {
+    const g = this.g, fx = g.fx, cam = g.camera.position, U = this.W.wetU;
+    for (let i = this.jets.length - 1; i >= 0; i--) {
+      const J = this.jets[i], flowing = J.t > 0;
+      if (flowing) { J.r = Math.min(6.5, J.r + dt * 0.5 * (1 - J.r / 7.5) * 2); J.amt = Math.min(1, J.amt + dt * 0.5); }
+      else { J.amt -= dt / 75; J.r += dt * 0.02; }
+      if (J.amt <= 0) { this.jets.splice(i, 1); continue; }
+      const d = Math.hypot(J.x - cam.x, J.z - cam.z);
+      if (d > 140) continue;
+      const k = clamp(J.t / 4, 0, 1);
+      if (flowing) {
+        // gotas caindo em volta (o vento empurra pra um lado) com coroinha ao bater no chão
+        const wx = g.env.wind.x * 0.25, wz = g.env.wind.y * 0.25;
+        for (let n = Math.random() < dt * 30 * k ? 2 : 0; n > 0; n--) {
+          const a = Math.random() * 6.28, r = 0.6 + Math.random() * 2.8, x = J.x + Math.cos(a) * r + wx, z = J.z + Math.sin(a) * r + wz, gy = groundAt(x, z);
+          for (let c = 0; c < 4; c++) fx.sprite(x, gy + 0.03, z, { color: 0xe6f0f8, op: 0.55, size: 0.08, life: 0.35, vx: (Math.random() - 0.5) * 2, vy: 1 + Math.random() * 1.4, vz: (Math.random() - 0.5) * 2, g: 11, grow: 1.2 });
+        }
+        // água borbulhando na base quebrada e névoa baixa
+        if (Math.random() < dt * 14 * k) fx.sprite(J.x + (Math.random() - 0.5) * 0.3, J.y + 0.1, J.z + (Math.random() - 0.5) * 0.3, { color: 0xf0f6fb, op: 0.6, size: 0.25, life: 0.5, vx: (Math.random() - 0.5) * 3, vy: 1.5 + Math.random() * 2, vz: (Math.random() - 0.5) * 3, g: 10, grow: 1.6 });
+        if (Math.random() < dt * 3 * k) fx.sprite(J.x + (Math.random() - 0.5) * J.r, J.y + 0.4, J.z + (Math.random() - 0.5) * J.r, { color: 0xdfe8ef, op: 0.14, size: 2.2, life: 2.5, vx: wx * 2, vy: 0.3, vz: wz * 2, grow: 1.8 });
+      } else if (J.t > -10 && Math.random() < dt * 4 * (1 + J.t / 10)) {
+        // resto escorrendo do cano depois que a pressão cai
+        fx.sprite(J.x, J.y + 0.08, J.z, { color: 0xeef4f9, op: 0.4, size: 0.12, life: 0.4, vx: (Math.random() - 0.5), vy: 0.6, vz: (Math.random() - 0.5), g: 9, grow: 1.4 });
+      }
+      // carro passando pela poça: lençol d'água das rodas
+      for (const v of g.vehicles) {
+        if (v.t.boat || v.speed < 4 || Math.hypot(v.pos.x - J.x, v.pos.z - J.z) > J.r * 0.8 + 2) continue;
+        if (this.wetAt(v.pos.x, v.pos.z) < 0.25 || Math.random() > dt * 20) continue;
+        const sh = Math.sin(v.heading), ch = Math.cos(v.heading), sp = v.speed;
+        for (const s of [-1, 1]) fx.puddle(v.pos.x + ch * s * v.t.width * 0.5, v.pos.y + 0.1, v.pos.z - sh * s * v.t.width * 0.5, ch * s, -sh * s, v.vel.x, v.vel.z, sp);
+        fx.spray(v.pos.x - sh * v.t.length * 0.5, v.pos.y + 0.3, v.pos.z - ch * v.t.length * 0.5, v.vel.x, v.vel.z, 1);
+      }
+    }
+    // as 4 poças mais perto da câmera vão pro shader
+    const near = this.jets.slice().sort((a, b) => Math.hypot(a.x - cam.x, a.z - cam.z) - Math.hypot(b.x - cam.x, b.z - cam.z));
+    for (let i = 0; i < 4; i++) {
+      const J = near[i];
+      if (J) { U.uSpot.value[i].set(J.x, J.z, J.r, J.amt); U.uSpotR.value[i] = J.t > 0 ? clamp(J.t / 4, 0, 1) * 0.8 : 0; } else { U.uSpot.value[i].w = 0; U.uSpotR.value[i] = 0; }
+    }
+  }
+
   makeBody(it) {
     const grp = new THREE.Group(), inner = new THREE.Group();
     inner.position.y = -it.K.com;
-    for (const [g, mat] of it.geo.parts) { const m = new THREE.Mesh(g, mat); m.castShadow = true; inner.add(m); }
+    let head = null;
+    it.geo.parts.forEach(([g, mat], k) => {
+      // cabeça da luminária caída ainda pisca um pouco antes de queimar
+      if (it.kind === 'lamp' && k === 2) mat = head = new THREE.MeshStandardMaterial({ color: 0xfff1cf, emissive: 0xffd68a, emissiveIntensity: 0 });
+      const m = new THREE.Mesh(g, mat); m.castShadow = true; inner.add(m);
+    });
     grp.add(inner);
     this.W.scene.add(grp);
     const L = it.K.len, M = it.K.m, c = it.K.com;
@@ -162,6 +325,7 @@ export class Props {
       it, grp, M, pts, invI: new THREE.Vector3(1 / Ixx, 1 / Iyy, 1 / Ixx),
       pos: new THREE.Vector3(it.x, it.y + c, it.z), q: new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), it.rot),
       vel: new THREE.Vector3(), w: new THREE.Vector3(), rest: 0, sleep: false, life: 0, clangT: 0,
+      head, flick: head ? 1.5 + Math.random() * 3.5 : 0,
     };
     it.body = b;
     this.bodies.push(b);
@@ -341,6 +505,7 @@ export class Props {
     for (let i = this.jets.length - 1; i >= 0; i--) {
       const J = this.jets[i];
       J.t -= dt;
+      if (J.t <= 0) continue;
       const d = Math.hypot(J.x - cam.x, J.z - cam.z);
       if (d < 150) {
         J.acc += dt * 45 * clamp(J.t / 4, 0, 1);
@@ -352,9 +517,17 @@ export class Props {
         }
       }
       if (!this.jetNear || d < this.jetNear) this.jetNear = d;
-      if (J.t <= 0) this.jets.splice(i, 1);
     }
-    g.audio.setGush(this.jets.length ? clamp(1 - (this.jetNear || 999) / 60, 0, 1) : 0);
+    this.updateWater(dt);
+    this.updateLive(dt);
+    // luminária caída piscando
+    const lit = this.W.lampMat.emissiveIntensity;
+    for (const b of this.bodies) if (b.head && b.flick > 0) {
+      b.flick -= dt;
+      b.head.emissiveIntensity = b.flick > 0 && Math.random() < 0.55 ? lit * (0.4 + Math.random() * 0.8) : 0;
+      if (b.flick <= 0 && lit > 0.5) { const p = _v.set(0, 7.32 - b.it.K.com, -1.6).applyQuaternion(b.q).add(b.pos); fx.sparks(p.x, p.y, p.z, 10); g.audio.zap(p.distanceTo(cam), 0.4); }
+    }
+    g.audio.setGush(this.jets.some((J) => J.t > 0) ? clamp(1 - (this.jetNear || 999) / 60, 0, 1) : 0);
     this.jetNear = 0;
     // quebrados longe da vista voltam ao lugar
     this.chk = (this.chk || 0) - dt;
@@ -370,11 +543,12 @@ export class Props {
   }
 
   restore(it) {
+    if (it.stub) { this.W.scene.remove(it.stub, it.arc); const k = this.live.findIndex((L) => L.it === it); if (k >= 0) this.live.splice(k, 1); it.stub = it.arc = null; }
     if (it.body) { this.W.scene.remove(it.body.grp); this.bodies.splice(this.bodies.indexOf(it.body), 1); it.body = null; }
     it.broken = false; it.box.gone = false;
     if (it.lamp) it.lamp.off = false;
     this.setVisible(it, true);
   }
 
-  reset() { for (const it of this.items) if (it.broken) this.restore(it); this.jets.length = 0; }
+  reset() { for (const it of this.items) if (it.broken) this.restore(it); this.jets.length = 0; this.live.length = 0; }
 }

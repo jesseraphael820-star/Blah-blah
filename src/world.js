@@ -390,6 +390,8 @@ const WET_GLSL = `
 uniform float uWet, uRain, uTime;
 uniform vec4 uL[${12}];
 uniform vec3 uLC[${12}];
+uniform vec4 uSpot[4];
+uniform float uSpotR[4];
 varying vec3 vWP;
 varying vec3 vWN;
 float pudF(vec2 p) {
@@ -414,7 +416,7 @@ vec2 ripples(vec2 p, float t) {
 }`;
 export function addWet(mat, U, { puddles = true, dark = 0.62 } = {}) {
   mat.onBeforeCompile = (sh) => {
-    Object.assign(sh.uniforms, { uWet: U.uWet, uRain: U.uRain, uTime: U.uTime, uL: U.uL, uLC: U.uLC });
+    Object.assign(sh.uniforms, { uWet: U.uWet, uRain: U.uRain, uTime: U.uTime, uL: U.uL, uLC: U.uLC, uSpot: U.uSpot, uSpotR: U.uSpotR });
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', '#include <common>\nvarying vec3 vWP;\nvarying vec3 vWN;')
       .replace('#include <project_vertex>', '#include <project_vertex>\nvWP = (modelMatrix * vec4(transformed, 1.0)).xyz;\nvWN = normalize(mat3(modelMatrix) * objectNormal);');
@@ -423,26 +425,39 @@ export function addWet(mat, U, { puddles = true, dark = 0.62 } = {}) {
       .replace('#include <map_fragment>', `#include <map_fragment>
         float up = smoothstep(0.7, 0.95, vWN.y);
         float pud = ${puddles ? 'smoothstep(1.3 - 0.45 * uWet, 1.42 - 0.4 * uWet, pudF(vWP.xz)) * smoothstep(0.25, 0.7, uWet) * up' : '0.0'};
-        diffuseColor.rgb *= mix(1.0, ${dark.toFixed(2)}, uWet);
+        // água do hidrante: mancha molhada de borda irregular com lâmina d'água no meio
+        float spot = 0.0, spotR = 0.0;
+        for (int i = 0; i < 4; i++) {
+          if (uSpot[i].w <= 0.0) continue;
+          float d = length(vWP.xz - uSpot[i].xy) / uSpot[i].z + 0.16 * pudF(vWP.xz * 2.1);
+          float k = uSpot[i].w * (1.0 - smoothstep(0.6, 1.0, d));
+          spot = max(spot, k);
+          spotR = max(spotR, uSpotR[i] * (1.0 - smoothstep(0.1, 0.75, d)));
+        }
+        spot *= up;
+        pud = max(pud, smoothstep(0.45, 0.85, spot));
+        float wetL = max(uWet, spot);
+        diffuseColor.rgb *= mix(1.0, ${dark.toFixed(2)}, wetL);
         diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * 0.3 + vec3(0.008, 0.01, 0.013), pud);`)
       .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 0.025, pud);')
       .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
-        if (uRain > 0.02 && uWet > 0.1) {
+        float rainK = max(uRain * step(0.1, uWet), spotR);
+        if (rainK > 0.02) {
           float near = 1.0 - smoothstep(9.0, 32.0, length(vWP - cameraPosition));
-          vec2 gr = near > 0.0 ? ripples(vWP.xz, uTime) * uRain * up * near * (pud * 0.55 + 0.06 * uWet) : vec2(0.0);
+          vec2 gr = near > 0.0 ? ripples(vWP.xz, uTime) * rainK * up * near * (pud * 0.55 + 0.06 * wetL) : vec2(0.0);
           normal = normalize(normal + (viewMatrix * vec4(gr.x, 0.0, gr.y, 0.0)).xyz);
         }`)
       // prédios e árvores tapam boa parte do céu que o chão refletiria (o mapa de ambiente é só céu)
       .replace('#include <lights_fragment_maps>', '#include <lights_fragment_maps>\n#if defined( RE_IndirectSpecular )\nradiance *= mix(0.32, 0.7, pud);\n#endif')
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
         // reflexo das luzes (postes, faróis) no chão molhado: alongado no asfalto, espelhado na poça
-        if (uWet > 0.05) {
+        if (wetL > 0.05) {
           vec3 nW = normalize((vec4(normal, 0.0) * viewMatrix).xyz);
           vec3 V = normalize(vWP - cameraPosition);
           vec3 Rf = reflect(V, nW);
           vec3 side = normalize(cross(V, vec3(0.0, 1.0, 0.0)) + 1e-5);
           float fres = 0.04 + 0.96 * pow(1.0 - clamp(dot(-V, nW), 0.0, 1.0), 5.0);
-          float wetK = uWet * up;
+          float wetK = wetL * up;
           float k = mix(0.35, 9.0, pud), kh = mix(14.0, 1.0, pud);
           vec3 acc = vec3(0.0);
           for (int i = 0; i < ${12}; i++) {
@@ -528,6 +543,8 @@ export class World {
       uWet: { value: 0 }, uRain: { value: 0 }, uTime: this.windU.uTime,
       uL: { value: Array.from({ length: LIGHTS_N }, () => new THREE.Vector4()) },
       uLC: { value: Array.from({ length: LIGHTS_N }, () => new THREE.Color()) },
+      // manchas d'água locais (hidrante): x, z, raio, quantidade; uSpotR = força das gotas caindo
+      uSpot: { value: Array.from({ length: 4 }, () => new THREE.Vector4()) }, uSpotR: { value: [0, 0, 0, 0] },
     };
     this.R = rng(1993);
   }

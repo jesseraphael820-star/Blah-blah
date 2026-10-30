@@ -115,6 +115,15 @@ export class Audio {
   }
   bin(dist = 0) { if (!this.ctx) return; const k = clamp(1 - dist / 90, 0, 1); if (k < 0.01) return; this.burst(0.25, 700, k * 0.5); this.tone(240, 160, 0.2, k * 0.25, 'square'); this.burst(0.35, 3500, k * 0.12, 'highpass'); }
   thud(dist = 0, v = 6) { if (!this.ctx) return; const k = clamp(1 - dist / 100, 0, 1) * clamp(v / 15, 0.2, 1); if (k < 0.01) return; this.tone(90, 45, 0.35, k * 0.6); this.burst(0.5, 4000, k * 0.15, 'highpass'); }
+  // curto-circuito: estalos agudos + zumbido de 60 Hz
+  zap(dist = 0, v = 0.6) {
+    if (!this.ctx) return;
+    const k = clamp(1 - dist / 110, 0, 1) * v;
+    if (k < 0.01) return;
+    for (let i = 0; i < 4; i++) this.tone(2000 + Math.random() * 3000, 800, 0.03, k * 0.12, 'square', i * (0.02 + Math.random() * 0.05));
+    this.burst(0.18, 5000, k * 0.35, 'highpass');
+    this.tone(120, 118, 0.25, k * 0.14, 'sawtooth'); this.tone(60, 60, 0.3, k * 0.1, 'square');
+  }
   setGush(v) { if (!this.ctx) return; this.set(this.gush.g, v * 0.25, 0.3); }
   click() { if (!this.ctx) return; this.tone(1800, 1200, 0.04, 0.15, 'square'); }
   swing() { if (!this.ctx) return; this.burst(0.18, 1400, 0.25, 'bandpass'); }
