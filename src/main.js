@@ -16,6 +16,11 @@ import { Audio, STATIONS } from './audio.js';
 import { Voice } from './voice.js';
 import { Missions } from './missions.js';
 import { LINES, ui } from './i18n.js';
+import { Police } from './police.js';
+import { FX } from './fx.js';
+import { Air } from './air.js';
+import { Shops } from './shops.js';
+import { periodAt } from './sky.js';
 
 const settings = new Settings();
 const Q = settings.get('quality');
@@ -60,6 +65,10 @@ class Player {
     this.swim = false;
     this.down = 0;
     this.speed = 0;
+    this.stamina = 5;
+    this.breath = 15;
+    this.under = false;
+    this.airT = 0;
     scene.add(this.char.root);
   }
 }
@@ -122,15 +131,40 @@ const game = {
   },
   cineTitle(a, b) { this.hud.cineTitle(a, b); },
   camYawTo(y) { this.cam.yaw = y; },
+  setPlayerLook(look, muscle) {
+    const p = this.player, old = p.char;
+    const ch = new Character({ ...look, muscle });
+    ch.root.position.copy(old.root.position); ch.root.rotation.copy(old.root.rotation);
+    if (p.vehicle) p.vehicle.setRider(ch); else { scene.remove(old.root); scene.add(ch.root); }
+    p.char = ch;
+  },
+  explode(v) {
+    v.exploded = true; v.health = -1; v.dead = true;
+    v.paint.color.setHex(0x161616); v.paint.clearcoat = 0; v.paint.metalness = 0.1; v.paint.roughness = 1;
+    for (const part of v.parts || []) part.visible = false;
+    fx.explode(v.pos.x, v.pos.y, v.pos.z, v.color);
+    audio.boom();
+    v.vy = 7; v.onGround = false; v.yawRate += (Math.random() - 0.5) * 3;
+    const d = v.pos.distanceTo(camera.position);
+    this.cam.shake = Math.max(this.cam.shake, Math.max(0, 1.2 - d / 60));
+    input.rumble(1, 1, 500);
+    if (this.player.vehicle === v) { this.exitVehicle(true); this.player.health -= 70; this.player.down = 2.5; }
+    else if (this.player.pos.distanceTo(v.pos) < 7) { this.player.health -= 40; this.player.down = 2; }
+    for (const o of this.vehicles) if (o !== v && o.pos.distanceTo(v.pos) < 9) { const dir = o.pos.clone().sub(v.pos).setY(0).normalize(); o.vel.addScaledVector(dir, 6); o.sleeping = false; o.damage(4); }
+    peds.scare(v.pos.x, v.pos.z, 40);
+    if (v.driver === 'player' || this.player.pos.distanceTo(v.pos) < 40) this.addWanted(0.5);
+  },
   placePlayer(x, z, h) {
     const p = this.player;
+    p.swim = false; p.under = false; p.vy = 0;
     if (p.vehicle) this.exitVehicle(true);
     p.pos.set(x, groundAt(x, z), z); p.vel.set(0, 0, 0); p.heading = h; this.cam.yaw = h;
   },
 
   enterVehicle(v) {
     const p = this.player;
-    if (v.driver === 'ai') {
+    if (v.police) { this.addWanted(2); v.police = false; if (v.siren) v.siren.red.emissiveIntensity = v.siren.blue.emissiveIntensity = 0; }
+    if (v.driver === 'ai' && v.rider) {
       const ch = v.rider;
       v.setRider(null);
       const d = v.doorPoint(1);
@@ -175,7 +209,8 @@ const player = (game.player = new Player());
 const world = (game.world = new World(scene, Q));
 const input = (game.input = new Input(settings, renderer.domElement));
 const audio = (game.audio = new Audio(settings));
-let env, hud, voice, traffic, peds, missions;
+let env, hud, voice, traffic, peds, missions, police, air, shops;
+const fx = (game.fx = new FX(scene));
 
 // luzes dinâmicas: postes próximos e farol do jogador
 const lampLights = [];
@@ -199,24 +234,55 @@ function updateOnFoot(dt, inp) {
   const wl = Math.hypot(wx, wz);
   if (wl > 0.01) { wx /= wl; wz /= wl; }
   const gy = groundAt(p.pos.x, p.pos.z);
-  p.swim = gy < -1.35;
-  let top = p.swim ? 2.4 : inp.sprint ? 7.4 : 4.6;
+  const deep = gy < -1.35;
+  if (deep && !p.swim && p.pos.y < 0.15) {
+    p.swim = true; p.under = false;
+    fx.splash(p.pos.x, 0, p.pos.z, p.vy < -6);
+    audio.splash(p.vy < -6);
+    if (p.vy < -6) { p.under = true; p.vy = Math.max(p.vy * 0.25, -3); }
+  }
+  if (!deep && p.swim && p.pos.y > gy - 0.6) { p.swim = false; p.under = false; }
+  const shops = game.shops;
+  const sprinting = inp.sprint && p.stamina > 0 && mag > 0.1;
+  if (sprinting) p.stamina -= dt; else p.stamina = Math.min(shops.sprintMax, p.stamina + dt * 0.7);
+  let top = p.swim ? (p.under ? 2.1 : sprinting ? 3.4 : 2.3) : sprinting ? 7.4 : 4.6;
   if (!inp.analog && !inp.walk) mag = mag > 0 ? 1 : 0;
   const speed = top * mag;
   if (wl > 0.01) p.heading += clamp(angleDiff(p.heading, Math.atan2(wx, wz)), -dt * 11, dt * 11);
-  const k = 1 - Math.exp(-dt * (p.onGround || p.swim ? 12 : 1.5));
+  const k = 1 - Math.exp(-dt * (p.onGround || p.swim ? (p.swim ? 4 : 12) : 1.5));
   p.vel.x = lerp(p.vel.x, wx * speed, k);
   p.vel.z = lerp(p.vel.z, wz * speed, k);
+  const ox = p.pos.x, oz = p.pos.z;
   p.pos.x += p.vel.x * dt; p.pos.z += p.vel.z * dt;
-  if (p.swim) { p.pos.y = lerp(p.pos.y, -0.35, 1 - Math.exp(-dt * 4)); p.vy = 0; p.onGround = false; }
-  else {
-    if (free && inp.jump && p.onGround) { p.vy = 6.2; p.onGround = false; }
+  if (!p.swim && p.onGround && groundAt(p.pos.x, p.pos.z) - p.pos.y > 0.6) { p.pos.x = ox; p.pos.z = oz; }
+  if (p.swim) {
+    p.onGround = false;
+    const bed = heightAt(p.pos.x, p.pos.z) + 0.5;
+    if (free && inp.dive) p.under = true;
+    if (p.under) {
+      const want = free && inp.dive ? -2.4 : free && inp.up ? 2.8 : 0.7;
+      p.vy = lerp(p.vy, want, 1 - Math.exp(-dt * 3));
+      p.pos.y += p.vy * dt;
+      if (p.pos.y < bed) { p.pos.y = bed; p.vy = Math.max(p.vy, 0); }
+      if (p.pos.y >= -0.35) { p.under = false; p.pos.y = -0.35; if (p.breath < shops.breathMax * 0.5) audio.splash(false); }
+      p.breath -= dt;
+      if (p.breath < 0) p.health -= dt * 10;
+      if (Math.random() < dt * 3) fx.bubbles(p.pos.x + Math.sin(p.heading) * 0.9, p.pos.y + 0.3, p.pos.z + Math.cos(p.heading) * 0.9);
+    } else {
+      p.vy = 0;
+      p.pos.y = lerp(p.pos.y, -0.35 + Math.sin(game.simTime * 1.7) * 0.06 * (1 + env.windStrength), 1 - Math.exp(-dt * 4));
+      p.breath = Math.min(shops.breathMax, p.breath + dt * 5);
+      if (free && inp.jump && gy > -2.2) { p.vy = 4; p.swim = false; }
+    }
+  } else {
+    p.breath = Math.min(shops.breathMax, p.breath + dt * 5);
+    if (free && inp.jump && p.onGround) { p.vy = 6.2; p.onGround = false; p.airT = 0; }
     p.vy -= 20 * dt;
     p.pos.y += p.vy * dt;
     if (p.pos.y <= gy || (p.onGround && p.pos.y - gy < 0.45)) {
-      if (!p.onGround && p.vy < -14) p.health -= (-p.vy - 14) * 6;
-      p.pos.y = gy; p.vy = 0; p.onGround = true;
-    } else p.onGround = false;
+      if (!p.onGround && p.vy < -14) { p.health -= (-p.vy - 14) * 6; input.rumble(0.6, 0.4, 200); game.cam.shake = 0.3; }
+      p.pos.y = gy; p.vy = 0; p.onGround = true; p.airT = 0;
+    } else { p.onGround = false; p.airT = (p.airT || 0) + dt; }
   }
   world.col.resolveCircle(p.pos, 0.35, p.pos.y);
   // carros
@@ -245,16 +311,21 @@ function updateOnFoot(dt, inp) {
         const dx = q.pos.x - p.pos.x, dz = q.pos.z - p.pos.z, d = Math.hypot(dx, dz);
         if (d < 1.5 && (dx * fx + dz * fz) / (d || 1) > 0.4) { peds.knock(q, fx * 2.5, fz * 2.5, false); audio.punch(); input.rumble(0.3, 0.5, 90); peds.scare(p.pos.x, p.pos.z, 15); }
       }
+      if (police.punch(p.pos.x, p.pos.z, fx, fz)) { audio.punch(); input.rumble(0.3, 0.5, 90); }
     }, 150);
   }
-  let mode = p.swim ? 'swim' : p.onGround ? 'ground' : 'air';
+  let mode = p.swim ? (p.under ? 'swimUnder' : p.speed > 0.4 ? 'swim' : 'tread') : p.onGround ? 'ground' : 'air';
+  if (!p.swim && !p.onGround) {
+    if (deep && p.pos.y > 0.8 && p.vy < 1) mode = 'dive';
+    else if (p.vy < -9 || p.airT > 1.1) mode = 'fall';
+  }
   if (p.down > 0) {
     p.down -= dt; mode = 'down';
     p.vel.multiplyScalar(Math.exp(-dt * 3));
   }
   ch.root.position.copy(p.pos);
   ch.root.rotation.y = p.heading;
-  ch.animate(dt, p.speed, mode);
+  if (!game.shops.open) ch.animate(dt, p.speed, mode);
   // entrar em veículo
   let near = null, nd = 1e9;
   for (const v of game.vehicles) {
@@ -320,6 +391,7 @@ function updateCamera(dt, inp) {
     if (camBlocked(camTarget.x + ray.x * s, camTarget.y + ray.y * s, camTarget.z + ray.z * s)) { d = Math.max(0.6, s - 0.35); break; }
   }
   const want = camTarget.clone().addScaledVector(ray, d);
+  if (!v && player.swim && player.under) want.y = Math.min(want.y, -0.6);
   if (!c.init) { c.pos.copy(want); c.init = true; }
   c.pos.lerp(want, 1 - Math.exp(-dt * (v ? 14 : 22)));
   if (d < c.dist - 0.3) c.pos.copy(want);
@@ -358,7 +430,7 @@ function tick() {
     return;
   }
   const inp = input.poll(dt);
-  if (inp.pause && !game.mapOpen) setPaused(!game.paused);
+  if (inp.pause && !game.mapOpen && !(shops && shops.open)) setPaused(!game.paused);
   if (inp.map && !game.paused && !game.locked) { game.mapOpen = !game.mapOpen; hud.showFullMap(game, game.mapOpen); if (game.mapOpen) document.exitPointerLock?.(); }
   if (game.mapOpen && inp.pause) { game.mapOpen = false; hud.showFullMap(game, false); }
   if (game.paused || game.mapOpen) { render(); return; }
@@ -366,6 +438,7 @@ function tick() {
   game.simTime += dt;
   if (game.cine && inp.skip) voice.skip();
 
+  if (shops.update(dt, inp)) { inp.moveX = inp.moveY = inp.mag = 0; inp.jump = inp.punch = inp.enter = false; inp.lookX = inp.lookY = 0; }
   const p = player, v = p.vehicle;
   if (v) {
     const free = !game.locked;
@@ -402,9 +475,23 @@ function tick() {
     car.update(dt, ctrl, env, car === p.vehicle && settings.get('gearbox') === 'manual');
     if (!car.sleeping || car === p.vehicle) car.collideWorld(world.col);
     awake.push(car);
-    if (car.health <= 0 && !car.dead) { car.dead = true; car.paint.color.multiplyScalar(0.25); car.paint.clearcoat = 0; }
+    // estrago progressivo: peças caem, fumaça, fogo e explosão
+    if (car.health < 700 && car.parts && car.parts[0].visible) fx.detach(car, car.parts[0]);
+    if (car.health < 420 && car.parts && car.parts[1].visible) fx.detach(car, car.parts[1]);
+    if (!car.exploded && d < 260) {
+      const hx = car.pos.x + Math.sin(car.heading) * car.t.length * 0.35, hz = car.pos.z + Math.cos(car.heading) * car.t.length * 0.35, hy = car.pos.y + car.t.height * 0.7;
+      if (car.health < 450 && Math.random() < dt * (car.health < 250 ? 14 : 6)) fx.smoke(hx, hy, hz, car.health < 250, env.wind);
+      if (car.health < 150) {
+        if (!car.burnT) { car.burnT = 6; car.dead = true; }
+        if (Math.random() < dt * 25) fx.fire(hx, hy, hz);
+        car.burnT -= dt;
+        if (car.burnT <= 0 && !car.t.pedal) game.explode(car);
+        else if (car.burnT <= 0) car.exploded = true;
+      }
+    } else if (car.exploded && Math.random() < dt * 3 && d < 200) fx.smoke(car.pos.x, car.pos.y + 1, car.pos.z, true, env.wind);
   }
   collideVehicles(awake, (A, B, vn) => {
+    if ((A === p.vehicle && B.police) || (B === p.vehicle && A.police)) game.addWanted(vn > 4 ? 1 : 0.4);
     if (A === p.vehicle || B === p.vehicle) { audio.crash(vn); input.rumble(clamp(vn / 12, 0.2, 1), 0.5, 220); game.cam.shake = Math.max(game.cam.shake, vn * 0.05); if (vn > 6) game.addWanted(0.15); }
   });
   if (v) {
@@ -414,6 +501,9 @@ function tick() {
   for (const car of game.vehicles) car.impact = 0;
 
   traffic.update(dt);
+  police.update(dt);
+  air.update(dt);
+  fx.update(dt, camera.position);
   peds.update(dt);
   for (const a of game.actors) { a.ch.root.position.copy(a.pos); a.ch.root.rotation.y = a.heading; a.ch.animate(dt, 0, 'ground'); }
   // marcadores e blips que seguem objetos
@@ -432,7 +522,7 @@ function tick() {
     setTimeout(() => {
       const of = world.oficina;
       game.placePlayer(of.x - 4, of.z + 6, Math.PI);
-      p.health = 100; p.down = 0; game.money = Math.max(0, game.money - 100); game.wanted = 0; game.dead = false;
+      p.health = 100; p.down = 0; game.money = Math.max(0, game.money - 100); game.wanted = 0; game.dead = false; police.clear();
     }, 3500);
   }
   if (p.health < 100 && game.crimeT > 8) p.health = Math.min(100, p.health + dt * 1.5);
@@ -448,6 +538,10 @@ function tick() {
   game.camForward.set(Math.sin(game.cam.yaw), 0, Math.cos(game.cam.yaw));
   if (game.cine) { camera.getWorldDirection(game.camForward); }
   env.update(dt, camera.position, game.focus);
+  // câmera debaixo d'água
+  const underCam = camera.position.y < -0.15 && heightAt(camera.position.x, camera.position.z) < -0.6;
+  if (underCam) { scene.fog.color.setRGB(0.02, 0.12, 0.16).multiplyScalar(1 - env.night * 0.8); scene.fog.density = 0.045; }
+  document.body.classList.toggle('underwater', underCam);
   world.update(dt, camera.position, env);
   if (frames % 2 === 0) world.updateGrass(camera.position.x, camera.position.z, game.camForward.x, game.camForward.z);
 
@@ -474,6 +568,9 @@ function tick() {
     headlight.intensity = 180;
   } else headlight.intensity = 0;
 
+  // período do dia
+  const per = periodAt(env.time);
+  if (per !== game.period) { if (game.period && !game.locked) hud.hint(ui('period', settings.get('lang'), { n: per[settings.get('lang')] }), 3500); game.period = per; }
   // zona
   zoneT -= dt;
   if (zoneT <= 0) {
@@ -509,6 +606,14 @@ async function boot() {
   traffic = game.traffic = new Traffic(game);
   peds = game.peds = new Peds(game);
   missions = game.missions = new Missions(game);
+  police = game.police = new Police(game);
+  air = game.air = new Air(game);
+  shops = game.shops = new Shops(game);
+  game.setPlayerLook(shops.data.look, shops.data.muscle);
+  player.stamina = shops.sprintMax; player.breath = shops.breathMax;
+  Vehicle.onDamage = (v, strength) => {
+    if (strength > 2.5 && v.pos.distanceTo(camera.position) < 150) fx.impact(v, strength);
+  };
   // carros estacionados pelas cidades
   const types = ['sedan', 'sedan', 'pickup', 'sport', 'moto', 'taxi', 'sedan', 'pickup'];
   world.parkSpots.forEach((s, i) => {
@@ -544,7 +649,8 @@ async function boot() {
   const pauseBox = document.getElementById('pauseSettings');
   renderPause = () => buildSettingsUI(pauseBox, settings, () => setPaused(false));
   document.getElementById('btnResume').onclick = () => setPaused(false);
-  settings.on((k) => {
+  settings.on((k, val) => {
+    if (k === 'period' && val !== 'free') { const P = { morning: 8, noon: 12.5, afternoon: 16.5, night: 20.5, dawn: 2.5 }[val]; if (P != null) env.time = P; }
     if (k === 'volume' || k === 'musicVol') audio.applyVolume();
     if (k === 'quality') { if (confirm(settings.get('lang') === 'pt' ? 'Recarregar o jogo para aplicar a qualidade?' : 'Reload the game to apply quality?')) location.reload(); }
     if (k === 'lang') document.getElementById('btnResume').textContent = ui('resume', settings.get('lang'));

@@ -21,6 +21,12 @@ export const UI = {
   retry: { pt: 'Aperte {k} para tentar de novo', en: 'Press {k} to retry' },
   skip: { pt: 'Enter: pular fala', en: 'Enter: skip line' },
   mapClose: { pt: 'M / Esc para fechar', en: 'M / Esc to close' },
+  busted: { pt: 'PRESO', en: 'BUSTED' },
+  closed: { pt: '~y~{n}~w~ está fechada por enquanto. Volte mais tarde.', en: '~y~{n}~w~ is closed for now. Come back later.' },
+  unlocked: { pt: 'Liberado: ~y~{n}~w~ em Porto Sereno! Veja o ícone no mapa.', en: 'Unlocked: ~y~{n}~w~ in Porto Sereno! Check the map icon.' },
+  enterShop: { pt: 'Aperte {k} para entrar em ~y~{n}~w~', en: 'Press {k} to enter ~y~{n}~w~' },
+  period: { pt: 'Agora é ~y~{n}~w~', en: "It's now ~y~{n}~w~" },
+  breath: { pt: 'Fôlego', en: 'Breath' },
   radioOff: { pt: 'Rádio desligado', en: 'Radio off' },
 };
 
@@ -66,5 +72,13 @@ export const LINES = {
   miss: [{ pt: 'Vai devagar, doido!', en: 'Slow down, maniac!' }, { pt: 'Quase me atropelou!', en: 'You almost ran me over!' }],
   idle: [{ pt: 'Que calor hoje, hein?', en: 'Hot one today, huh?' }, { pt: 'Já viu o pôr do sol da Costa Esmeralda?', en: 'Ever seen the sunset at Costa Esmeralda?' }, { pt: 'Esse bairro já foi melhor...', en: 'This neighborhood used to be better...' }],
   idleRain: [{ pt: 'Que chuva, meu Deus.', en: 'What a downpour.' }, { pt: 'Esqueci o guarda-chuva de novo.', en: 'Forgot my umbrella again.' }],
+  chat: [
+    [{ pt: 'Você viu o preço do pão?', en: 'Did you see the price of bread?' }, { pt: 'Vi. Daqui a pouco vou pagar parcelado.', en: "I did. Soon I'll need a payment plan." }],
+    [{ pt: 'Dizem que os Corvos compraram mais uma garagem.', en: 'They say the Crows bought another garage.' }, { pt: 'Fala baixo, cara. Eles têm ouvido em tudo.', en: 'Keep it down, man. They have ears everywhere.' }],
+    [{ pt: 'Vai ter baile na Batida FM sábado.', en: "There's a Batida FM party on Saturday." }, { pt: 'Já tô com a roupa separada!', en: 'I already picked my outfit!' }],
+    [{ pt: 'Meu primo jura que viu um disco voador no Deserto do Sal.', en: 'My cousin swears he saw a UFO in the Salt Desert.' }, { pt: 'Teu primo jura muita coisa.', en: 'Your cousin swears a lot of things.' }],
+    [{ pt: 'Esse calor tá de matar.', en: 'This heat is killing me.' }, { pt: 'Bora pra Costa Esmeralda mais tarde?', en: 'Wanna hit Costa Esmeralda later?' }],
+    [{ pt: 'Tô treinando na Força Bruta agora.', en: "I'm training at Força Bruta now." }, { pt: 'Tá dando pra ver, hein!', en: 'It shows, huh!' }],
+  ],
   dj: [{ pt: 'Você tá ligado na Rádio Sereno, noventa e três ponto nove! Só os sons da quebrada.', en: "You're tuned to Radio Sereno, ninety-three point nine! Only street sounds." }, { pt: 'Batida FM! Cento e um! O baile não para!', en: 'Batida FM! One-oh-one! The party never stops!' }],
 };

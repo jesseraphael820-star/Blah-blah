@@ -8,6 +8,7 @@ export const VTYPES = {
   moto: { name: 'Sanhaço 250', shape: 'moto', mass: 240, wheelbase: 1.42, width: 0.75, length: 2.1, height: 1.2, cgh: 0.7, wheelR: 0.31, torque: 95, idle: 1200, redline: 10500, gears: [2.8, 2.0, 1.6, 1.3, 1.1, 0.95], final: 3.9, grip: 1.1, CdA: 0.55, brakeF: 3000, steer: 0.5, steerFall: 0.045, drive: 'rear', twoWheel: true, seat: [0, 0.55, -0.35] },
   sedan: { name: 'Prima', shape: 'sedan', mass: 1300, wheelbase: 2.7, width: 1.8, length: 4.5, height: 1.45, cgh: 0.55, wheelR: 0.32, torque: 220, idle: 850, redline: 6300, gears: [3.4, 2.1, 1.45, 1.05, 0.82], final: 3.9, grip: 1.0, CdA: 0.68, brakeF: 11000, steer: 0.6, steerFall: 0.03, drive: 'rear', seat: [0.38, 0.2, -0.25] },
   taxi: { name: 'Táxi Prima', shape: 'taxi', mass: 1330, wheelbase: 2.7, width: 1.8, length: 4.5, height: 1.45, cgh: 0.55, wheelR: 0.32, torque: 220, idle: 850, redline: 6300, gears: [3.4, 2.1, 1.45, 1.05, 0.82], final: 3.9, grip: 1.0, CdA: 0.7, brakeF: 11000, steer: 0.6, steerFall: 0.03, drive: 'rear', seat: [0.38, 0.2, -0.25] },
+  police: { name: 'Viatura', shape: 'police', mass: 1450, wheelbase: 2.8, width: 1.85, length: 4.7, height: 1.5, cgh: 0.55, wheelR: 0.33, torque: 360, idle: 800, redline: 6200, gears: [3.3, 2.1, 1.5, 1.12, 0.86], final: 3.7, grip: 1.12, CdA: 0.7, brakeF: 15000, steer: 0.6, steerFall: 0.028, drive: 'rear', seat: [0.4, 0.2, -0.25] },
   sport: { name: 'Faísca GT', shape: 'sport', mass: 1250, wheelbase: 2.55, width: 1.95, length: 4.4, height: 1.15, cgh: 0.45, wheelR: 0.33, torque: 520, idle: 950, redline: 7900, gears: [3.1, 2.2, 1.65, 1.28, 1.02, 0.84], final: 3.5, grip: 1.25, CdA: 0.6, brakeF: 16000, steer: 0.55, steerFall: 0.03, drive: 'awd', seat: [0.4, -0.1, -0.35] },
   pickup: { name: 'Touro', shape: 'pickup', mass: 1900, wheelbase: 3.1, width: 2.0, length: 5.2, height: 1.85, cgh: 0.78, wheelR: 0.39, torque: 430, idle: 700, redline: 5200, gears: [3.6, 2.2, 1.45, 1.0, 0.76], final: 3.7, grip: 0.95, CdA: 1.1, brakeF: 15000, steer: 0.55, steerFall: 0.03, drive: 'rear', seat: [0.42, 0.45, 0.4] },
 };
@@ -94,11 +95,21 @@ function buildMesh(t, color) {
   const ww = W / 2 - 0.13;
   mkWheel(ww, a, true); mkWheel(-ww, a, true); mkWheel(ww, -b, false); mkWheel(-ww, -b, false);
   const sh = t.shape;
-  if (sh === 'sedan' || sh === 'taxi') {
+  let siren = null;
+  if (sh === 'sedan' || sh === 'taxi' || sh === 'police') {
     addBox(body, W, 0.55, L, 0, r + 0.32, 0, paint);
     addBox(body, W * 0.92, 0.5, L * 0.47, 0, r + 0.84, -L * 0.06, M.glass);
     addBox(body, W * 0.9, 0.06, L * 0.42, 0, r + 1.11, -L * 0.07, paint);
     addBox(body, W * 0.93, 0.36, 0.08, 0, r + 0.77, -L * 0.06, paint).scale.set(1, 1, 1);
+    if (sh === 'police') {
+      const white = new THREE.MeshPhysicalMaterial({ color: 0xf2f2f2, metalness: 0.4, roughness: 0.35, clearcoat: 1 });
+      addBox(body, W + 0.01, 0.4, L * 0.42, 0, r + 0.36, -L * 0.03, white);
+      const red = new THREE.MeshStandardMaterial({ color: 0x550000, emissive: 0xff1010, emissiveIntensity: 0 });
+      const blue = new THREE.MeshStandardMaterial({ color: 0x000055, emissive: 0x1040ff, emissiveIntensity: 0 });
+      addBox(body, 0.5, 0.14, 0.25, 0.3, r + 1.2, -L * 0.07, red, false);
+      addBox(body, 0.5, 0.14, 0.25, -0.3, r + 1.2, -L * 0.07, blue, false);
+      siren = { red, blue };
+    }
     if (sh === 'taxi') {
       const sign = addBox(body, 0.75, 0.22, 0.3, 0, r + 1.25, -L * 0.07, new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffe066, emissiveIntensity: 0.6 }));
       sign.castShadow = false;
@@ -127,9 +138,9 @@ function buildMesh(t, color) {
     addBox(body, 0.4, 0.14, 0.06, s * (W / 2 - 0.3), ly, L / 2, headMat, false);
     addBox(body, 0.36, 0.14, 0.06, s * (W / 2 - 0.28), ly + 0.05, -L / 2, tailMat, false);
   }
-  addBox(body, W * 0.98, 0.14, 0.12, 0, r + 0.1, L / 2 - 0.02, M.black);
-  addBox(body, W * 0.98, 0.14, 0.12, 0, r + 0.1, -L / 2 + 0.02, M.black);
-  return { root, body, wheels, headMat, tailMat, paint };
+  const bumperF = addBox(body, W * 0.98, 0.14, 0.12, 0, r + 0.1, L / 2 - 0.02, M.black);
+  const bumperR = addBox(body, W * 0.98, 0.14, 0.12, 0, r + 0.1, -L / 2 + 0.02, M.black);
+  return { root, body, wheels, headMat, tailMat, paint, siren, parts: [bumperF, bumperR] };
 }
 
 let uid = 1;
@@ -410,6 +421,7 @@ export class Vehicle {
   damage(v) {
     this.impact = Math.max(this.impact, v);
     this.health -= v * v * 1.2;
+    if (Vehicle.onDamage) Vehicle.onDamage(this, v);
   }
 
   circles(out) {

@@ -23,6 +23,13 @@ Ou publique a pasta no GitHub Pages / Netlify. É preciso internet na primeira v
 - **NPCs**: pedestres andam pelas calçadas, atravessam a rua, fogem, reclamam e caem. O trânsito anda pela mão direita, para diante de obstáculos, buzina e desencalha sozinho. Dá para roubar carros.
 - **Dublagem** em português do Brasil e inglês (voz sintetizada do navegador), com legendas independentes do idioma da voz.
 - **Rádio** com 3 estações procedurais: G-Funk, Funk Carioca e Bossa Lo-fi.
+- **Polícia**: as estrelas de procurado (1 a 5) sobem quando você atropela, rouba, bate em viatura ou soca um policial. As viaturas perseguem com sirene e luzes e tentam te fechar. Se você está a pé, os policiais descem e correm atrás de você. Ficar parado perto deles dá **PRESO**. A partir de 3 estrelas aparece um helicóptero da polícia varrendo a área com holofote. Fugir da vista deles faz as estrelas caírem uma por uma.
+- **Períodos do dia**: Madrugada, Manhã, Começo da tarde, Tarde e Noite, mostrados embaixo do relógio e avisados na troca. Dá para pular para um período nas Configurações.
+- **Batidas**: lascas da lataria e do vidro voam e ficam no chão. Os para-choques caem, o motor solta fumaça, pega fogo e o carro explode, empurrando o que estiver perto.
+- **Céu**: aviões cruzam o céu com luzes de navegação piscando e som.
+- **Pedestres conversando**: duplas param na calçada e conversam com gestos e falas dubladas.
+- **Água**: dá para pular na água em pose de mergulho (tem um píer com trampolim de 11 m na praia de Porto Sereno), com respingo. Na superfície você nada crawl ou fica boiando. Com `Ctrl`/`Z` você mergulha e nada de peito embaixo d'água, com bolhas, visão azulada e barra de fôlego.
+- **Loja de roupas e academia**: a **Moda Sereno** e a **Academia Força Bruta** em Porto Sereno abrem depois de um tempo de jogo, e o jogo avisa quando liberam (ícone no mapa). Na loja você compra camisa, calça, boné e corrente. Na academia você treina apertando o botão: o personagem ganha músculo visível e fôlego, que dá mais tempo de corrida e de ar embaixo d'água.
 - **História**: começa com uma cena de chegada de táxi, depois você segue o Duda de bicicleta até a oficina e por fim faz um racha no Faísca GT até São Cruzeiro. Depois disso, o mundo fica livre para explorar.
 
 ## Controles

@@ -52,7 +52,34 @@ export class Audio {
     for (const o of [this.eo1, this.eo2, this.eo3]) { o.frequency.value = 40; o.start(); }
     this.horn = null;
     this.radioTimer = null;
+    // sirene: tom com LFO (wail)
+    this.sg = C.createGain(); this.sg.gain.value = 0;
+    this.so = C.createOscillator(); this.so.type = 'sawtooth'; this.so.frequency.value = 900;
+    const sf = C.createBiquadFilter(); sf.type = 'lowpass'; sf.frequency.value = 2200;
+    this.slfo = C.createOscillator(); this.slfo.frequency.value = 0.35;
+    const sd = C.createGain(); sd.gain.value = 380;
+    this.slfo.connect(sd); sd.connect(this.so.frequency);
+    this.so.connect(sf); sf.connect(this.sg); this.sg.connect(this.sfx);
+    this.so.start(); this.slfo.start();
+    // helicóptero: ruído grave pulsando
+    this.heli = noiseChain('lowpass', 260, 1);
+    const hl = C.createOscillator(); hl.frequency.value = 17;
+    const hd = C.createGain(); hd.gain.value = 0;
+    this.heliDepth = hd;
+    hl.connect(hd); hd.connect(this.heli.g.gain); hl.start();
+    this.plane = noiseChain('lowpass', 140, 0.6);
   }
+
+  setSiren(v, stars) {
+    if (!this.ctx) return;
+    this.set(this.sg, v * 0.07, 0.2);
+    this.slfo.frequency.setTargetAtTime(stars >= 4 ? 2.5 : 0.35, this.ctx.currentTime, 0.3);
+  }
+  setHeli(v) { if (!this.ctx) return; this.set(this.heli.g, v * 0.22, 0.3); this.heliDepth.gain.setTargetAtTime(v * 0.2, this.ctx.currentTime, 0.3); }
+  setPlane(v) { if (!this.ctx) return; this.set(this.plane.g, v * v * 0.3, 0.5); }
+  splash(big) { if (!this.ctx) return; this.burst(big ? 0.9 : 0.4, 900, big ? 0.6 : 0.3, 'lowpass'); this.burst(0.3, 3000, 0.2, 'highpass'); }
+  boom() { if (!this.ctx) return; this.burst(2.5, 220, 1); this.tone(90, 30, 1.2, 0.8); this.burst(0.6, 2500, 0.5, 'bandpass'); }
+  jingle() { if (!this.ctx) return; [72, 76, 79, 84].forEach((n, i) => this.tone(NOTE(n), NOTE(n), 0.3, 0.15, 'triangle', i * 0.12)); }
 
   applyVolume() {
     if (!this.ctx) return;

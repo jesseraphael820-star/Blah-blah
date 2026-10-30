@@ -114,6 +114,7 @@ export class Input {
       handbrake: k('Space'), sprint: k('ShiftLeft') || k('ShiftRight'), walk: k('AltLeft'),
       jump: p('Space'), enter: p('KeyF'), punch: p('Mouse0') || p('KeyX'),
       map: p('KeyM'), pause: p('Escape') || p('KeyP'), radio: p('KeyR'), horn: k('KeyH'),
+      dive: k('ControlLeft') || k('KeyZ'), up: k('Space'),
       shiftUp: p('KeyE'), shiftDown: p('KeyQ'), cam: p('KeyC'), skip: p('Enter') || p('NumpadEnter'), retry: p('KeyF') || p('Enter'),
       analog: false, mag: 0,
     };
@@ -140,6 +141,7 @@ export class Input {
       st.pause = st.pause || bp(9); st.map = st.map || bp(8); st.radio = st.radio || bp(14);
       st.horn = st.horn || bt(10); st.cam = st.cam || bp(11);
       st.shiftUp = st.shiftUp || bp(5); st.shiftDown = st.shiftDown || bp(4);
+      st.dive = st.dive || bt(4); st.up = st.up || bt(2);
       st.skip = st.skip || bp(0); st.retry = st.retry || bp(3);
       this.padPrev = pad.buttons.map((b) => b.pressed || b.value > 0.5);
     }
@@ -159,6 +161,7 @@ export class Input {
       if (b('brake')) st.brake = 1;
       st.handbrake = st.handbrake || b('hand');
       st.sprint = st.sprint || b('sprint');
+      st.dive = st.dive || b('dive'); st.up = st.up || b('jump');
       st.jump = st.jump || tp('jump') || tp('hand');
       st.punch = st.punch || tp('punch');
       st.enter = st.enter || tp('enter'); st.retry = st.retry || tp('enter');

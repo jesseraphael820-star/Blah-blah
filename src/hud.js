@@ -15,7 +15,7 @@ export class HUD {
     this.w = world; this.s = settings;
     const $ = (id) => document.getElementById(id);
     this.el = {
-      hud: $('hud'), mini: $('minimap'), clock: $('clock'), weather: $('weather'), money: $('money'), hp: $('hp'), stars: $('stars'),
+      hud: $('hud'), mini: $('minimap'), clock: $('clock'), weather: $('weather'), money: $('money'), hp: $('hp'), period: $('period'), air: $('air'), airwrap: $('airwrap'), stars: $('stars'),
       obj: $('objective'), timer: $('timer'), zone: $('zone'), veh: $('vehname'), speedo: $('speedo'), kmh: $('kmh'), unit: $('unit'), gear: $('gear'), rpm: $('rpm'),
       radio: $('radio'), sub: $('subtitle'), big: $('bigmsg'), hint: $('hint'), full: $('fullmap'), lb: $('letterbox'), touch: $('touch'), title: $('cinetitle'),
     };
@@ -154,6 +154,15 @@ export class HUD {
     if (Math.abs(g.money - this.shownMoney) < 1) this.shownMoney = g.money;
     this.el.money.textContent = '$' + String(Math.round(this.shownMoney)).padStart(8, '0');
     this.el.hp.style.width = `${clamp(p.health, 0, 100)}%`;
+    const per = g.period;
+    this.el.period.textContent = per ? per[this.s.get('lang')] : '';
+    if (g.shops) {
+      const under = p.swim && p.under;
+      const frac = under ? p.breath / g.shops.breathMax : p.stamina / g.shops.sprintMax;
+      this.el.airwrap.classList.toggle('hidden', frac > 0.99 || !!p.vehicle);
+      this.el.air.style.width = `${clamp(frac, 0, 1) * 100}%`;
+      this.el.air.classList.toggle('breath', under);
+    }
     const st = Math.ceil(g.wanted - 0.05);
     this.el.stars.innerHTML = Array.from({ length: 5 }, (_, i) => `<span class="${i < st ? 'on' : ''}">★</span>`).join('');
     this.el.stars.classList.toggle('flash', g.wantedFlash > 0);

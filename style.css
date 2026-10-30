@@ -137,3 +137,28 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #000; color:
   #touch .top { top: 220px; }
   #timer { top: 300px; }
 }
+
+#period { font-size: 15px; color: var(--gold); margin-top: -2px; }
+.bar.air { height: 8px; margin-top: 3px; background: #1a2430; }
+#air { height: 100%; background: linear-gradient(#ffe27a, #d8a017); }
+#air.breath { background: linear-gradient(#8fd3ff, #2a8fbd); }
+#underwater { position: fixed; inset: 0; pointer-events: none; opacity: 0; transition: opacity .3s; z-index: 2;
+  background: radial-gradient(ellipse at center, rgba(20, 90, 110, .15), rgba(0, 30, 45, .65)); }
+body.underwater #underwater { opacity: 1; }
+#shop { position: fixed; inset: 0; z-index: 9; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, .35); padding: 16px; }
+.shopbox { width: min(560px, 100%); max-height: 86vh; overflow: auto; background: rgba(8, 8, 10, .9); border: 2px solid #333; border-top: 4px solid var(--gold); padding: 16px; }
+.stitle { font-family: 'Pirata One'; font-size: 40px; color: var(--gold); text-shadow: 2px 2px 0 #000; }
+.shopbox .money { font-family: 'Bebas Neue'; font-size: 28px; color: #4cc35a; }
+.cat { margin: 10px 0; }
+.cat b { display: block; font-size: 18px; margin-bottom: 6px; }
+.items { display: flex; flex-wrap: wrap; gap: 8px; }
+.sw { position: relative; width: 52px; height: 52px; border: 2px solid #555; border-radius: 6px; color: #fff; font-size: 20px; cursor: pointer; }
+.sw.on { border-color: var(--gold); box-shadow: 0 0 0 2px var(--gold); }
+.sw em { position: absolute; bottom: -2px; left: 0; right: 0; font-size: 11px; font-style: normal; background: rgba(0, 0, 0, .7); }
+.shopbox .close, .shopbox .go { display: block; margin: 12px auto 0; font-family: 'Pirata One'; font-size: 28px; background: none; border: none; color: #fff; cursor: pointer; text-shadow: 2px 2px 0 #000; }
+.shopbox .go { font-size: 34px; color: var(--gold); padding: 6px 30px; border: 2px solid var(--gold); border-radius: 8px; touch-action: manipulation; }
+.stat { display: flex; align-items: center; gap: 10px; margin: 6px 0; font-size: 17px; }
+.sbar, .lift { flex: 1; height: 12px; background: #222; border: 1px solid #444; }
+.sbar i, .lift i { display: block; height: 100%; background: linear-gradient(90deg, #f08a24, var(--gold)); }
+.lift { height: 22px; margin: 10px 0; }
+#gymreps { text-align: center; font-family: 'Bebas Neue'; font-size: 26px; }

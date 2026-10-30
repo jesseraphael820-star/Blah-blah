@@ -180,6 +180,18 @@ export class Peds {
       if (p.dir < 0) p.corner = k;
       this.g.scene.add(ch.root);
       this.list.push(p);
+      if (Math.random() < 0.3) {
+        // dupla parada conversando
+        const look2 = randomLook();
+        const ch2 = new Character(look2);
+        const ox = (b[1] - a[1]) === 0 ? 0 : 1.1, oz = ox ? 0 : 1.1;
+        const q = { ...p, ch: ch2, look: look2, female: look2.long, pos: new THREE.Vector3(x + ox, p.pos.y, z + oz), vel: new THREE.Vector3(), said: 0 };
+        this.g.scene.add(ch2.root);
+        this.list.push(q);
+        const conv = { a: p, b: q, line: Math.floor(Math.random() * LINES.chat.length), step: 0, t: 0 };
+        for (const m of [p, q]) { m.state = 'chat'; m.t = 25 + Math.random() * 30; m.conv = conv; }
+        p.heading = Math.atan2(ox, oz); q.heading = p.heading + Math.PI;
+      }
       return p;
     }
   }
@@ -252,6 +264,27 @@ export class Peds {
         p.heading = Math.atan2(dx, dz) + Math.sin(p.t * 1.3) * 0.3;
         speed = 5.2;
         if (p.t <= 0) this.rejoin(p);
+      } else if (p.state === 'chat') {
+        p.t -= dt;
+        mode = 'ground';
+        const cv = p.conv;
+        if (cv.a === p) {
+          cv.t -= dt;
+          const talker = cv.step % 2 === 0 ? cv.a : cv.b;
+          talker.ch.talk = Math.max(talker.ch.talk, 0.3);
+          if (cv.t <= 0) {
+            cv.t = 3.5 + Math.random() * 2;
+            const pair = LINES.chat[cv.line];
+            if (Math.hypot(p.pos.x - plr.pos.x, p.pos.z - plr.pos.z) < 14 && cv.step < 2) {
+              const who = pair[cv.step] ? (cv.step % 2 === 0 ? cv.a : cv.b) : null;
+              if (who) g.voice.say(who.female ? 'pedF' : 'pedM', pair[cv.step], { ambient: true, char: who.ch, seed: who === cv.a ? 1 : 2, pitch: (who.female ? 1.25 : 0.9) + (who === cv.a ? 0 : 0.15), vol: 0.8 });
+              cv.step++;
+              if (cv.step >= 2) { cv.step = 0; cv.line = (cv.line + 1) % LINES.chat.length; cv.t = 10; }
+            }
+          }
+        }
+        if (p.t <= 0) { p.state = 'walk'; p.conv = null; }
+        if (p.ch.talk <= 0) mode = 'chat';
       } else if (p.state === 'walk' || p.state === 'cross') {
         const tg = p.cross || this.loopRect(p.c, p.i, p.j)[p.corner];
         const dx = tg[0] - p.pos.x, dz = tg[1] - p.pos.z;

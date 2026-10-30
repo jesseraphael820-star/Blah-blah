@@ -9,6 +9,14 @@ export const WEATHERS = {
   storm: { pt: 'Tempestade', en: 'Storm', icon: '⛈', cloud: 1, rain: 1, fog: 0.0022, wind: 16 },
   fog: { pt: 'Neblina', en: 'Fog', icon: '🌫', cloud: 0.5, rain: 0, fog: 0.0058, wind: 1.5 },
 };
+export const PERIODS = [
+  { id: 'dawn', pt: 'Madrugada', en: 'Late night', from: 0, to: 5, jump: 2.5 },
+  { id: 'morning', pt: 'Manhã', en: 'Morning', from: 5, to: 11, jump: 8 },
+  { id: 'noon', pt: 'Começo da tarde', en: 'Early afternoon', from: 11, to: 14, jump: 12.5 },
+  { id: 'afternoon', pt: 'Tarde', en: 'Afternoon', from: 14, to: 18, jump: 16.5 },
+  { id: 'night', pt: 'Noite', en: 'Night', from: 18, to: 24, jump: 20.5 },
+];
+export const periodAt = (t) => PERIODS.find((p) => t >= p.from && t < p.to) || PERIODS[0];
 const AUTO = [['clear', 4], ['cloudy', 3], ['rain', 1.6], ['storm', 0.7], ['fog', 0.8]];
 
 function cloudTexture() {

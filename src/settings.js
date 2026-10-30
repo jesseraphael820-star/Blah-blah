@@ -22,6 +22,7 @@ export const DEFAULTS = {
   drawDist: 1,
   weather: 'auto',
   timeScale: 1,
+  period: 'free',
   units: 'kmh',
 };
 
@@ -83,6 +84,7 @@ const TABS = [
   {
     id: 'world', name: L('Clima e tempo', 'Weather & time'), items: [
       { k: 'weather', label: L('Clima', 'Weather'), type: 'select', opts: [['auto', L('Dinâmico', 'Dynamic')], ['clear', L('Ensolarado', 'Sunny')], ['cloudy', L('Nublado', 'Cloudy')], ['rain', L('Chuva', 'Rain')], ['storm', L('Tempestade', 'Storm')], ['fog', L('Neblina', 'Fog')]] },
+      { k: 'period', label: L('Pular para o período', 'Jump to time of day'), type: 'select', opts: [['free', L('— manter —', '— keep —')], ['morning', L('Manhã', 'Morning')], ['noon', L('Começo da tarde', 'Early afternoon')], ['afternoon', L('Tarde', 'Afternoon')], ['night', L('Noite', 'Night')], ['dawn', L('Madrugada', 'Late night')]] },
       { k: 'timeScale', label: L('Velocidade do relógio', 'Clock speed'), type: 'range', min: 0, max: 10, step: 0.5 },
     ],
   },
@@ -96,7 +98,8 @@ const HELP = {
   <tr><td>Câmera</td><td>Mouse</td><td>Analógico direito</td><td>Arrastar à direita</td></tr>
   <tr><td>Acelerar / frear</td><td>W / S</td><td>RT / LT (analógico)</td><td>Botões ▲ ▼ ou analógico</td></tr>
   <tr><td>Correr / freio de mão</td><td>Shift / Espaço</td><td>A (segurar)</td><td>Botões</td></tr>
-  <tr><td>Pular</td><td>Espaço</td><td>X</td><td>⤒</td></tr>
+  <tr><td>Pular / subir na água</td><td>Espaço</td><td>X</td><td>⤒</td></tr>
+  <tr><td>Mergulhar (na água)</td><td>Ctrl / Z</td><td>LB</td><td>🤿</td></tr>
   <tr><td>Soco</td><td>Clique</td><td>B</td><td>👊</td></tr>
   <tr><td>Entrar/sair do veículo</td><td>F</td><td>Y</td><td>🚗</td></tr>
   <tr><td>Buzina / rádio</td><td>H / R</td><td>L3 / D-pad ←</td><td>📻</td></tr>
@@ -109,7 +112,8 @@ const HELP = {
   <tr><td>Camera</td><td>Mouse</td><td>Right stick</td><td>Drag on right side</td></tr>
   <tr><td>Throttle / brake</td><td>W / S</td><td>RT / LT (analog)</td><td>▲ ▼ buttons or stick</td></tr>
   <tr><td>Sprint / handbrake</td><td>Shift / Space</td><td>A (hold)</td><td>Buttons</td></tr>
-  <tr><td>Jump</td><td>Space</td><td>X</td><td>⤒</td></tr>
+  <tr><td>Jump / swim up</td><td>Space</td><td>X</td><td>⤒</td></tr>
+  <tr><td>Dive (in water)</td><td>Ctrl / Z</td><td>LB</td><td>🤿</td></tr>
   <tr><td>Punch</td><td>Click</td><td>B</td><td>👊</td></tr>
   <tr><td>Enter/exit vehicle</td><td>F</td><td>Y</td><td>🚗</td></tr>
   <tr><td>Horn / radio</td><td>H / R</td><td>L3 / D-pad ←</td><td>📻</td></tr>

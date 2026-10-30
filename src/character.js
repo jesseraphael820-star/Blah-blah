@@ -45,7 +45,12 @@ export class Character {
     const hips = (this.hips = pivot(this.g, 0, 0.95, 0));
     part(hips, box(0.36, 0.16, 0.22), mat(pants), 0, 0.02, 0);
     const torso = (this.torso = pivot(hips, 0, 0.08, 0));
-    part(torso, box(0.42, 0.5, 0.24), mat(shirt), 0, 0.27, 0);
+    const mu = (this.muscle = o.muscle || 0);
+    part(torso, box(0.42, 0.5, 0.24), mat(shirt), 0, 0.27, 0).scale.set(1 + mu * 0.3, 1, 1 + mu * 0.25);
+    if (o.uniform) {
+      part(torso, box(0.08, 0.06, 0.02), mat(0xd4af37, 0.3), 0.1, 0.4, 0.125);
+      part(torso, box(0.44, 0.05, 0.26), mat(0x111111), 0, 0.03, 0);
+    }
     if (o.chain) part(torso, box(0.2, 0.02, 0.02), mat(0xd4af37, 0.3), 0, 0.42, 0.125);
     const neck = pivot(torso, 0, 0.54, 0);
     part(neck, box(0.1, 0.06, 0.1), mat(skin), 0, 0.0, 0);
@@ -64,7 +69,8 @@ export class Character {
     this.arms = [];
     this.legs = [];
     for (const side of [1, -1]) {
-      const sh = pivot(torso, side * 0.27, 0.48, 0);
+      const sh = pivot(torso, side * (0.27 + mu * 0.06), 0.48, 0);
+      sh.scale.set(1 + mu * 0.45, 1, 1 + mu * 0.45);
       part(sh, box(0.12, 0.17, 0.13), mat(shirt), 0, -0.07, 0);
       part(sh, box(0.1, 0.15, 0.11), mat(o.sleeves ? shirt : skin), 0, -0.22, 0);
       const el = pivot(sh, 0, -0.3, 0);
@@ -154,6 +160,52 @@ export class Character {
       AL.sh.rotation.x = Math.sin(this.phase) * 1.6 - 1.5;
       AR.sh.rotation.x = Math.sin(this.phase + Math.PI) * 1.6 - 1.5;
       L.hp.rotation.x = Math.sin(this.phase * 2) * 0.3; Rr.hp.rotation.x = -Math.sin(this.phase * 2) * 0.3;
+    }
+    else if (mode === 'tread') {
+      this.phase += dt * 3;
+      g.position.y = -1.25;
+      const s = Math.sin(this.phase);
+      AL.sh.rotation.z = 0.9 + s * 0.4; AR.sh.rotation.z = -0.9 - s * 0.4;
+      AL.el.rotation.x = AR.el.rotation.x = -0.5;
+      L.hp.rotation.x = s * 0.5; Rr.hp.rotation.x = -s * 0.5;
+      L.kn.rotation.x = 0.5 + s * 0.3; Rr.kn.rotation.x = 0.5 - s * 0.3;
+    } else if (mode === 'swimUnder') {
+      this.phase += dt * (1.5 + speed * 0.8);
+      const s = Math.sin(this.phase), c = Math.cos(this.phase);
+      g.rotation.x = Math.PI / 2;
+      g.position.y = 0.3;
+      g.position.z = -0.9;
+      // nado de peito: braços abrem pra trás, pernas em tesoura
+      AL.sh.rotation.x = AR.sh.rotation.x = -2.9 + Math.max(0, s) * 1.2;
+      AL.sh.rotation.z = 0.2 + Math.max(0, s) * 1.1; AR.sh.rotation.z = -0.2 - Math.max(0, s) * 1.1;
+      AL.el.rotation.x = AR.el.rotation.x = -Math.max(0, c) * 1.2;
+      L.hp.rotation.z = 0.1 + Math.max(0, -s) * 0.5; Rr.hp.rotation.z = -0.1 - Math.max(0, -s) * 0.5;
+      L.kn.rotation.x = Rr.kn.rotation.x = Math.max(0, c) * 1.4;
+    } else if (mode === 'dive') {
+      g.rotation.x = Math.PI * 0.62;
+      g.position.y = 0.9;
+      AL.sh.rotation.x = AR.sh.rotation.x = -3.05;
+      AL.sh.rotation.z = 0.1; AR.sh.rotation.z = -0.1;
+      L.hp.rotation.z = 0.02; Rr.hp.rotation.z = -0.02;
+    } else if (mode === 'fall') {
+      this.phase += dt * 14;
+      const s = Math.sin(this.phase);
+      AL.sh.rotation.z = 2.2 + s * 0.6; AR.sh.rotation.z = -2.2 + s * 0.6;
+      AL.el.rotation.x = s * 0.8; AR.el.rotation.x = -s * 0.8;
+      L.hp.rotation.x = -0.6 + s * 0.6; Rr.hp.rotation.x = -0.6 - s * 0.6;
+      L.kn.rotation.x = Rr.kn.rotation.x = 0.9;
+      this.torso.rotation.x = -0.25;
+    } else if (mode === 'lift') {
+      this.phase += dt * speed;
+      const k = (Math.sin(this.phase) + 1) / 2;
+      AL.sh.rotation.x = AR.sh.rotation.x = -0.2;
+      AL.el.rotation.x = AR.el.rotation.x = -0.4 - k * 2.0;
+      this.hips.position.y = 0.95;
+    } else if (mode === 'chat') {
+      AR.sh.rotation.x = -0.3 + Math.sin(this.t * 2.3) * 0.25;
+      AR.el.rotation.x = -1.1;
+      AL.sh.rotation.z = 0.12;
+      this.head.rotation.y = Math.sin(this.t * 0.7) * 0.15;
     }
     if (this.punchT > 0) {
       this.punchT -= dt;

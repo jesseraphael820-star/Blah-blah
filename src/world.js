@@ -153,7 +153,20 @@ export function surfaceAt(x, z) {
   if (coastX(x, z) > 930 && h < 4) return 'sand';
   return 'grass';
 }
+// plataformas onde dá pra andar (píer e trampolim de salto na praia)
+export const PLATFORMS = [
+  { x0: 1030, x1: 1206, z0: 497.5, z1: 502.5, a: 3.4, b: 3.4 },
+  { x0: 1180, x1: 1206, z0: 502.5, z1: 505.5, a: 3.4, b: 11 },
+  { x0: 1206, x1: 1214, z0: 497.5, z1: 505.5, a: 11, b: 11 },
+];
+export function platformAt(x, z) {
+  let top = -1e9;
+  for (const p of PLATFORMS) if (x >= p.x0 && x <= p.x1 && z >= p.z0 && z <= p.z1) top = Math.max(top, p.a + (p.b - p.a) * ((x - p.x0) / (p.x1 - p.x0)));
+  return top;
+}
 export function groundAt(x, z) {
+  const pf = platformAt(x, z);
+  if (pf > -1e8) return Math.max(pf, heightAt(x, z));
   const h = heightAt(x, z);
   const c = cityAt(x, z, -0.01);
   return c && !onCityRoad(c, x, z) ? h + CURB : h;
@@ -398,6 +411,34 @@ export class World {
     progress('Enchendo o mar...'); await tick();
     this.buildWater();
     this.buildBillboards();
+    this.buildPier();
+  }
+
+  buildPier() {
+    const wood = new THREE.MeshStandardMaterial({ color: 0x7a5a3a, roughness: 0.85 });
+    const post = new THREE.MeshStandardMaterial({ color: 0x4a3524, roughness: 0.9 });
+    for (const p of PLATFORMS) {
+      const w = p.x1 - p.x0, d = p.z1 - p.z0;
+      const ramp = p.a !== p.b;
+      const g = new THREE.BoxGeometry(ramp ? Math.hypot(w, p.b - p.a) : w, 0.25, d);
+      const m = new THREE.Mesh(g, wood);
+      m.position.set((p.x0 + p.x1) / 2, (p.a + p.b) / 2 - 0.12, (p.z0 + p.z1) / 2);
+      if (ramp) m.rotation.z = Math.atan2(p.b - p.a, w);
+      m.castShadow = m.receiveShadow = true;
+      this.scene.add(m);
+      for (let x = p.x0 + 2; x < p.x1; x += 8) {
+        const top = p.a + (p.b - p.a) * ((x - p.x0) / w);
+        const bottom = Math.min(heightAt(x, p.z0), 0) - 2;
+        for (const z of [p.z0 + 0.3, p.z1 - 0.3]) {
+          const pl = new THREE.Mesh(new THREE.BoxGeometry(0.3, top - bottom, 0.3), post);
+          pl.position.set(x, (top + bottom) / 2, z);
+          this.scene.add(pl);
+        }
+      }
+    }
+    const board = new THREE.Mesh(new THREE.BoxGeometry(3, 0.12, 0.8), new THREE.MeshStandardMaterial({ color: 0x2a8fbd }));
+    board.position.set(1215, 11, 501.5);
+    this.scene.add(board);
   }
 
   // ---------------- terreno
@@ -864,6 +905,7 @@ export class World {
     const mat = new THREE.ShaderMaterial({
       uniforms: this.waterU,
       transparent: true,
+      side: THREE.DoubleSide,
       vertexShader: `${waves}
         varying vec3 vW;
         void main() {
