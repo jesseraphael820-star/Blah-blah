@@ -4,7 +4,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { clamp, lerp, smoothstep, angleDiff } from './util.js';
-import { World, groundAt, heightAt, zoneName, cityAt, puddleAt, LIGHTS_N, crossingAhead, lightAt, gangAt, ROAD_W, GANGS } from './world.js';
+import { World, surfaceAt, groundAt, heightAt, zoneName, cityAt, puddleAt, LIGHTS_N, crossingAhead, lightAt, gangAt, ROAD_W, GANGS } from './world.js';
 import { Vehicle, collideVehicles, BEAM, VTYPES } from './vehicle.js';
 import { Character } from './character.js';
 import { Traffic, Peds, Driver } from './npc.js';
@@ -161,7 +161,7 @@ const game = {
   },
   placePlayer(x, z, h) {
     const p = this.player;
-    p.swim = false; p.under = false; p.vy = 0;
+    p.swim = false; p.under = false; p.vy = 0; p.tumble = null; p.down = 0;
     if (p.vehicle) this.exitVehicle(true);
     p.pos.set(x, groundAt(x, z), z); p.vel.set(0, 0, 0); p.heading = h; this.cam.yaw = h;
   },
@@ -189,6 +189,24 @@ const game = {
     this.audio.door();
     this.hud.vehicle(v.t.name);
     if (!v.t.twoWheel && this.audio.station) this.audio.startRadio();
+  },
+  // pular do veículo andando: sai pela porta com a velocidade do carro, rola no chão e se machuca
+  bailOut() {
+    const p = this.player, v = p.vehicle;
+    if (!v) return;
+    const sp = v.speed;
+    this.exitVehicle(true);
+    // empurra pro lado da porta por onde saiu
+    const sh = Math.sin(v.heading), ch = Math.cos(v.heading);
+    const side = Math.sign((p.pos.x - v.pos.x) * ch - (p.pos.z - v.pos.z) * sh) || 1;
+    p.vel.set(v.vel.x * 0.85 + ch * side * 3.2, 0, v.vel.z * 0.85 - sh * side * 3.2);
+    p.vy = 2.8; p.onGround = false;
+    p.pos.y += 0.6;
+    p.tumble = { t: 0, roll: 0, hit: false, dmg: Math.min(75, Math.max(0, sp - 6) * 2.6 + 4), sp };
+    p.heading = Math.atan2(p.vel.x, p.vel.z);
+    // carro sem motorista continua rodando até parar sozinho
+    v.coastT = 6; v.sleeping = false;
+    this.audio.door();
   },
   exitVehicle(force) {
     const p = this.player, v = p.vehicle;
@@ -275,8 +293,57 @@ function updateWetLights(lit) {
 
 // ---------------------------------------------------------------- atualização do jogador a pé
 const tmpP = { x: 0, z: 0 };
+function updateTumble(dt) {
+  const p = player, ch = p.char, T = p.tumble;
+  T.t += dt;
+  p.vy -= 20 * dt;
+  p.pos.x += p.vel.x * dt; p.pos.z += p.vel.z * dt; p.pos.y += p.vy * dt;
+  const gy = groundAt(p.pos.x, p.pos.z);
+  let mode = 'bail';
+  if (p.pos.y <= gy) {
+    p.pos.y = gy;
+    if (!T.hit) {
+      // impacto com o chão: o dano depende da velocidade
+      T.hit = true;
+      p.health -= T.dmg;
+      audio.crash(T.sp * 0.5); audio.punch();
+      input.rumble(clamp(T.sp / 25, 0.4, 1), 0.8, 350);
+      game.cam.shake = Math.max(game.cam.shake, clamp(T.sp * 0.02, 0.15, 0.5));
+      if (T.sp > 14) combat.blood(p.pos.x, p.pos.y + 0.3, p.pos.z, 6);
+    }
+    p.vy = Math.abs(p.vy) > 3 && T.t < 1.2 ? -p.vy * 0.25 : 0;
+    // atrito do asfalto (grama segura mais)
+    const sp = Math.hypot(p.vel.x, p.vel.z), fr = (surfaceAtCached(p.pos.x, p.pos.z) === 'grass' ? 9 : 6.5) * dt;
+    const k = sp > fr ? (sp - fr) / sp : 0;
+    p.vel.x *= k; p.vel.z *= k;
+    T.roll += (sp / 0.45) * dt;
+    mode = 'tumble';
+    if (Math.random() < dt * sp * 2) fx.sprite(p.pos.x, p.pos.y + 0.1, p.pos.z, { color: 0xb5a890, op: 0.5, size: 0.4, life: 0.8, vy: 0.5, grow: 2.2 });
+    if (sp < 0.6) {
+      // termina deitado e depois levanta
+      p.tumble = null; p.down = 1.8; p.vel.set(0, 0, 0); p.onGround = true;
+      ch.rollA = 0;
+    }
+  } else T.roll += dt * 3;
+  // parede ou carro no caminho: bate e para
+  const bx = p.pos.x, bz = p.pos.z;
+  if (world.col.resolveCircle(p.pos, 0.35, p.pos.y) && Math.hypot(p.vel.x, p.vel.z) > 4) {
+    p.health -= Math.hypot(p.vel.x, p.vel.z) * 1.5; audio.crash(5); game.cam.shake = 0.3;
+    p.vel.multiplyScalar(-0.2);
+  }
+  void bx; void bz;
+  ch.rollA = T ? T.roll : 0;
+  ch.root.position.copy(p.pos);
+  ch.root.rotation.y = p.heading;
+  ch.animate(dt, 0, p.tumble ? mode : 'down');
+  p.speed = Math.hypot(p.vel.x, p.vel.z);
+  game.ui.nearCar = false;
+}
+const surfaceAtCached = (x, z) => surfaceAt(x, z);
+
 function updateOnFoot(dt, inp) {
   const p = player, ch = p.char;
+  if (p.tumble) { updateTumble(dt); return; }
   const free = !game.locked && p.down <= 0;
   let mx = free ? inp.moveX : 0, my = free ? inp.moveY : 0, mag = free ? inp.mag : 0;
   const yaw = game.cam.yaw;
@@ -574,7 +641,7 @@ function tick() {
       audio.tone(900, 900, 0.05, 0.08, 'square');
     }
     v.lights = !!v.headOn;
-    if (free && inp.enter) game.exitVehicle();
+    if (free && inp.enter) { if (v.speed > 6 && !v.t.boat) game.bailOut(); else game.exitVehicle(); }
     if (free && inp.radio && !v.t.twoWheel) {
       const st = audio.cycleRadio();
       hud.radio(st ? `${st.name} — ${st.genre}` : ui('radioOff', settings.get('lang')));
@@ -598,6 +665,7 @@ function tick() {
     if (car === p.vehicle) ctrl = car.ctrl;
     else if (car.ai) ctrl = car.ai.controls(dt, game);
     else if (car.driver === 'ai') ctrl = { throttle: 0, brake: 0.6, steer: 0, handbrake: true };
+    else if (car.coastT > 0) { car.coastT -= dt; ctrl = { throttle: 0, brake: 0, steer: 0, handbrake: false }; }
     if (car.ai && !car.lights) car.lights = env.lightsOn;
     car.update(dt, ctrl, env, car === p.vehicle && settings.get('gearbox') === 'manual');
     if (d < 220) skids.track(car, dt, (x, y, z) => fx.tireSmoke(x, y, z));

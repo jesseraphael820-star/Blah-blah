@@ -228,6 +228,23 @@ export class Character {
       AL.sh.rotation.x = AR.sh.rotation.x = -0.2;
       AL.el.rotation.x = AR.el.rotation.x = -0.4 - k * 2.0;
       this.hips.position.y = 0.95;
+    } else if (mode === 'tumble') {
+      // rolando no asfalto: corpo encolhido girando em volta do quadril
+      const a = this.rollA || 0, r = 0.45;
+      g.rotation.x = a;
+      g.position.y = r - r * Math.cos(a) + 0.05;
+      g.position.z = -r * Math.sin(a);
+      g.rotation.z = Math.sin(a * 0.5) * 0.25;
+      for (const l of this.legs) { l.hp.rotation.x = -1.3; l.kn.rotation.x = 1.6; }
+      AL.sh.rotation.x = AR.sh.rotation.x = -1.6; AL.el.rotation.x = AR.el.rotation.x = -1.8;
+      AL.sh.rotation.z = 0.3; AR.sh.rotation.z = -0.3;
+      this.torso.rotation.x = 0.5; this.head.rotation.x = 0.4;
+    } else if (mode === 'bail') {
+      // saltando da porta: braços abertos, corpo inclinado pro lado do pulo
+      g.rotation.z = -0.6;
+      AL.sh.rotation.z = 1.6; AR.sh.rotation.z = -1.2; AR.sh.rotation.x = -0.8;
+      L.hp.rotation.x = -0.9; L.kn.rotation.x = 1.2; Rr.hp.rotation.x = 0.4; Rr.kn.rotation.x = 0.6;
+      this.torso.rotation.x = 0.3;
     } else if (mode === 'dead') {
       g.rotation.x = -Math.PI / 2;
       g.position.y = 0.12;
