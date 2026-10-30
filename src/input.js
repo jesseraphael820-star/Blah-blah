@@ -30,8 +30,11 @@ export class Input {
     canvas.addEventListener('mousedown', (e) => {
       if (this.wantLock && !this.locked && !this.touchActive()) canvas.requestPointerLock?.();
       if (e.button === 0) { this.mouseDown = true; this.pressed.add('Mouse0'); }
+      if (e.button === 2) this.rightDown = true;
     });
-    addEventListener('mouseup', () => (this.mouseDown = false));
+    addEventListener('mouseup', (e) => { if (e.button === 0) this.mouseDown = false; if (e.button === 2) this.rightDown = false; });
+    canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+    canvas.addEventListener('wheel', (e) => this.pressed.add(e.deltaY > 0 ? 'WheelDown' : 'WheelUp'), { passive: true });
     document.addEventListener('pointerlockchange', () => (this.locked = document.pointerLockElement === canvas));
     addEventListener('gamepadconnected', () => (this.padConnected = true));
     addEventListener('gamepaddisconnected', () => (this.padConnected = [...(navigator.getGamepads?.() || [])].some(Boolean)));
@@ -115,7 +118,10 @@ export class Input {
       jump: p('Space'), enter: p('KeyF'), punch: p('Mouse0') || p('KeyX'),
       map: p('KeyM'), pause: p('Escape') || p('KeyP'), radio: p('KeyR'), lights: p('KeyL'), horn: k('KeyH'),
       dive: k('ControlLeft') || k('KeyZ'), up: k('Space'),
-      shiftUp: p('KeyE'), shiftDown: p('KeyQ'), cam: p('KeyC'), skip: p('Enter') || p('NumpadEnter'), retry: p('KeyF') || p('Enter'),
+      shiftUp: p('KeyE'), shiftDown: p('KeyQ'),
+      // armas: Q/E ou roda do mouse troca, 1–5 escolhe, botão direito mira, clique segurado atira automático
+      aim: !!this.rightDown, fire: !!this.mouseDown, weaponNext: p('KeyE') || p('WheelDown'), weaponPrev: p('KeyQ') || p('WheelUp'),
+      weaponSlot: ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5'].findIndex((c) => p(c)), cam: p('KeyC'), skip: p('Enter') || p('NumpadEnter'), retry: p('KeyF') || p('Enter'),
       analog: false, mag: 0,
     };
     st.mag = Math.min(1, Math.hypot(st.moveX, st.moveY));
@@ -142,6 +148,7 @@ export class Input {
       st.horn = st.horn || bt(10); st.cam = st.cam || bp(11);
       st.shiftUp = st.shiftUp || bp(5); st.shiftDown = st.shiftDown || bp(4);
       st.dive = st.dive || bt(4); st.up = st.up || bt(2); st.lights = st.lights || bp(12);
+      st.aim = st.aim || lt > 0.4; st.fire = st.fire || bt(1); st.weaponNext = st.weaponNext || bp(15);
       st.skip = st.skip || bp(0); st.retry = st.retry || bp(3);
       this.padPrev = pad.buttons.map((b) => b.pressed || b.value > 0.5);
     }
@@ -168,6 +175,7 @@ export class Input {
       st.lights = st.lights || tp('lights');
       st.map = st.map || tp('map'); st.pause = st.pause || tp('pause'); st.radio = st.radio || tp('radio');
       st.skip = st.skip || tp('skip'); st.cam = st.cam || tp('cam');
+      st.weaponNext = st.weaponNext || tp('weapon'); st.aim = st.aim || b('aim'); st.fire = st.fire || b('punch');
       st.horn = st.horn || b('horn');
       T.tap.clear();
     }

@@ -43,10 +43,13 @@ export class Character {
     this.g = pivot(this.root, 0, 0, 0);
     this.g.scale.setScalar(o.scale ?? 1);
     const hips = (this.hips = pivot(this.g, 0, 0.95, 0));
-    part(hips, box(0.36, 0.16, 0.22), mat(pants), 0, 0.02, 0);
+    const fat = (this.fat = o.fat || 0);
+    part(hips, box(0.36, 0.16, 0.22), mat(pants), 0, 0.02, 0).scale.set(1 + fat * 0.45, 1, 1 + fat * 0.6);
     const torso = (this.torso = pivot(hips, 0, 0.08, 0));
     const mu = (this.muscle = o.muscle || 0);
-    part(torso, box(0.42, 0.5, 0.24), mat(shirt), 0, 0.27, 0).scale.set(1 + mu * 0.3, 1, 1 + mu * 0.25);
+    part(torso, box(0.42, 0.5, 0.24), mat(shirt), 0, 0.27, 0).scale.set(1 + mu * 0.3 + fat * 0.5, 1, 1 + mu * 0.25 + fat * 0.7);
+    // barriga (cresce comendo demais)
+    if (fat > 0.05) part(torso, box(0.36, 0.3, 0.12), mat(shirt), 0, 0.16, 0.12 + fat * 0.06).scale.set(1 + fat * 0.4, 0.6 + fat * 0.6, fat * 1.6);
     if (o.uniform) {
       part(torso, box(0.08, 0.06, 0.02), mat(0xd4af37, 0.3), 0.1, 0.4, 0.125);
       part(torso, box(0.44, 0.05, 0.26), mat(0x111111), 0, 0.03, 0);
@@ -62,6 +65,9 @@ export class Character {
     part(head, box(0.045, 0.03, 0.01), mat(0x111111), 0.055, 0.16, 0.121);
     part(head, box(0.045, 0.03, 0.01), mat(0x111111), -0.055, 0.16, 0.121);
     part(head, box(0.05, 0.05, 0.03), mat(skin), 0, 0.1, 0.13);
+    // boca: abre e fecha quando o personagem fala
+    this.mouth = part(head, box(0.08, 0.025, 0.012), mat(0x3a1414), 0, 0.045, 0.121);
+    this.mouth.castShadow = false;
     if (o.cap) {
       part(head, box(0.25, 0.07, 0.27), mat(o.cap), 0, 0.29, 0);
       part(head, box(0.22, 0.02, 0.12), mat(o.cap), 0, 0.27, 0.17);
@@ -76,7 +82,8 @@ export class Character {
       const el = pivot(sh, 0, -0.3, 0);
       part(el, box(0.1, 0.27, 0.11), mat(o.sleeves ? shirt : skin), 0, -0.13, 0);
       part(el, box(0.09, 0.09, 0.1), mat(skin), 0, -0.31, 0);
-      this.arms.push({ sh, el });
+      const hand = pivot(el, 0, -0.33, 0.02);
+      this.arms.push({ sh, el, hand });
       const hp = pivot(hips, side * 0.11, -0.02, 0);
       part(hp, box(0.15, 0.45, 0.17), mat(pants), 0, -0.22, 0);
       const kn = pivot(hp, 0, -0.45, 0);
@@ -91,6 +98,22 @@ export class Character {
     this.hitT = 0;
     this.talk = 0;
     this.t = Math.random() * 10;
+    this.weapon = null; this.aim = 0; this.aimPitch = 0; this.swingT = 0;
+  }
+
+  // arma na mão direita: bat, knife, pistol, shotgun
+  setWeapon(type) {
+    if (this.weaponMesh) { this.weaponMesh.parent.remove(this.weaponMesh); this.weaponMesh = null; }
+    this.weapon = type;
+    if (!type || type === 'fist') return;
+    const g = new THREE.Group(), dark = mat(0x1a1a1a, 0.4), wood = mat(0x8a5a2b, 0.7), steel = mat(0xb8b8b8, 0.3);
+    // o eixo -y da mão aponta pra frente quando o braço mira; +z vira "pra cima"
+    if (type === 'bat') part(g, box(0.05, 0.75, 0.05), wood, 0, -0.32, 0);
+    else if (type === 'knife') { part(g, box(0.03, 0.09, 0.04), dark, 0, -0.02, 0); part(g, box(0.012, 0.2, 0.035), steel, 0, -0.15, 0); }
+    else if (type === 'pistol') { part(g, box(0.04, 0.2, 0.05), dark, 0, -0.08, 0.02); part(g, box(0.035, 0.04, 0.11), dark, 0, 0.0, -0.05); }
+    else if (type === 'shotgun') { part(g, box(0.05, 0.95, 0.07), dark, 0, -0.3, 0.02); part(g, box(0.06, 0.32, 0.12), wood, 0, 0.22, -0.03); }
+    this.arms[1].hand.add(g);
+    this.weaponMesh = g;
   }
 
   animate(dt, speed, mode = 'ground') {
@@ -205,6 +228,13 @@ export class Character {
       AL.sh.rotation.x = AR.sh.rotation.x = -0.2;
       AL.el.rotation.x = AR.el.rotation.x = -0.4 - k * 2.0;
       this.hips.position.y = 0.95;
+    } else if (mode === 'dead') {
+      g.rotation.x = -Math.PI / 2;
+      g.position.y = 0.12;
+      g.position.z = -0.9;
+      AL.sh.rotation.z = 1.4; AR.sh.rotation.z = -0.4; AR.sh.rotation.x = -0.6;
+      L.hp.rotation.z = 0.25; Rr.hp.rotation.z = -0.1; L.kn.rotation.x = 0.3;
+      this.head.rotation.y = 0.6;
     } else if (mode === 'chat') {
       AR.sh.rotation.x = -0.3 + Math.sin(this.t * 2.3) * 0.25;
       AR.el.rotation.x = -1.1;
@@ -270,8 +300,30 @@ export class Character {
     if (this.talk > 0) {
       this.talk -= dt;
       this.head.rotation.x = Math.sin(this.t * 9) * 0.06;
-      AR.sh.rotation.x += Math.sin(this.t * 3) * 0.15 - 0.2;
-      AR.el.rotation.x -= 0.5;
+      if (mode !== 'drive' && mode !== 'moto' && mode !== 'bike') { AR.sh.rotation.x += Math.sin(this.t * 3) * 0.15 - 0.2; AR.el.rotation.x -= 0.5; }
+      // sílabas: a boca abre e fecha em ritmo irregular
+      const o = Math.max(0, Math.sin(this.t * 17) * 0.6 + Math.sin(this.t * 7.3 + 1) * 0.5);
+      this.mouth.scale.set(1 - o * 0.25, 1 + o * 2.6, 1);
+    } else this.mouth.scale.set(1, 1, 1);
+    // mirando: braço direito (pistola) ou os dois (escopeta) apontados pra frente
+    if (this.aim > 0 && (mode === 'ground' || mode === 'air')) {
+      const w = Math.min(1, this.aim), p = this.aimPitch;
+      if (this.weapon === 'shotgun') {
+        AR.sh.rotation.x = lerp(AR.sh.rotation.x, -1.45 - p, w); AR.el.rotation.x = lerp(AR.el.rotation.x, -0.1, w); AR.sh.rotation.z = lerp(AR.sh.rotation.z, 0.2, w);
+        AL.sh.rotation.x = lerp(AL.sh.rotation.x, -1.35 - p, w); AL.el.rotation.x = lerp(AL.el.rotation.x, -0.5, w); AL.sh.rotation.z = lerp(AL.sh.rotation.z, -0.5, w);
+        this.torso.rotation.y = lerp(this.torso.rotation.y, 0.25, w);
+      } else {
+        AR.sh.rotation.x = lerp(AR.sh.rotation.x, -1.55 - p, w); AR.el.rotation.x = lerp(AR.el.rotation.x, 0, w); AR.sh.rotation.z = lerp(AR.sh.rotation.z, 0.05, w);
+      }
+      this.head.rotation.x = -p * 0.6;
+    }
+    // golpe de taco/faca: arco de cima pra baixo
+    if (this.swingT > 0) {
+      this.swingT -= dt;
+      const u = clamp(1 - this.swingT / 0.42, 0, 1), k = u < 0.35 ? u / 0.35 : 1 - (u - 0.35) / 0.65;
+      AR.sh.rotation.x = u < 0.35 ? lerp(0, -2.6, k) : lerp(-0.3, -2.6, k);
+      AR.sh.rotation.z = 0.3 * k; AR.el.rotation.x = -0.4 * k;
+      this.torso.rotation.y = u < 0.35 ? 0.4 * k : -0.5 * (1 - k);
     }
   }
 }

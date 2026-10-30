@@ -79,6 +79,48 @@ export class Audio {
   setHeli(v) { if (!this.ctx) return; this.set(this.heli.g, v * 0.22, 0.3); this.heliDepth.gain.setTargetAtTime(v * 0.2, this.ctx.currentTime, 0.3); }
   setPlane(v) { if (!this.ctx) return; this.set(this.plane.g, v * v * 0.3, 0.5); }
   splash(big) { if (!this.ctx) return; this.burst(big ? 0.9 : 0.4, 900, big ? 0.6 : 0.3, 'lowpass'); this.burst(0.3, 3000, 0.2, 'highpass'); }
+  // conversa ao fundo: sílaba sintética (voz com formante de vogal), sem palavras
+  syllable(vol, female) {
+    if (!this.ctx || vol < 0.004) return;
+    const C = this.ctx, t = C.currentTime, d = 0.09 + Math.random() * 0.14;
+    const f0 = (female ? 200 : 115) * (0.85 + Math.random() * 0.35);
+    const o = C.createOscillator(); o.type = 'sawtooth';
+    o.frequency.setValueAtTime(f0, t); o.frequency.linearRampToValueAtTime(f0 * (0.85 + Math.random() * 0.3), t + d);
+    const F = [[730, 1090], [530, 1840], [270, 2290], [570, 840], [300, 870]][Math.floor(Math.random() * 5)];
+    const g = C.createGain();
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+    for (const [f, q, k] of [[F[0], 6, 1], [F[1], 9, 0.5]]) {
+      const bp = C.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = f; bp.Q.value = q;
+      const kg = C.createGain(); kg.gain.value = k;
+      o.connect(bp); bp.connect(kg); kg.connect(g);
+    }
+    g.connect(this.sfx); o.start(t); o.stop(t + d + 0.02);
+  }
+  gun(type, dist = 0) {
+    if (!this.ctx) return;
+    const v = Math.max(0.05, 1 - dist / 180);
+    if (type === 'shotgun') { this.burst(0.5, 700, 0.9 * v); this.burst(0.18, 3500, 0.5 * v, 'highpass'); this.tone(80, 40, 0.25, 0.5 * v); }
+    else { this.burst(0.22, 1600, 0.7 * v); this.burst(0.08, 5000, 0.4 * v, 'highpass'); this.tone(150, 60, 0.1, 0.3 * v); }
+  }
+  click() { if (!this.ctx) return; this.tone(1800, 1200, 0.04, 0.15, 'square'); }
+  swing() { if (!this.ctx) return; this.burst(0.18, 1400, 0.25, 'bandpass'); }
+  bark(dist = 0) {
+    if (!this.ctx) return;
+    const v = Math.max(0, 1 - dist / 60) * 0.35;
+    for (let i = 0; i < 2; i++) { this.tone(520, 240, 0.12, v, 'sawtooth', i * 0.22); this.burst(0.1, 900, v * 0.6, 'bandpass'); }
+  }
+  gull(dist = 0) {
+    if (!this.ctx) return;
+    const v = Math.max(0, 1 - dist / 90) * 0.12;
+    for (let i = 0; i < 3; i++) this.tone(1500, 900, 0.18, v, 'triangle', i * 0.2);
+  }
+  chirp(dist = 0) {
+    if (!this.ctx) return;
+    const v = Math.max(0, 1 - dist / 70) * 0.06;
+    for (let i = 0; i < 4; i++) this.tone(3200 + Math.random() * 800, 4200, 0.05, v, 'sine', i * 0.08);
+  }
+  eat() { if (!this.ctx) return; for (let i = 0; i < 3; i++) this.burst(0.08, 1200, 0.2, 'bandpass'); }
+  cash() { if (!this.ctx) return; this.tone(1320, 1320, 0.08, 0.15, 'square'); this.tone(1760, 1760, 0.12, 0.12, 'square', 0.07); }
   boom() { if (!this.ctx) return; this.burst(2.5, 220, 1); this.tone(90, 30, 1.2, 0.8); this.burst(0.6, 2500, 0.5, 'bandpass'); }
   jingle() { if (!this.ctx) return; [72, 76, 79, 84].forEach((n, i) => this.tone(NOTE(n), NOTE(n), 0.3, 0.15, 'triangle', i * 0.12)); }
 

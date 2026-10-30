@@ -152,12 +152,12 @@ export class Police {
         const on = Math.sin(g.simTime * 14) > 0;
         if (v.siren) { v.siren.red.emissiveIntensity = W && on ? 6 : 0; v.siren.blue.emissiveIntensity = W && !on ? 6 : 0; }
         // policial desce se o jogador está a pé
-        if (W && !plr.vehicle && d < 22 && v.speed < 2 && !v.pursuit.deployed) {
+        if (W && (!plr.vehicle || (W >= 3 && plr.vehicle.speed < 4)) && d < 22 && v.speed < 2 && !v.pursuit.deployed) {
           v.pursuit.deployed = true;
           const ch = v.rider;
           v.setRider(null);
           const dp = v.doorPoint(1);
-          const cop = { ch, pos: new THREE.Vector3(dp.x, groundAt(dp.x, dp.z), dp.z), heading: v.heading, down: 0, car: v };
+          const cop = { ch, pos: new THREE.Vector3(dp.x, groundAt(dp.x, dp.z), dp.z), heading: v.heading, down: 0, car: v, hp: 100, shotT: 1.2 };
           g.scene.add(ch.root);
           this.cops.push(cop);
           this.copSay(ch);
@@ -169,8 +169,27 @@ export class Police {
       const c = this.cops[k];
       const dx = plr.pos.x - c.pos.x, dz = plr.pos.z - c.pos.z, d = Math.hypot(dx, dz);
       let sp = 0, mode = 'ground';
+      if (c.dead) {
+        c.deadT -= dt;
+        if (c.deadT <= 0 && d > 40) { g.scene.remove(c.ch.root); this.cops.splice(k, 1); continue; }
+        c.ch.root.position.copy(c.pos); c.ch.root.rotation.y = c.heading;
+        c.ch.animate(dt, 0, 'dead');
+        continue;
+      }
+      // a partir de 3 estrelas os policiais sacam a pistola e atiram
+      const armed = W >= 3;
+      if (armed && c.ch.weapon !== 'pistol') c.ch.setWeapon('pistol');
+      if (!armed && c.ch.weapon) { c.ch.setWeapon(null); c.ch.aim = 0; }
+      c.shotT = (c.shotT ?? 1) - dt;
       if (c.down > 0) { c.down -= dt; mode = 'down'; }
-      else if (W && !plr.vehicle) {
+      else if (W && armed && d < 26) {
+        c.heading = Math.atan2(dx, dz);
+        sp = d > 9 ? 5 : d < 1.1 ? 0 : plr.vehicle ? 0 : d < 3 ? 4 : 0;
+        c.ch.aim = Math.min(1, c.ch.aim + dt * 4);
+        if (c.shotT <= 0 && !g.dead) { c.shotT = 1.0 + Math.random() * 0.7; g.combat.npcShoot(c, plr); }
+        if (d < 1.4) this.bustT += dt * 1.6;
+      } else if (W && !plr.vehicle) {
+        c.ch.aim = 0;
         c.heading = Math.atan2(dx, dz);
         sp = d > 1.1 ? 5.6 : 0;
         if (d < 1.4) this.bustT += dt * 1.6;
@@ -265,9 +284,24 @@ export class Police {
     this.cars = []; this.cops = [];
   }
 
+  // tiro/facada/taco num policial
+  hurt(c, dmg) {
+    if (c.dead) return;
+    c.hp -= dmg;
+    c.ch.hitT = 0.4;
+    this.g.addWanted(Math.max(1, 3 - this.g.wanted) * 0.5 + 0.5);
+    if (c.hp <= 0) {
+      c.dead = true; c.deadT = 40; c.ch.setWeapon(null); c.ch.aim = 0;
+      if (c.car) c.car.pursuit.deployed = true;
+      this.g.dropMoney(c.pos.x, c.pos.z, 40);
+      this.g.wanted = Math.min(5, Math.max(this.g.wanted, 3));
+    }
+  }
+
   // soco num policial
   punch(x, z, fx, fz) {
     for (const c of this.cops) {
+      if (c.dead) continue;
       const dx = c.pos.x - x, dz = c.pos.z - z, d = Math.hypot(dx, dz);
       if (d < 1.5 && (dx * fx + dz * fz) / (d || 1) > 0.4) { c.down = 3; this.g.addWanted(1); return true; }
     }

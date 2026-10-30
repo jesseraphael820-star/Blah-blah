@@ -4,10 +4,10 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { clamp, lerp, smoothstep, angleDiff } from './util.js';
-import { World, groundAt, heightAt, zoneName, cityAt, puddleAt, LIGHTS_N } from './world.js';
-import { Vehicle, collideVehicles, BEAM } from './vehicle.js';
+import { World, groundAt, heightAt, zoneName, cityAt, puddleAt, LIGHTS_N, crossingAhead, lightAt, gangAt, ROAD_W, GANGS } from './world.js';
+import { Vehicle, collideVehicles, BEAM, VTYPES } from './vehicle.js';
 import { Character } from './character.js';
-import { Traffic, Peds } from './npc.js';
+import { Traffic, Peds, Driver } from './npc.js';
 import { Environment } from './sky.js';
 import { HUD } from './hud.js';
 import { Input } from './input.js';
@@ -20,7 +20,9 @@ import { Police } from './police.js';
 import { FX } from './fx.js';
 import { Skids } from './skids.js';
 import { Air } from './air.js';
-import { Shops } from './shops.js';
+import { Shops, PLACES } from './shops.js';
+import { Combat } from './combat.js';
+import { Animals } from './animals.js';
 import { periodAt } from './sky.js';
 
 const settings = new Settings();
@@ -135,7 +137,8 @@ const game = {
   camYawTo(y) { this.cam.yaw = y; },
   setPlayerLook(look, muscle) {
     const p = this.player, old = p.char;
-    const ch = new Character({ ...look, muscle });
+    const ch = new Character({ ...look, muscle, fat: this.shops ? this.shops.data.fat : 0 });
+    if (this.combat) ch.setWeapon(this.combat.current);
     ch.root.position.copy(old.root.position); ch.root.rotation.copy(old.root.rotation);
     if (p.vehicle) p.vehicle.setRider(ch); else { scene.remove(old.root); scene.add(ch.root); }
     p.char = ch;
@@ -212,7 +215,7 @@ const player = (game.player = new Player());
 const world = (game.world = new World(scene, Q));
 const input = (game.input = new Input(settings, renderer.domElement));
 const audio = (game.audio = new Audio(settings));
-let env, hud, voice, traffic, peds, missions, police, air, shops;
+let env, hud, voice, traffic, peds, missions, police, air, shops, combat, animals;
 const fx = (game.fx = new FX(scene));
 const skids = new Skids(scene);
 
@@ -291,8 +294,11 @@ function updateOnFoot(dt, inp) {
   if (!deep && p.swim && p.pos.y > gy - 0.6) { p.swim = false; p.under = false; }
   const shops = game.shops;
   const sprinting = inp.sprint && p.stamina > 0 && mag > 0.1;
+  p.sprinting = sprinting;
   if (sprinting) p.stamina -= dt; else p.stamina = Math.min(shops.sprintMax, p.stamina + dt * 0.7);
   let top = p.swim ? (p.under ? 2.1 : sprinting ? 3.4 : 2.3) : sprinting ? 7.4 : 4.6;
+  top *= 1 - shops.data.fat * 0.18;
+  if (p.char.aim > 0.5) top = Math.min(top, 2.4);
   if (!inp.analog && !inp.walk) mag = mag > 0 ? 1 : 0;
   const speed = top * mag;
   if (settings.get('view') === 'first' && !p.swim && p.down <= 0) p.heading += clamp(angleDiff(p.heading, yaw), -dt * 14, dt * 14);
@@ -362,7 +368,7 @@ function updateOnFoot(dt, inp) {
   }
   p.speed = Math.hypot(p.vel.x, p.vel.z);
   // soco
-  if (free && inp.punch && p.onGround && !p.swim && ch.punchT <= 0.06) {
+  if (free && inp.punch && p.onGround && !p.swim && ch.punchT <= 0.06 && combat.current === 'fist') {
     // combo jab -> direto -> gancho se apertar no ritmo
     game.combo = game.simTime - (game.lastPunch ?? -9) < 0.8 ? ((game.combo || 0) + 1) % 3 : 0;
     game.lastPunch = game.simTime;
@@ -370,7 +376,7 @@ function updateOnFoot(dt, inp) {
     // vira na direção do pedestre mais próximo à frente
     let best = null, bd = 2.6;
     for (const q of peds.list) {
-      if (q.state === 'down') continue;
+      if (q.state === 'down' || q.state === 'dead') continue;
       const d = Math.hypot(q.pos.x - p.pos.x, q.pos.z - p.pos.z);
       const dot = ((q.pos.x - p.pos.x) * Math.sin(p.heading) + (q.pos.z - p.pos.z) * Math.cos(p.heading)) / (d || 1);
       if (d < bd && dot > 0.2) { bd = d; best = q; }
@@ -580,6 +586,7 @@ function tick() {
     p.pos.copy(v.pos);
     p.char.animate(dt, v.speed, v.t.shape === 'bike' ? 'bike' : v.t.twoWheel ? 'moto' : 'drive');
   } else updateOnFoot(dt, inp);
+  combat.update(dt, inp);
   game.focus.copy(p.vehicle ? p.vehicle.pos : p.pos);
 
   // veículos
@@ -624,6 +631,10 @@ function tick() {
   traffic.update(dt);
   police.update(dt);
   air.update(dt);
+  animals.update(dt);
+  world.updateTrafficLights(game.simTime);
+  redLightCheck(dt);
+  gangZoneHint();
   fx.light = 0.1 + 0.9 * (env.day ?? 1);
   BEAM.uBeam.value = (0.12 + 0.88 * env.night) * (0.05 + env.p.rain * 0.35 + clamp((env.p.fog - 0.0005) * 60, 0, 0.3));
   fx.update(dt, camera.position);
@@ -730,6 +741,70 @@ function render() {
   if (settings.get('bloom')) composer.render(); else renderer.render(scene, camera);
 }
 
+// ---------------------------------------------------------------- marina, veículos comprados, sinal vermelho, gangues
+const MARINA = [{ x: 1100, z: 516, h: Math.PI / 2 }, { x: 1080, z: 486, h: Math.PI / 2 }, { x: 1130, z: 486, h: Math.PI / 2 }, { x: 1150, z: 520, h: Math.PI / 2 }];
+function waterSpot(x, z) {
+  // anda pro mar até ter fundo suficiente
+  for (let k = 0; k < 60 && heightAt(x, z) > -1.6; k++) x += 4;
+  return { x, z };
+}
+function spawnMarina() {
+  [['boat', 0xb3201c], ['jetski', 0x2a8fbd], ['jetski', 0xf0b429]].forEach(([t, c], i) => {
+    const s = waterSpot(MARINA[i].x, MARINA[i].z);
+    const v = new Vehicle(t, c, s.x, s.z, MARINA[i].h);
+    v.pos.y = 0;
+    game.addVehicle(v);
+  });
+  game.addBlip({ id: 'marina', x: 1080, z: 500, color: '#4cc3ff', shape: 'sq', label: 'M', keep: true });
+}
+// vaga na beira da rua em frente a um lugar (a placa fica na calçada, 8,5 m do meio da rua)
+const curb = (p) => p.x - Math.sign(Math.sin(p.face)) * 3.5;
+game.deliverVehicle = (type, color) => {
+  const t = VTYPES[type];
+  let x, z, h;
+  if (t.boat) { const s = waterSpot(MARINA[3].x, MARINA[3].z + (Math.random() - 0.5) * 10); x = s.x; z = s.z; h = Math.PI / 2; }
+  else { const d = PLACES.find((p) => p.id === 'dealer'); x = curb(d); z = d.z - 10 + Math.random() * 6; h = 0; }
+  const v = new Vehicle(type, color, x, z, h);
+  if (t.boat) v.pos.y = 0;
+  v.owned = true;
+  game.addVehicle(v);
+  return v;
+};
+function spawnOwned(atHouse) {
+  const hs = PLACES.find((p) => p.id === 'house');
+  if (atHouse) game.placePlayer(hs.x + 1.5, hs.z + 2, Math.PI);
+  shops.data.cars.forEach((c, i) => {
+    const t = VTYPES[c.type];
+    if (t.boat) { game.deliverVehicle(c.type, c.color); return; }
+    const base = atHouse ? hs : PLACES.find((p) => p.id === 'dealer');
+    const x = curb(base), z = base.z - 12 + i * 7;
+    const v = new Vehicle(c.type, c.color, x, z, 0);
+    v.owned = true;
+    game.addVehicle(v);
+  });
+}
+// furar o vermelho com a polícia olhando dá estrela
+let redState = null;
+function redLightCheck() {
+  const v = player.vehicle;
+  if (!v || v.t.boat) { redState = null; return; }
+  const X = crossingAhead(v.pos.x, v.pos.z, Math.atan2(v.vel.x, v.vel.z), 4);
+  const inside = X && X.dist < ROAD_W / 2 && X.dist > -ROAD_W / 2;
+  if (inside && !redState && v.speed > 4) {
+    redState = X;
+    if (lightAt(X.c, X.i, X.j, X.axis, game.simTime) === 'r') {
+      const cop = police.cars.some((c) => c.pos.distanceTo(v.pos) < 55) || police.cops.some((c) => !c.dead && c.pos.distanceTo(v.pos) < 40);
+      if (cop && game.wanted < 1) { game.addWanted(1); hud.hint(ui('redLight', settings.get('lang')), 3000); }
+    }
+  } else if (!inside) redState = null;
+}
+let lastGang = null;
+function gangZoneHint() {
+  const G = gangAt(game.focus.x, game.focus.z);
+  if (G && G !== lastGang) hud.hint(ui('gangZone', settings.get('lang'), { n: G.name }), 3000);
+  lastGang = G;
+}
+
 // ---------------------------------------------------------------- boot
 async function boot() {
   const bar = document.getElementById('loadbar'), txt = document.getElementById('loadtxt');
@@ -745,6 +820,10 @@ async function boot() {
   police = game.police = new Police(game);
   air = game.air = new Air(game);
   shops = game.shops = new Shops(game);
+  combat = game.combat = new Combat(game);
+  animals = game.animals = new Animals(game);
+  game.vtypes = VTYPES; game.gangs = GANGS;
+  Vehicle.world = world;
   game.setPlayerLook(shops.data.look, shops.data.muscle);
   player.stamina = shops.sprintMax; player.breath = shops.breathMax;
   Vehicle.fx = fx;
@@ -758,6 +837,7 @@ async function boot() {
     const v = new Vehicle(t, t === 'taxi' ? 0xf2c014 : [0xb3201c, 0x1d3f8a, 0xe8e8e8, 0x151515, 0x2f6b3a, 0xc9a227, 0x6d6f73][i % 7], s.x, s.z, s.h);
     game.addVehicle(v);
   });
+  spawnMarina();
   bar.style.width = '100%';
   txt.textContent = settings.get('lang') === 'pt' ? 'Pronto!' : 'Ready!';
   document.getElementById('menu').classList.remove('hidden');
@@ -775,6 +855,8 @@ async function boot() {
     if (!input.touchActive()) renderer.domElement.requestPointerLock?.();
     hud.setVisible(true);
     missions.start(fresh).catch((e) => console.error(e));
+    if (fresh) { shops.data.cars = []; shops.data.house = false; }
+    spawnOwned(!fresh && shops.data.house && missions.stage >= 2);
   };
   document.getElementById('btnNew').onclick = () => start(true);
   btnCont.onclick = () => start(false);
@@ -793,7 +875,7 @@ async function boot() {
     if (k === 'lang') document.getElementById('btnResume').textContent = ui('resume', settings.get('lang'));
   });
   document.getElementById('btnResume').textContent = ui('resume', lang);
-  window.__fta = game;
+  window.__fta = game; game.Driver = Driver;
 }
 
 boot();

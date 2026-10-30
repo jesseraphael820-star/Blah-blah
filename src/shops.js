@@ -8,7 +8,31 @@ const KEY = 'fta1_player';
 export const PLACES = [
   { id: 'clothes', name: 'Moda Sereno', x: 568.5, z: 545, unlockAt: 150, color: '#e05ab8', icon: 'R', face: Math.PI / 2 },
   { id: 'gym', name: 'Academia Força Bruta', x: 731.5, z: 455, unlockAt: 330, color: '#f08a24', icon: 'A', face: -Math.PI / 2 },
+  { id: 'food', name: 'Lanchonete do Zé', x: 478.5, z: 455, unlockAt: 0, color: '#ffcc33', icon: 'L', face: Math.PI / 2 },
+  { id: 'food2', kind: 'food', name: 'Pastelaria Serrana', x: -649.5, z: 650, unlockAt: 0, color: '#ffcc33', icon: 'L', face: Math.PI / 2 },
+  { id: 'dealer', name: 'Auto Sereno Veículos', x: 821.5, z: 635, unlockAt: 60, color: '#4cc3ff', icon: 'V', face: -Math.PI / 2 },
+  { id: 'guns', name: 'Armas do Tonhão', x: 658.5, z: 365, unlockAt: 240, color: '#ff4a4a', icon: 'T', face: Math.PI / 2 },
+  { id: 'house', name: 'Casa à venda', x: 388.5, z: 725, unlockAt: 0, color: '#7cff7c', icon: 'H', face: Math.PI / 2 },
 ];
+// comida: fome que mata (0–1) e quanto engorda
+const FOOD = [
+  { pt: 'Pastel de carne', en: 'Meat pastry', price: 5, fill: 0.25, fat: 0.025 },
+  { pt: 'X-tudo + refri', en: 'Loaded burger + soda', price: 12, fill: 0.55, fat: 0.07 },
+  { pt: 'Prato feito', en: 'Rice & beans plate', price: 10, fill: 0.6, fat: 0.03 },
+  { pt: 'Salada de frutas', en: 'Fruit salad', price: 8, fill: 0.3, fat: -0.03 },
+];
+export const DEALER = [
+  { type: 'moto', color: 0x111111, price: 600 }, { type: 'sedan', color: 0x7a1f4d, price: 900 },
+  { type: 'pickup', color: 0x2f6b3a, price: 1600 }, { type: 'sport', color: 0xf0b429, price: 5000 },
+  { type: 'jetski', color: 0xff5a1f, price: 1200 }, { type: 'boat', color: 0x1d3f8a, price: 2500 },
+];
+export const GUNS = {
+  bat: { pt: 'Taco de beisebol', en: 'Baseball bat', price: 40 },
+  knife: { pt: 'Faca', en: 'Knife', price: 60 },
+  pistol: { pt: 'Pistola (+34 balas)', en: 'Pistol (+34 rounds)', price: 350, ammo: 34, ammoPrice: 40 },
+  shotgun: { pt: 'Escopeta (+16 cartuchos)', en: 'Shotgun (+16 shells)', price: 900, ammo: 16, ammoPrice: 60 },
+};
+export const HOUSE_PRICE = 1500;
 
 const CATALOG = {
   shirt: { pt: 'Camisa', en: 'Shirt', items: [[0xf4f4f4, 0], [0x1f4e8c, 40], [0xb3261e, 40], [0x2f6b3a, 40], [0xf0b429, 60], [0x6a2c70, 60], [0x111111, 80], [0xd9661f, 50], [0x7fb3d5, 50]] },
@@ -20,12 +44,13 @@ const CATALOG = {
 export class Shops {
   constructor(game) {
     this.g = game;
-    this.data = { look: { skin: 0x6b4226, shirt: 0xf4f4f4, pants: 0x1f3a6b, hair: 0x111111, chain: true, cap: null }, muscle: 0, stamina: 0, owned: { chain_1: true }, unlocked: {}, played: 0 };
+    this.data = { look: { skin: 0x6b4226, shirt: 0xf4f4f4, pants: 0x1f3a6b, hair: 0x111111, chain: true, cap: null }, muscle: 0, stamina: 0, owned: { chain_1: true }, unlocked: {}, played: 0, hunger: 1, fat: 0, house: false, cars: [], weapons: {}, ammo: {} };
     try { Object.assign(this.data, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch (e) { /* sem armazenamento */ }
     this.el = document.getElementById('shop');
     this.open = null;
     this.markers = {};
     this.saveT = 0;
+    if (this.data.house) PLACES.find((p) => p.id === 'house').name = 'Sua Casa';
     for (const p of PLACES) this.buildFront(p);
     for (const p of PLACES) if (this.data.unlocked[p.id]) this.reveal(p, false);
   }
@@ -73,16 +98,28 @@ export class Shops {
   }
 
   // stats para o resto do jogo
-  get sprintMax() { return 5 + this.data.stamina * 15; }
+  get sprintMax() { return (5 + this.data.stamina * 15) * (1 - this.data.fat * 0.5); }
   get breathMax() { return 15 + this.data.stamina * 25; }
 
   update(dt, inp) {
     const g = this.g;
     if (!g.locked) this.data.played += dt;
+    // fome: esvazia em ~15 min de jogo; com fome demais a vida cai
+    const d = this.data;
+    if (!g.locked && !this.open) {
+      const before = d.hunger;
+      d.hunger = Math.max(0, d.hunger - dt / 900);
+      if (before > 0.2 && d.hunger <= 0.2) g.hud.hint(ui('hungry', this.lang()), 5000);
+      if (before > 0 && d.hunger <= 0) g.hud.hint(ui('starving', this.lang()), 5000);
+      if (d.hunger <= 0) g.player.health -= dt * 0.6;
+      // correr queima gordura
+      if (g.player.sprinting && d.fat > 0) { d.fat = Math.max(0, d.fat - dt * 0.0015); this.fatDirty = (this.fatDirty || 0) + dt; }
+      if (this.fatDirty > 20) { this.fatDirty = 0; g.setPlayerLook(d.look, d.muscle); }
+    }
     this.saveT -= dt;
     if (this.saveT <= 0) { this.saveT = 10; this.save(); }
     for (const p of PLACES) {
-      if (!this.data.unlocked[p.id] && this.data.played > p.unlockAt) this.reveal(p, true);
+      if (!this.data.unlocked[p.id] && this.data.played >= p.unlockAt) this.reveal(p, p.unlockAt > 0);
     }
     for (const m of this.permanent || []) m.children[1].position.y = 0.2 + Math.sin(g.simTime * 3) * 0.15;
     if (this.open) { this.menuInput(dt, inp); return true; }
@@ -109,7 +146,11 @@ export class Shops {
     document.exitPointerLock?.();
     this.el.classList.remove('hidden');
     if (p.id === 'clothes') this.renderClothes();
-    else { this.gym = { t: 0, reps: 0, power: 0, active: false }; this.renderGym(); }
+    else if (p.id === 'gym') { this.gym = { t: 0, reps: 0, power: 0, active: false }; this.renderGym(); }
+    else if (p.id === 'food' || p.kind === 'food') this.renderFood();
+    else if (p.id === 'dealer') this.renderDealer();
+    else if (p.id === 'guns') this.renderGuns();
+    else if (p.id === 'house') this.renderHouse();
   }
   close() {
     this.open = null;
@@ -147,6 +188,93 @@ export class Shops {
     d.look[k] = val;
     this.g.setPlayerLook(d.look, d.muscle);
     this.renderClothes();
+  }
+
+  // ------------------------------------------------ lista genérica (nome, preço, ação)
+  renderList(rows, note = '') {
+    const L = this.lang();
+    this.el.innerHTML = `<div class="shopbox"><div class="stitle">${this.open.name}</div><div class="money">$${Math.round(this.g.money)}</div>${note}
+      <div class="list">${rows.map((r, i) => `<button class="row" data-i="${i}" ${r.off ? 'disabled' : ''}><span>${r.label}</span><em>${r.right}</em></button>`).join('')}</div>
+      <button class="close">${L === 'pt' ? 'Sair' : 'Leave'}</button></div>`;
+    this.el.querySelectorAll('.row').forEach((b) => (b.onclick = () => rows[+b.dataset.i].act()));
+    this.el.querySelector('.close').onclick = () => this.close();
+  }
+  pay(price) {
+    if (this.g.money < price) { this.g.hud.hint(ui('noMoney', this.lang()), 2000); return false; }
+    this.g.money -= price;
+    this.g.audio.cash();
+    return true;
+  }
+
+  renderFood() {
+    const L = this.lang(), d = this.data;
+    const bar = `<div class="stat">${L === 'pt' ? 'Fome' : 'Hunger'} <div class="sbar"><i style="width:${d.hunger * 100}%;background:#ffb020"></i></div></div>
+      <div class="stat">${L === 'pt' ? 'Gordura' : 'Body fat'} <div class="sbar"><i style="width:${d.fat * 100}%;background:#d9661f"></i></div></div>
+      <p>${L === 'pt' ? 'Comer de barriga cheia engorda. Correr e treinar emagrece.' : 'Eating when full makes you fat. Running and training burn it off.'}</p>`;
+    this.renderList(FOOD.map((f) => ({
+      label: f[L], right: '$' + f.price,
+      act: () => {
+        if (!this.pay(f.price)) return;
+        const over = Math.max(0, d.hunger + f.fill - 1);
+        d.hunger = Math.min(1, d.hunger + f.fill);
+        d.fat = clamp(d.fat + f.fat * (0.3 + over * 1.2), 0, 1);
+        this.g.player.health = Math.min(100, this.g.player.health + f.fill * 30);
+        this.g.audio.eat();
+        this.g.setPlayerLook(d.look, d.muscle);
+        this.renderFood();
+      },
+    })), bar);
+  }
+
+  renderDealer() {
+    const L = this.lang(), d = this.data, VT = this.g.vtypes;
+    this.renderList(DEALER.map((c) => ({
+      label: `${VT[c.type].name}${VT[c.type].boat ? (L === 'pt' ? ' (entregue na marina)' : ' (delivered to marina)') : ''}`, right: '$' + c.price,
+      act: () => {
+        if (!this.pay(c.price)) return;
+        d.cars.push({ type: c.type, color: c.color });
+        this.save();
+        const v = this.g.deliverVehicle(c.type, c.color);
+        this.close();
+        this.g.hud.big(VT[c.type].name, L === 'pt' ? 'é seu!' : 'is yours!', 3500);
+        if (v) this.g.addBlip({ id: 'bought', color: '#4cc3ff', follow: v });
+        setTimeout(() => this.g.removeBlip('bought'), 60000);
+      },
+    })), `<p>${L === 'pt' ? 'Os veículos comprados voltam pra você toda vez que você carrega o jogo.' : 'Bought vehicles come back every time you load the game.'}</p>`);
+  }
+
+  renderGuns() {
+    const L = this.lang(), d = this.data;
+    const rows = [];
+    for (const [k, G] of Object.entries(GUNS)) {
+      if (!d.weapons[k]) rows.push({ label: G[L], right: '$' + G.price, act: () => { if (!this.pay(G.price)) return; d.weapons[k] = true; if (G.ammo) d.ammo[k] = (d.ammo[k] || 0) + G.ammo; this.g.combat.equip(k); this.save(); this.renderGuns(); } });
+      else if (G.ammo) rows.push({ label: `${L === 'pt' ? 'Munição' : 'Ammo'}: ${G[L].split(' (')[0]} (+${G.ammo}) · ${d.ammo[k] || 0}`, right: '$' + G.ammoPrice, act: () => { if (!this.pay(G.ammoPrice)) return; d.ammo[k] = (d.ammo[k] || 0) + G.ammo; this.save(); this.renderGuns(); } });
+      else rows.push({ label: G[L], right: '✔', off: true, act: () => {} });
+    }
+    this.renderList(rows, `<p>${L === 'pt' ? 'Troque de arma com <b>Q/E</b> ou <b>1–5</b>, D-pad → ou 🔫. Mire com o <b>botão direito</b> / LT.' : 'Switch weapons with <b>Q/E</b> or <b>1–5</b>, D-pad → or 🔫. Aim with <b>right mouse</b> / LT.'}</p>`);
+  }
+
+  renderHouse() {
+    const L = this.lang(), d = this.data, g = this.g;
+    if (!d.house) {
+      this.renderList([{ label: L === 'pt' ? 'Comprar a casa' : 'Buy the house', right: '$' + HOUSE_PRICE, act: () => {
+        if (!this.pay(HOUSE_PRICE)) return;
+        d.house = true; this.open.name = L === 'pt' ? 'Sua casa' : 'Your house'; this.save();
+        g.hud.big(L === 'pt' ? 'Casa comprada!' : 'House bought!', L === 'pt' ? 'agora você salva e dorme aqui' : 'save and sleep here now', 4000);
+        this.renderHouse();
+      } }], `<p>${L === 'pt' ? 'Com casa própria você salva o jogo, dorme pra passar o tempo e começa aqui quando volta.' : 'Own a house to save, sleep to pass time, and start here when you come back.'}</p>`);
+      return;
+    }
+    this.renderList([{ label: L === 'pt' ? 'Dormir e salvar (6 horas)' : 'Sleep and save (6 hours)', right: '💤', act: () => {
+      g.env.time = (g.env.time + 6) % 24;
+      g.player.health = 100;
+      d.hunger = Math.max(0, d.hunger - 0.15);
+      g.saveGame && g.saveGame();
+      this.save();
+      this.close();
+      g.hud.big(L === 'pt' ? 'Jogo salvo' : 'Game saved', '', 2500);
+      g.hud.hint(ui('saved', L, { h: g.env.clock() }), 4000);
+    } }]);
   }
 
   renderGym() {
@@ -195,6 +323,7 @@ export class Shops {
       const d = this.data;
       const gm = clamp(G.reps * 0.008, 0, 1 - d.muscle), gs = clamp(G.reps * 0.006, 0, 1 - d.stamina);
       d.muscle += gm; d.stamina += gs;
+      d.fat = Math.max(0, d.fat - G.reps * 0.004);
       g.setPlayerLook(d.look, d.muscle);
       g.hud.big(this.lang() === 'pt' ? 'Treino concluído!' : 'Workout done!', `${this.lang() === 'pt' ? 'Músculo' : 'Muscle'} +${Math.round(gm * 100)}% · ${this.lang() === 'pt' ? 'Fôlego' : 'Stamina'} +${Math.round(gs * 100)}%`, 3500);
       this.save();

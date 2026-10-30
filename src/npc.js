@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { clamp, angleDiff, pick } from './util.js';
-import { CITIES, ROAD_W, cityAt, groundAt } from './world.js';
+import { CITIES, ROAD_W, cityAt, groundAt, crossingAhead, lightAt, GANGS, gangAt } from './world.js';
 import { Vehicle, CAR_COLORS } from './vehicle.js';
 import { Character, randomLook } from './character.js';
 import { LINES } from './i18n.js';
@@ -48,17 +48,26 @@ export class Driver {
     if (last) desired = Math.min(desired, dist * 0.6);
     // obstáculos à frente
     const sh = Math.sin(v.heading), ch = Math.cos(v.heading);
-    let ahead = 99;
-    const test = (x, z, w) => {
+    let ahead = 99, blocker = null;
+    const test = (x, z, w, who) => {
       const rx = x - v.pos.x, rz = z - v.pos.z;
       const f = rx * sh + rz * ch, l = Math.abs(rx * ch - rz * sh);
-      if (f > 0 && f < 22 && l < w) ahead = Math.min(ahead, f);
+      if (f > 0 && f < 22 && l < w && f < ahead) { ahead = f; blocker = who; }
     };
-    for (const o of game.vehicles) if (o !== v && Math.abs(o.pos.x - v.pos.x) < 24 && Math.abs(o.pos.z - v.pos.z) < 24) test(o.pos.x, o.pos.z, 2.4);
-    if (!game.player.vehicle) test(game.player.pos.x, game.player.pos.z, 1.8);
-    for (const p of game.peds.list) if (p.state !== 'down' && Math.abs(p.pos.x - v.pos.x) < 22 && Math.abs(p.pos.z - v.pos.z) < 22) test(p.pos.x, p.pos.z, 1.8);
+    for (const o of game.vehicles) if (o !== v && Math.abs(o.pos.x - v.pos.x) < 24 && Math.abs(o.pos.z - v.pos.z) < 24) test(o.pos.x, o.pos.z, 2.4, o);
+    if (!game.player.vehicle) test(game.player.pos.x, game.player.pos.z, 1.8, 'player');
+    for (const p of game.peds.list) if (p.state !== 'down' && p.state !== 'dead' && Math.abs(p.pos.x - v.pos.x) < 22 && Math.abs(p.pos.z - v.pos.z) < 22) test(p.pos.x, p.pos.z, 1.8);
     const front = v.t.length / 2 + 3;
     if (ahead < 99) desired = Math.min(desired, Math.max(0, (ahead - front) * 0.7));
+    // semáforo: para antes da faixa no vermelho (no amarelo só se ainda dá pra parar)
+    if (this.mode === 'grid') {
+      const X = crossingAhead(v.pos.x, v.pos.z, v.heading);
+      if (X) {
+        const st = lightAt(X.c, X.i, X.j, X.axis, game.simTime), stop = X.dist - ROAD_W / 2 - 2.5 - v.t.length / 2;
+        if ((st === 'r' || (st === 'y' && stop > vx * 0.9)) && stop > -1.5) desired = Math.min(desired, Math.max(0, stop * 0.55));
+        this.redLight = st === 'r' && stop > -1.5 && stop < 6;
+      } else this.redLight = false;
+    }
     if (this.waitFor) {
       const d = this.waitFor();
       if (d > 0) desired = Math.min(desired, d);
@@ -67,7 +76,8 @@ export class Driver {
     let brake = clamp((vx - desired) * 0.5, 0, 1);
     if (desired < 0.3 && vx < 0.6) brake = 0.4;
     // buzina se o jogador fica parado na frente
-    if (ahead < front + 2 && vx < 1) {
+    // buzina só pra quem atrapalha (não pra fila do semáforo)
+    if (ahead < front + 2 && vx < 1 && (blocker === 'player' || (blocker && blocker.driver === 'player'))) {
       this.blocked += dt;
       if (this.blocked > 2.5 && (this.honkT -= dt) <= 0) { this.honkT = 2 + Math.random() * 3; game.audio.beep(v.pos.distanceTo(game.camera.position)); }
     } else this.blocked = 0;
@@ -175,7 +185,7 @@ export class Peds {
       const p = {
         ch, look, c, i, j, corner: (k + 1) % 4, dir: Math.random() < 0.5 ? 1 : -1,
         pos: new THREE.Vector3(x, groundAt(x, z), z), heading: 0, speed: 1.2 + Math.random() * 0.5,
-        state: 'walk', t: 0, vel: new THREE.Vector3(), female: look.long, cross: null, said: 0,
+        state: 'walk', t: 0, vel: new THREE.Vector3(), female: look.long, cross: null, said: 0, hp: 100,
       };
       if (p.dir < 0) p.corner = k;
       this.g.scene.add(ch.root);
@@ -201,7 +211,7 @@ export class Peds {
     const c = cityAt(x, z, 40) || CITIES[0];
     const p = {
       ch, look: {}, c, i: 0, j: 0, corner: 0, dir: 1, pos: new THREE.Vector3(x, groundAt(x, z), z), heading: 0, speed: 1.4,
-      state: 'walk', t: 0, vel: new THREE.Vector3(), female: false, cross: null, said: 0,
+      state: 'walk', t: 0, vel: new THREE.Vector3(), female: false, cross: null, said: 0, hp: 100,
     };
     ch.root.position.set(0, 0, 0); ch.root.rotation.set(0, 0, 0);
     this.g.scene.add(ch.root);
@@ -224,7 +234,10 @@ export class Peds {
   }
 
   knock(p, vx, vz, strong) {
-    if (p.state === 'down') return;
+    if (p.state === 'down' || p.state === 'dead') return;
+    // atropelamento forte mata
+    const sp = Math.hypot(vx, vz);
+    if (sp > 10) { this.damage(p, sp * 9, vx / sp, vz / sp, true); if (p.state === 'dead') { p.vel.set(vx, 0, vz); return; } }
     p.state = 'down';
     p.t = 3 + Math.random() * 2;
     p.vel.set(vx, strong ? 3 : 0, vz);
@@ -234,7 +247,8 @@ export class Peds {
 
   // soco: dois primeiros cambaleiam, o gancho (ou o 3º golpe) derruba
   punched(p, fx, fz, type) {
-    if (p.state === 'down') return;
+    if (p.state === 'down' || p.state === 'dead') return;
+    if (p.gang) { p.gang.angry = 45; p.ch.hitT = 0.4; p.hp -= type === 2 ? 30 : 15; if (p.hp <= 0) this.damage(p, 1, fx, fz); else { p.pos.x += fx * 0.4; p.pos.z += fz * 0.4; } return; }
     p.hits = (p.hits || 0) + 1;
     if (type === 2 || p.hits >= 3) { this.knock(p, fx * (type === 2 ? 4 : 2.5), fz * (type === 2 ? 4 : 2.5), type === 2); p.hits = 0; return; }
     p.ch.hitT = 0.4;
@@ -245,8 +259,61 @@ export class Peds {
     this.g.addWanted(0.15);
   }
 
+  // membros de gangue parados em grupo no próprio território
+  spawnGang(G, P) {
+    const c = G.c;
+    for (let tries = 0; tries < 8; tries++) {
+      const i = G.i0 + Math.floor(Math.random() * (G.i1 - G.i0 + 1)), j = G.j0 + Math.floor(Math.random() * (G.j1 - G.j0 + 1));
+      const rect = this.loopRect(c, i, j), a = pick(rect);
+      const d = Math.hypot(a[0] - P.x, a[1] - P.z);
+      if (d < 30 || d > 140) continue;
+      const grp = [];
+      for (let k = 0; k < 3; k++) {
+        const look = { ...randomLook(), shirt: G.shirt, cap: Math.random() < 0.6 ? G.cap : null, pants: 0x1b1b1b, long: false };
+        const ch = new Character(look);
+        const r = Math.random();
+        const armed = r < 0.35 ? 'pistol' : r < 0.6 ? 'bat' : null;
+        if (armed) ch.setWeapon(armed);
+        const ang = (k / 3) * Math.PI * 2;
+        const x = a[0] + Math.cos(ang) * 1.1, z = a[1] + Math.sin(ang) * 1.1;
+        const p = {
+          ch, look, c, i, j, corner: 0, dir: 1, pos: new THREE.Vector3(x, groundAt(x, z), z), heading: Math.atan2(a[0] - x, a[1] - z), speed: 1.3,
+          state: 'gang', t: 0, vel: new THREE.Vector3(), female: false, cross: null, said: 0, hp: 120, gang: G, armed, home: { x, z }, shotT: 1 + Math.random(), hitCD: 0, talkT: Math.random() * 4,
+        };
+        this.g.scene.add(ch.root);
+        this.list.push(p);
+        grp.push(p);
+      }
+      return grp;
+    }
+    return null;
+  }
+
+  // dano de arma (tiro, faca, taco); devolve true se matou
+  damage(p, dmg, fx, fz, byPlayer = true) {
+    if (p.state === 'dead') return false;
+    p.hp -= dmg;
+    const g = this.g;
+    if (p.gang && byPlayer) p.gang.angry = 45;
+    if (p.hp <= 0) {
+      p.state = 'dead'; p.t = 40;
+      p.heading = Math.atan2(-fx, -fz);
+      p.ch.talk = 0;
+      if (p.ch.weapon) p.ch.setWeapon(null);
+      const cash = p.gang ? 20 + Math.floor(Math.random() * 60) : Math.random() < 0.6 ? 5 + Math.floor(Math.random() * 25) : 0;
+      if (cash && g.dropMoney) g.dropMoney(p.pos.x + fx * 0.6, p.pos.z + fz * 0.6, cash);
+      if (byPlayer) g.addWanted(p.gang ? 0.35 : 0.8);
+      this.scare(p.pos.x, p.pos.z, 30);
+      return true;
+    }
+    p.ch.hitT = 0.4;
+    if (!p.gang) { p.state = 'flee'; p.t = 6; p.from = { x: p.pos.x - fx * 3, z: p.pos.z - fz * 3 }; this.say(p, 'hit'); }
+    if (byPlayer) g.addWanted(0.2);
+    return false;
+  }
+
   scare(x, z, r = 25) {
-    for (const p of this.list) if (p.state !== 'down' && Math.hypot(p.pos.x - x, p.pos.z - z) < r) { p.state = 'flee'; p.t = 5 + Math.random() * 3; p.from = { x, z }; }
+    for (const p of this.list) if (p.state !== 'down' && p.state !== 'dead' && !p.gang && Math.hypot(p.pos.x - x, p.pos.z - z) < r) { p.state = 'flee'; p.t = 5 + Math.random() * 3; p.from = { x, z }; }
   }
 
   update(dt) {
@@ -256,8 +323,13 @@ export class Peds {
     const target = !c ? 0 : (c.kind === 'metro' ? 34 : c.kind === 'town' ? 16 : 8) * (g.settings.get('quality') === 'low' ? 0.5 : 1);
     if (this.timer <= 0) {
       this.timer = 0.25;
-      if (c && this.list.length < target) this.spawn(c, P);
+      if (c && this.list.filter((p) => !p.gang).length < target) this.spawn(c, P);
+      for (const G of GANGS) {
+        const near = P.x > G.x0 - 140 && P.x < G.x1 + 140 && P.z > G.z0 - 140 && P.z < G.z1 + 140;
+        if (near && this.list.filter((p) => p.gang === G && p.state !== 'dead').length < 9 && Math.random() < 0.15) this.spawnGang(G, P);
+      }
     }
+    for (const G of GANGS) G.angry = Math.max(0, (G.angry || 0) - dt);
     const plr = g.player;
     for (let n = this.list.length - 1; n >= 0; n--) {
       const p = this.list[n];
@@ -265,7 +337,19 @@ export class Peds {
       if (dP > 190 && !p.keep) { this.remove(p); continue; }
       p.said -= dt;
       let speed = 0, mode = 'ground';
-      if (p.state === 'down') {
+      if (p.state === 'dead') {
+        p.t -= dt;
+        p.vel.x *= Math.exp(-dt * 4); p.vel.z *= Math.exp(-dt * 4);
+        p.pos.x += p.vel.x * dt; p.pos.z += p.vel.z * dt;
+        if (p.t <= 0 && dP > 40) { this.remove(p); continue; }
+        p.pos.y = groundAt(p.pos.x, p.pos.z);
+        p.ch.root.position.copy(p.pos); p.ch.root.rotation.y = p.heading;
+        if (dP < 90) p.ch.animate(dt, 0, 'dead');
+        p.ch.root.visible = dP < 160;
+        continue;
+      }
+      if (p.gang) { const r = this.gangAI(p, dt, plr); speed = r.speed; mode = r.mode; }
+      else if (p.state === 'down') {
         p.t -= dt;
         p.vel.x *= Math.exp(-dt * 3); p.vel.z *= Math.exp(-dt * 3);
         p.pos.x += p.vel.x * dt; p.pos.z += p.vel.z * dt;
@@ -285,6 +369,7 @@ export class Peds {
           cv.t -= dt;
           const talker = cv.step % 2 === 0 ? cv.a : cv.b;
           talker.ch.talk = Math.max(talker.ch.talk, 0.3);
+          this.babble(talker, dt, plr);
           if (cv.t <= 0) {
             cv.t = 3.5 + Math.random() * 2;
             const pair = LINES.chat[cv.line];
@@ -348,6 +433,60 @@ export class Peds {
       if (dP < 90) p.ch.animate(dt, speed, mode);
       p.ch.root.visible = dP < 160;
     }
+  }
+
+  // murmúrio de conversa: sílabas sem palavras de quem está falando perto
+  babble(p, dt, plr) {
+    const d = Math.hypot(p.pos.x - plr.pos.x, p.pos.z - plr.pos.z);
+    if (d > 24) return;
+    p.babT = (p.babT || 0) - dt;
+    if (p.babT > 0) return;
+    p.babT = 0.1 + Math.random() * 0.16 + (Math.random() < 0.12 ? 0.45 : 0);
+    if (d < 14 && window.speechSynthesis && speechSynthesis.speaking) return;
+    this.g.audio.syllable(0.05 * (1 - d / 24), p.female);
+  }
+
+  // gangue: fica no território; avisa quem chega perto e ataca se insistir ou se for agredida
+  gangAI(p, dt, plr) {
+    const g = this.g, G = p.gang;
+    const tx = plr.vehicle ? plr.vehicle.pos.x : plr.pos.x, tz = plr.vehicle ? plr.vehicle.pos.z : plr.pos.z;
+    const dx = tx - p.pos.x, dz = tz - p.pos.z, d = Math.hypot(dx, dz);
+    p.hitCD -= dt; p.shotT -= dt;
+    if (p.state === 'down') { p.t -= dt; if (p.t <= 0) p.state = 'gang'; return { speed: 0, mode: 'down' }; }
+    if (G.angry > 0 && d < 50 && !g.dead) {
+      if (p.state !== 'attack') { p.state = 'attack'; if (Math.random() < 0.4) this.say(p, 'gangAttack'); }
+      p.heading = Math.atan2(dx, dz);
+      if (p.armed === 'pistol' && d < 22) {
+        p.ch.aim = Math.min(1, p.ch.aim + dt * 4);
+        if (p.shotT <= 0) { p.shotT = 0.9 + Math.random() * 0.8; g.combat && g.combat.npcShoot(p, plr); }
+        return { speed: d > 14 ? 3 : 0, mode: 'ground' };
+      }
+      p.ch.aim = 0;
+      if (plr.vehicle) return { speed: d > 6 ? 4.5 : 0, mode: 'ground' };
+      if (d < 1.3) {
+        if (p.hitCD <= 0) {
+          p.hitCD = 0.9;
+          if (p.armed === 'bat') { p.ch.swingT = 0.42; g.audio.swing(); } else { p.ch.punchT = p.ch.punchDur = 0.35; p.ch.punchType = Math.floor(Math.random() * 2); }
+          setTimeout(() => { if (p.state === 'attack' && Math.hypot(plr.pos.x - p.pos.x, plr.pos.z - p.pos.z) < 1.7 && !plr.vehicle) { plr.health -= p.armed === 'bat' ? 12 : 6; g.audio.punch(); g.input.rumble(0.4, 0.3, 120); g.cam.shake = Math.max(g.cam.shake, 0.12); } }, 160);
+        }
+        return { speed: 0, mode: 'ground' };
+      }
+      return { speed: 5, mode: 'ground' };
+    }
+    // calmo: volta pro ponto e fica de papo
+    if (p.state === 'attack') { p.state = 'gang'; p.ch.aim = 0; }
+    const hx = p.home.x - p.pos.x, hz = p.home.z - p.pos.z, hd = Math.hypot(hx, hz);
+    if (hd > 1) { p.heading = Math.atan2(hx, hz); return { speed: 1.6, mode: 'ground' }; }
+    if (d < 9 && !plr.vehicle) {
+      p.heading = Math.atan2(dx, dz);
+      p.warn = (p.warn || 0) + dt;
+      if (p.warn > 0.3 && !p.warned) { p.warned = true; p.said = 0; this.say(p, 'gangWarn'); }
+      if (p.warn > 5) { G.angry = 30; p.warn = 0; }
+    } else { p.warn = Math.max(0, (p.warn || 0) - dt); if (p.warn === 0) p.warned = false; }
+    p.talkT -= dt;
+    if (p.talkT <= 0) { p.talkT = 3 + Math.random() * 5; p.ch.talk = 1.2 + Math.random() * 1.5; }
+    if (p.ch.talk > 0) this.babble(p, dt, plr);
+    return { speed: 0, mode: p.ch.talk > 0 ? 'ground' : 'chat' };
   }
 
   startCross(p) {

@@ -11,6 +11,9 @@ export const VTYPES = {
   police: { name: 'Viatura', shape: 'police', mass: 1450, wheelbase: 2.8, width: 1.85, length: 4.7, height: 1.5, cgh: 0.55, wheelR: 0.33, torque: 360, idle: 800, redline: 6200, gears: [3.3, 2.1, 1.5, 1.12, 0.86], final: 3.7, grip: 1.12, CdA: 0.7, brakeF: 20200, steer: 0.6, steerFall: 0.028, drive: 'rear', seat: [0.4, 0.2, -0.25] },
   sport: { name: 'Faísca GT', shape: 'sport', mass: 1250, wheelbase: 2.55, width: 1.95, length: 4.4, height: 1.15, cgh: 0.45, wheelR: 0.33, torque: 520, idle: 950, redline: 7900, gears: [3.1, 2.2, 1.65, 1.28, 1.02, 0.84], final: 3.5, grip: 1.25, CdA: 0.6, ClA: 0.45, brakeF: 21600, steer: 0.55, steerFall: 0.03, drive: 'awd', seat: [0.4, -0.1, -0.35] },
   pickup: { name: 'Touro', shape: 'pickup', mass: 1900, wheelbase: 3.1, width: 2.0, length: 5.2, height: 1.85, cgh: 0.78, wheelR: 0.39, torque: 430, idle: 700, redline: 5200, gears: [3.6, 2.2, 1.45, 1.0, 0.76], final: 3.7, grip: 0.95, CdA: 1.1, brakeF: 20200, steer: 0.55, steerFall: 0.03, drive: 'rear', seat: [0.42, 0.45, 0.4] },
+  // barcos: thrust N, vmax m/s (só andam na água)
+  boat: { name: 'Lancha Maré', shape: 'boat', boat: true, mass: 950, wheelbase: 3.4, width: 2.1, length: 5.4, height: 1.3, cgh: 0.5, wheelR: 0.35, thrust: 11000, vmax: 21, idle: 900, redline: 5200, grip: 1, CdA: 1.2, brakeF: 0, steer: 0.6, steerFall: 0.02, drive: 'rear', seat: [0.4, 0.15, -0.9] },
+  jetski: { name: 'Jet Onda', shape: 'jetski', boat: true, twoWheel: true, mass: 320, wheelbase: 2.2, width: 1.1, length: 3.0, height: 1.1, cgh: 0.5, wheelR: 0.3, thrust: 5200, vmax: 19, idle: 1500, redline: 7800, grip: 1, CdA: 0.7, brakeF: 0, steer: 0.7, steerFall: 0.02, drive: 'rear', seat: [0, 0.2, -0.25] },
 };
 for (const t of Object.values(VTYPES)) {
   t.a = t.wheelbase * 0.48; t.b = t.wheelbase * 0.52;
@@ -82,6 +85,33 @@ function buildMesh(t, color) {
     root.add(piv);
     wheels.push({ piv, spin, front });
   };
+
+  if (t.boat) {
+    // casco: fundo em V (proa afinando), convés, para-brisa e motor de popa
+    const hull = new THREE.MeshPhysicalMaterial({ color: 0xf2f2f2, metalness: 0.1, roughness: 0.3, clearcoat: 1 });
+    const hs = new THREE.Shape();
+    const hl = L / 2, hw = W / 2;
+    hs.moveTo(0, hl); hs.quadraticCurveTo(hw, hl * 0.45, hw, -hl * 0.1); hs.lineTo(hw * 0.9, -hl); hs.lineTo(-hw * 0.9, -hl); hs.lineTo(-hw, -hl * 0.1); hs.quadraticCurveTo(-hw, hl * 0.45, 0, hl);
+    const hg = new THREE.ExtrudeGeometry(hs, { depth: t.shape === 'boat' ? 0.75 : 0.45, bevelEnabled: true, bevelThickness: 0.12, bevelSize: 0.08, bevelSegments: 2 });
+    hg.rotateX(Math.PI / 2); hg.translate(0, t.shape === 'boat' ? 0.85 : 0.6, 0);
+    const hm = new THREE.Mesh(hg, hull); hm.castShadow = true; body.add(hm);
+    const stripe = new THREE.Mesh(hg.clone().scale(1.01, 0.18, 1.01).translate(0, 0.42, 0), paint); body.add(stripe);
+    if (t.shape === 'boat') {
+      addBox(body, W * 0.8, 0.05, L * 0.55, 0, 0.88, -L * 0.12, new THREE.MeshStandardMaterial({ color: 0xc9a46a, roughness: 0.8 }));
+      const ws = addBox(body, W * 0.75, 0.45, 0.04, 0, 1.15, L * 0.12, M.glass, false); ws.rotation.x = -0.5;
+      addBox(body, 0.5, 0.45, 0.5, 0.4, 1.05, -0.4, M.seat);
+      addBox(body, 0.5, 0.45, 0.5, -0.4, 1.05, -0.4, M.seat);
+      addBox(body, 0.35, 0.7, 0.4, 0, 0.8, -L / 2 - 0.15, M.black);
+      addBox(body, 0.12, 0.1, 0.12, 0.25, 1.3, L * 0.05, headMat, false);
+    } else {
+      addBox(body, 0.4, 0.25, 0.9, 0, 0.75, -0.25, M.seat);
+      addBox(body, 0.55, 0.3, 0.6, 0, 0.75, 0.55, paint);
+      addBox(body, 0.7, 0.05, 0.05, 0, 1.0, 0.65, M.frame);
+      addBox(body, 0.12, 0.08, 0.06, 0, 0.82, 0.86, headMat, false);
+    }
+    addBox(body, 0.18, 0.08, 0.05, 0, t.shape === 'boat' ? 0.95 : 0.7, -L / 2 + 0.02, tailMat, false);
+    return { root, body, wheels, headMat, tailMat, paint };
+  }
 
   if (t.twoWheel) {
     mkWheel(0, a, true, t.shape === 'bike' ? 0.05 : 0.14);
@@ -249,6 +279,7 @@ export class Vehicle {
 
   update(dt, ctrl, env, manual = false) {
     const t = this.t;
+    if (t.boat) { this.updateBoat(dt, ctrl, env); return; }
     if (ctrl && (ctrl.throttle > 0.02 || ctrl.brake > 0.02 || Math.abs(ctrl.steer) > 0.02)) this.sleeping = false;
     if (this.sleeping && !this.driver) { this.syncMesh(); return; }
     ctrl = ctrl || { throttle: 0, brake: 0, steer: 0, handbrake: this.driver ? false : true };
@@ -453,6 +484,72 @@ export class Vehicle {
       this.inWater = true;
       if (this.pos.y < -1.0) { this.pos.y = Math.max(this.pos.y, -1.6); this.vy = Math.max(this.vy, -0.5); this.onGround = true; }
     } else this.inWater = false;
+  }
+
+  // ---------------- barco: empuxo, arrasto do casco, leme e boia nas ondas
+  updateBoat(dt, ctrl, env) {
+    const t = this.t, m = t.mass, W = Vehicle.world;
+    if (ctrl && (ctrl.throttle > 0.02 || ctrl.brake > 0.02)) this.sleeping = false;
+    if (this.sleeping && !this.driver) { this.floatMesh(dt, env); return; }
+    ctrl = ctrl || { throttle: 0, brake: 0, steer: 0 };
+    const sh = Math.sin(this.heading), ch = Math.cos(this.heading);
+    const vx = this.vel.x * sh + this.vel.z * ch, vy = this.vel.x * ch - this.vel.z * sh;
+    const bed = heightAt(this.pos.x + sh * t.length * 0.4, this.pos.z + ch * t.length * 0.4);
+    const afloat = heightAt(this.pos.x, this.pos.z) < -0.7;
+    this.inWater = false;
+    this.steer += clamp(clamp(ctrl.steer, -1, 1) * t.steer - this.steer, -4 * dt, 4 * dt);
+    let thr = ctrl.throttle - ctrl.brake * 0.45;
+    if (!afloat) thr = 0;
+    this.thr = Math.abs(thr); this.brakeOn = false;
+    const cx = t.thrust / (t.vmax * t.vmax);
+    let Fx = thr * t.thrust - cx * vx * Math.abs(vx) - vx * m * 0.05;
+    let Fy = -vy * Math.abs(vy) * m * 0.9 - vy * m * 1.6;
+    // vento empurra o barco de lado
+    const wx = env.wind.x * ch - env.wind.y * sh;
+    Fy += wx * Math.abs(wx) * t.CdA * 0.6;
+    // leme: vira mais quanto mais rápido; jet-ski vira com o jato mesmo devagar
+    const rudder = this.steer * (Math.abs(vx) * 0.55 + (t.shape === 'jetski' ? Math.abs(thr) * 3 : 0)) * Math.sign(vx || 1);
+    this.yawRate += (rudder - this.yawRate) * Math.min(1, dt * 2.5);
+    if (!afloat) { Fx = -vx * m * 6; Fy = -vy * m * 6; this.yawRate *= Math.exp(-dt * 6); }
+    this.vel.x += ((sh * Fx + ch * Fy) / m) * dt;
+    this.vel.z += ((ch * Fx - sh * Fy) / m) * dt;
+    this.heading += this.yawRate * dt;
+    this.pos.x += this.vel.x * dt; this.pos.z += this.vel.z * dt;
+    // encalhou na areia: para
+    if (bed > -0.4 && vx > 0) { this.vel.multiplyScalar(Math.exp(-dt * 5)); if (this.driver === 'player' && Vehicle.onBeach) Vehicle.onBeach(this); }
+    this.ax = lerp(this.ax || 0, clamp(Fx / m, -8, 8), 0.1);
+    this.ay = lerp(this.ay || 0, clamp(Fy / m, -8, 8), 0.1);
+    this.rpm = lerp(this.rpm, t.idle + Math.abs(thr) * (t.redline - t.idle) * (0.6 + 0.4 * Math.min(1, Math.abs(vx) / t.vmax)), 1 - Math.exp(-dt * 4));
+    this.onGround = true; this.surface = 'water';
+    this.slip = clamp(Math.abs(vy) / 6, 0, 1);
+    if (!this.driver && Math.hypot(this.vel.x, this.vel.z) < 0.05) this.sleeping = true;
+    this.floatMesh(dt, env);
+    if (W) void W;
+  }
+
+  // posição e inclinação seguindo as ondas (a proa sobe quando acelera)
+  floatMesh(dt, env) {
+    const t = this.t, W = Vehicle.world;
+    const sh = Math.sin(this.heading), ch = Math.cos(this.heading);
+    const w = W ? W.waveAt(this.pos.x, this.pos.z) : { h: 0, gx: 0, gz: 0 };
+    const ground = heightAt(this.pos.x, this.pos.z);
+    const target = Math.max(w.h - 0.35, ground);
+    this.pos.y = lerp(this.pos.y, target, 1 - Math.exp(-dt * 6));
+    const vx = this.fwdSpeed;
+    const gF = w.gx * sh + w.gz * ch, gL = w.gx * ch - w.gz * sh;
+    const plane = -clamp(vx / (t.vmax || 20), 0, 1) * (t.shape === 'boat' ? 0.12 : 0.08);
+    const bob = Math.sin((this.t0 = (this.t0 || 0) + dt) * 1.7 + this.id) * 0.02;
+    this.pitch = lerp(this.pitch, Math.atan(gF) * 0.8 + plane + bob, 1 - Math.exp(-dt * 4));
+    this.roll = lerp(this.roll, -Math.atan(gL) * 0.8 + clamp(this.yawRate * vx * 0.03, -0.35, 0.35) * (t.shape === 'jetski' ? -1.4 : -0.6), 1 - Math.exp(-dt * 4));
+    this.root.position.copy(this.pos);
+    this.root.rotation.set(this.pitch, this.heading, this.roll, 'YXZ');
+    this.headMat.emissiveIntensity = this.lights ? 4 : 0.15;
+    this.tailMat.emissiveIntensity = this.lights ? 1.4 : 0.1;
+    // esteira e espuma atrás quando anda
+    if (Vehicle.fx && dt > 0 && Math.abs(vx) > 3 && Math.random() < dt * Math.abs(vx) * 0.8) {
+      const bx = this.pos.x - sh * t.length * 0.5, bz = this.pos.z - ch * t.length * 0.5;
+      Vehicle.fx.sprite(bx + (Math.random() - 0.5) * t.width, w.h + 0.1, bz + (Math.random() - 0.5) * t.width, { color: 0xf4f8fa, op: 0.55, size: 0.6, life: 1.6, vx: -sh * 1.5 + (Math.random() - 0.5) * 2, vy: 0.8, vz: -ch * 1.5 + (Math.random() - 0.5) * 2, g: 3, grow: 2.6 });
+    }
   }
 
   syncMesh(dt = 0) {

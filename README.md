@@ -23,6 +23,21 @@ Ou publique a pasta no GitHub Pages / Netlify. É preciso internet na primeira v
 - **NPCs**: pedestres andam pelas calçadas, atravessam a rua, fogem, reclamam e caem. O trânsito anda pela mão direita, para diante de obstáculos, buzina e desencalha sozinho. Dá para roubar carros.
 - **Dublagem** em português do Brasil e inglês (voz sintetizada do navegador), com legendas independentes do idioma da voz.
 - **Rádio** com 3 estações procedurais: G-Funk, Funk Carioca e Bossa Lo-fi.
+- **Fome e comida**: a barra laranja embaixo da vida é a fome, que esvazia em uns 15 minutos de jogo. Com fome a vida cai. Na **Lanchonete do Zé** (Porto Sereno) e na **Pastelaria Serrana** (São Cruzeiro) você come pastel, X-tudo, prato feito ou salada. Comer de barriga cheia engorda (o personagem ganha barriga e corre mais devagar), e correr e treinar na academia emagrece.
+- **Dinheiro com sentido**:
+  - **Auto Sereno Veículos**: compra moto, sedã, picape, Faísca GT, jet-ski e lancha. Os barcos são entregues na marina, e o que você compra volta toda vez que carrega o jogo.
+  - **Casa à venda** ($1500): vira sua casa, onde você dorme 6 horas, salva o jogo e começa quando volta.
+  - Pedestres e gangues derrubados deixam dinheiro no chão.
+- **Barcos**: lancha e jet-ski na marina do píer (ícone M no mapa). Eles boiam nas mesmas ondas do mar, sobem e descem com elas, levantam a proa quando aceleram, inclinam na curva, deixam esteira de espuma e o vento empurra de lado. Na areia encalham.
+- **Semáforos** nos cruzamentos de Porto Sereno e São Cruzeiro: verde, amarelo e vermelho de verdade. Os carros param no vermelho e fazem fila. Furar o vermelho com a polícia perto dá uma estrela.
+- **Animais**: cachorros andam pelas calçadas, latem e abanam o rabo quando você chega perto e fogem de carro. Passarinhos voam sobre a cidade, pombos ciscam na calçada e saem voando quando você chega, e gaivotas planam sobre a praia.
+- **Gangues**: o **Bonde Verde** (Porto Sereno) e a **Família Roxa** (São Cruzeiro) têm território pintado no mapa. Os membros ficam em grupo conversando. Se você chegar perto eles avisam, e se insistir ou bater em um deles todos atacam, com soco, taco ou pistola.
+- **Armas**: na **Armas do Tonhão** tem taco, faca, pistola e escopeta, além de munição.
+  - Troca de arma com Q/E, 1–5 ou a roda do mouse.
+  - Mira com o botão direito (em 1ª ou 3ª pessoa) e atira com o clique. No controle e no toque a mira trava sozinha no alvo.
+  - Tiro na cabeça mata mais rápido, e acertar um carro estraga ele.
+  - A partir de 3 estrelas os policiais sacam a pistola e atiram em você.
+- **Gente conversando**: quem fala mexe a boca, e as pessoas conversando na rua fazem um murmúrio de vozes ao fundo.
 - **Câmera em 1ª ou 3ª pessoa**: `C` / R3 / 👁 alterna entre terceira pessoa, terceira pessoa de longe e primeira pessoa (também dá pra escolher em Configurações). Em primeira pessoa a pé o personagem olha pra onde você mira. No carro a câmera fica nos olhos do motorista, com painel, volante que gira e vidros por onde dá pra ver; o olhar volta pra frente sozinho quando você solta a câmera.
 - **Tela de toque organizada**: cada botão só aparece quando dá pra usar. O 🚗 só aparece com um carro (ou loja aberta) perto, o 🤿 só na água, o soco some quando você está nadando, buzina, rádio e farol somem na bicicleta, e o ⏭ só aparece durante falas e cenas.
 - **Chuva no chão**: o asfalto e as calçadas escurecem e ficam brilhando quando molham, e se formam poças que crescem com a chuva. As gotas abrem anéis nas poças e respingam no chão. Postes, faróis e lanternas se refletem na rua molhada, em faixas compridas no asfalto e como espelho nas poças. Os pneus levantam névoa atrás do carro, passar na poça espirra água para os lados, pisar na poça a pé também espirra, e dá para ouvir o chiado do pneu no molhado. Com chuva ou neblina, o facho do farol aparece no ar.
@@ -59,6 +74,8 @@ Ou publique a pasta no GitHub Pages / Netlify. É preciso internet na primeira v
 | Entrar/sair | F | Y | 🚗 |
 | Rádio / buzina | R / H | D-pad ← / L3 | 📻 📯 |
 | 1ª / 3ª pessoa | C | R3 | 👁 |
+| Trocar de arma | Q / E · 1–5 | D-pad → | 🔫 |
+| Mirar / atirar | Botão direito / clique | LT / B | 🎯 / 👊 |
 | Mapa / pausa | M / Esc | Back / Start | 🗺 ⏸ |
 
 Em **Configurações** você escolhe o esquema de controle (automático, teclado, controle analógico ou toque), se o analógico também acelera e freia, a sensibilidade, a zona morta, o câmbio, a dublagem, as legendas, os volumes, a qualidade gráfica, as sombras, o bloom, a distância de visão, o clima e a velocidade do relógio.

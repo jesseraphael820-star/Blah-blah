@@ -31,6 +31,14 @@ export const UI = {
   period: { pt: 'Agora é ~y~{n}~w~', en: "It's now ~y~{n}~w~" },
   breath: { pt: 'Fôlego', en: 'Breath' },
   radioOff: { pt: 'Rádio desligado', en: 'Radio off' },
+  hungry: { pt: 'Você está com ~r~fome~w~. Coma alguma coisa na lanchonete.', en: "You're ~r~hungry~w~. Grab something at the diner." },
+  starving: { pt: 'Você está ~r~morrendo de fome~w~!', en: "You're ~r~starving~w~!" },
+  noMoney: { pt: 'Dinheiro insuficiente.', en: 'Not enough money.' },
+  gangZone: { pt: 'Território da gangue ~p~{n}~w~', en: '~p~{n}~w~ gang territory' },
+  redLight: { pt: 'Furou o sinal vermelho na frente da polícia!', en: 'You ran a red light in front of the police!' },
+  noAmmo: { pt: 'Sem munição.', en: 'Out of ammo.' },
+  saved: { pt: 'Jogo salvo. Você dormiu até {h}.', en: 'Game saved. You slept until {h}.' },
+  boatOnly: { pt: 'Barcos só andam na água.', en: 'Boats only move in water.' },
 };
 
 export function ui(key, lang, vars = {}) {
@@ -83,5 +91,8 @@ export const LINES = {
     [{ pt: 'Esse calor tá de matar.', en: 'This heat is killing me.' }, { pt: 'Bora pra Costa Esmeralda mais tarde?', en: 'Wanna hit Costa Esmeralda later?' }],
     [{ pt: 'Tô treinando na Força Bruta agora.', en: "I'm training at Força Bruta now." }, { pt: 'Tá dando pra ver, hein!', en: 'It shows, huh!' }],
   ],
+  gangWarn: [{ pt: 'Ei! Essa área é nossa. Vaza!', en: 'Hey! This is our turf. Beat it!' }, { pt: 'Tá perdido, parceiro? Some daqui!', en: 'You lost, pal? Get outta here!' }, { pt: 'Último aviso, hein!', en: 'Last warning!' }],
+  gangAttack: [{ pt: 'Pega ele!', en: 'Get him!' }, { pt: 'Agora você vai ver!', en: "Now you're gonna get it!" }, { pt: 'Ninguém mexe com a gente!', en: 'Nobody messes with us!' }],
+  shot: [{ pt: 'Tiro! Corre!', en: 'Gunshots! Run!' }, { pt: 'Ele tá armado!', en: "He's got a gun!" }, { pt: 'Socorro!', en: 'Help!' }],
   dj: [{ pt: 'Você tá ligado na Rádio Sereno, noventa e três ponto nove! Só os sons da quebrada.', en: "You're tuned to Radio Sereno, ninety-three point nine! Only street sounds." }, { pt: 'Batida FM! Cento e um! O baile não para!', en: 'Batida FM! One-oh-one! The party never stops!' }],
 };

@@ -1,4 +1,4 @@
-import { HALF, ROAD_W, CITIES, HIGHWAYS, ZONES, TSEG, desertMask } from './world.js';
+import { HALF, ROAD_W, CITIES, HIGHWAYS, ZONES, TSEG, desertMask, GANGS } from './world.js';
 import { clamp } from './util.js';
 import { WEATHERS } from './sky.js';
 
@@ -6,8 +6,8 @@ const S = 0.5; // px por metro no mapa base
 const MAPPX = HALF * 2 * S;
 
 function colorize(text) {
-  const map = { y: '#f0c419', b: '#5fa8ff', r: '#ff5050', g: '#5fd35f', w: '#ffffff' };
-  return text.replace(/~([ybrgw])~/g, (_, c) => `</span><span style="color:${map[c]}">`).replace(/^/, '<span>') + '</span>';
+  const map = { y: '#f0c419', b: '#5fa8ff', r: '#ff5050', g: '#5fd35f', w: '#ffffff', p: '#c77dff' };
+  return text.replace(/~([ybrgwp])~/g, (_, c) => `</span><span style="color:${map[c]}">`).replace(/^/, '<span>') + '</span>';
 }
 
 export class HUD {
@@ -17,7 +17,7 @@ export class HUD {
     this.el = {
       hud: $('hud'), mini: $('minimap'), clock: $('clock'), weather: $('weather'), money: $('money'), hp: $('hp'), period: $('period'), air: $('air'), airwrap: $('airwrap'), stars: $('stars'),
       obj: $('objective'), timer: $('timer'), zone: $('zone'), veh: $('vehname'), speedo: $('speedo'), kmh: $('kmh'), unit: $('unit'), gear: $('gear'), rpm: $('rpm'),
-      radio: $('radio'), sub: $('subtitle'), big: $('bigmsg'), hint: $('hint'), full: $('fullmap'), lb: $('letterbox'), touch: $('touch'), title: $('cinetitle'),
+      food: $('food'), radio: $('radio'), sub: $('subtitle'), big: $('bigmsg'), hint: $('hint'), full: $('fullmap'), lb: $('letterbox'), touch: $('touch'), title: $('cinetitle'),
     };
     this.ctx = this.el.mini.getContext('2d');
     this.zoom = 1;
@@ -62,6 +62,12 @@ export class HUD {
     for (const r of this.w.buildRects) {
       c.fillStyle = r.park ? '#6f9a52' : '#8d8a83';
       c.fillRect(P(r.x0), P(r.z0), (r.x1 - r.x0) * S, (r.z1 - r.z0) * S);
+    }
+    // territórios das gangues pintados na cor de cada uma
+    for (const G of GANGS) {
+      c.globalAlpha = 0.5; c.fillStyle = G.color;
+      c.fillRect(P(G.x0), P(G.z0), (G.x1 - G.x0) * S, (G.z1 - G.z0) * S);
+      c.globalAlpha = 1;
     }
     c.strokeStyle = '#0d0d0d'; c.lineCap = 'round'; c.lineJoin = 'round';
     c.lineWidth = ROAD_W * S * 1.15;
@@ -154,6 +160,7 @@ export class HUD {
     if (Math.abs(g.money - this.shownMoney) < 1) this.shownMoney = g.money;
     this.el.money.textContent = '$' + String(Math.round(this.shownMoney)).padStart(8, '0');
     this.el.hp.style.width = `${clamp(p.health, 0, 100)}%`;
+    if (g.shops) { this.el.food.style.width = `${g.shops.data.hunger * 100}%`; this.el.food.classList.toggle('low', g.shops.data.hunger < 0.2); }
     const per = g.period;
     this.el.period.textContent = per ? per[this.s.get('lang')] : '';
     if (g.shops) {
@@ -192,6 +199,8 @@ export class HUD {
       punch: !p.swim && !shop,
       sprint: !shop,
       dive: p.swim,
+      weapon: !v && !p.swim && !shop && !!g.combat && g.combat.owned().length > 1,
+      aim: !v && !p.swim && !shop && !!g.combat && !['fist', 'bat', 'knife'].includes(g.combat.current),
       radio: v && !v.t.pedal, lights: v && !v.t.pedal, horn: v && !v.t.pedal,
       skip: talking || shop,
     };

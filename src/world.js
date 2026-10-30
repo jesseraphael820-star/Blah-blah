@@ -333,6 +333,42 @@ export function addWind(mat, windU, { sway = 0.3, flutter = 0.03, ref = 6 } = {}
   return mat;
 }
 
+// ---------------------------------------------------------------- semáforos
+// ciclo de 28 s: eixo z verde 0–11, amarelo 11–13, tudo vermelho 13–14; eixo x verde 14–25, amarelo 25–27, vermelho 27–28
+export const LIGHT_CYCLE = 28;
+export const hasLights = (c) => c.kind === 'metro' || c.kind === 'town';
+export function lightAt(c, i, j, axis, t) {
+  const u = (t + (i * 7 + j * 13) % LIGHT_CYCLE) % LIGHT_CYCLE;
+  const v = axis === 'z' ? u : (u + 14) % LIGHT_CYCLE;
+  return v < 11 ? 'g' : v < 13 ? 'y' : 'r';
+}
+// cruzamento à frente de quem está em (x, z) indo na direção h; null se não houver um perto
+export function crossingAhead(x, z, h, range = 32) {
+  const c = cityAt(x, z, ROAD_W);
+  if (!c || !hasLights(c)) return null;
+  const fx = Math.sin(h), fz = Math.cos(h);
+  const axis = Math.abs(fx) > Math.abs(fz) ? 'x' : 'z';
+  const i0 = Math.round((x - c.x0) / c.block), j0 = Math.round((z - c.z0) / c.block);
+  for (const [i, j] of [[i0, j0], [i0 + Math.sign(fx), j0], [i0, j0 + Math.sign(fz)]]) {
+    if (i < 0 || j < 0 || i > c.n || j > c.n) continue;
+    const nx = c.xs[i] - x, nz = c.zs[j] - z;
+    const f = nx * fx + nz * fz, lat = Math.abs(nx * fz - nz * fx);
+    if (f > -ROAD_W / 2 && f < range && lat < ROAD_W) return { c, i, j, axis, dist: f };
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------- gangues
+export const GANGS = [
+  { id: 'verdes', name: 'Bonde Verde', color: '#3fae49', shirt: 0x2f8f3a, cap: 0x1d5e25, city: 'porto', i0: 6, i1: 7, j0: 0, j1: 2 },
+  { id: 'roxos', name: 'Família Roxa', color: '#9b4dca', shirt: 0x6a2c70, cap: 0x3c1846, city: 'sao', i0: 0, i1: 1, j0: 0, j1: 1 },
+];
+for (const G of GANGS) {
+  const c = CITIES.find((k) => k.id === G.city);
+  G.c = c; G.x0 = c.xs[G.i0]; G.x1 = c.xs[G.i1 + 1]; G.z0 = c.zs[G.j0]; G.z1 = c.zs[G.j1 + 1];
+}
+export const gangAt = (x, z) => GANGS.find((G) => x > G.x0 && x < G.x1 && z > G.z0 && z < G.z1) || null;
+
 // ---------------------------------------------------------------- chão molhado e poças
 // mesma fórmula na CPU (aquaplanagem/respingos) e no shader
 export function puddleField(x, z) {
@@ -507,6 +543,7 @@ export class World {
     this.buildWater();
     this.buildBillboards();
     this.buildPier();
+    this.buildTrafficLights();
   }
 
   buildPier() {
@@ -1087,6 +1124,66 @@ export class World {
       this.scene.add(grp);
       this.addBox(x - 0.4, x + 0.4, z - 0.4, z + 0.4, y, y + 7);
     });
+  }
+
+  // altura das ondas na CPU (as 3 ondas maiores do shader), para barcos boiarem
+  waveAt(x, z) {
+    const W = this.windU.uWind.value, t = this.waterU.uTime.value;
+    const ang0 = Math.atan2(W.y, W.x), st = 0.25 + W.z * 0.75;
+    let h = 0, gx = 0, gz = 0;
+    for (const [off, wl] of [[0, 42], [0.55, 23], [-0.45, 14]]) {
+      const a = ang0 + off, dx = Math.cos(a), dz = Math.sin(a), k = 6.2831 / wl, amp = wl * 0.011 * st;
+      const ph = (dx * x + dz * z) * k - t * Math.sqrt(9.8 * k);
+      h += amp * Math.sin(ph);
+      gx += amp * k * Math.cos(ph) * dx; gz += amp * k * Math.cos(ph) * dz;
+    }
+    return { h, gx, gz };
+  }
+
+  // semáforos nos cruzamentos das cidades grandes (um poste por mão, virado pra quem chega)
+  buildTrafficLights() {
+    const poles = [];
+    for (const c of CITIES) if (hasLights(c)) for (let i = 0; i <= c.n; i++) for (let j = 0; j <= c.n; j++) {
+      for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        if ((dx > 0 && i === 0) || (dx < 0 && i === c.n) || (dz > 0 && j === 0) || (dz < 0 && j === c.n)) continue;
+        const o = ROAD_W / 2 + 0.9, rx = -dz, rz = dx;
+        poles.push({ c, i, j, axis: dx ? 'x' : 'z', x: c.xs[i] - dx * o + rx * o, z: c.zs[j] - dz * o + rz * o, rot: Math.atan2(-dx, -dz), y: c.h0 + CURB });
+      }
+    }
+    const n = poles.length;
+    const metal = new THREE.MeshStandardMaterial({ color: 0x2a2c2e, metalness: 0.5, roughness: 0.5 });
+    const pole = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.07, 0.09, 4.2, 6).translate(0, 2.1, 0), metal, n);
+    const head = new THREE.InstancedMesh(new THREE.BoxGeometry(0.34, 0.95, 0.26).translate(0, 4.55, 0), metal, n);
+    const bulbs = new THREE.InstancedMesh(new THREE.CircleGeometry(0.1, 10), new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false }), n * 3);
+    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), one = new THREE.Vector3(1, 1, 1), p = new THREE.Vector3(), col = new THREE.Color(0, 0, 0);
+    poles.forEach((P, k) => {
+      q.setFromAxisAngle(up, P.rot);
+      m.compose(p.set(P.x, P.y, P.z), q, one);
+      pole.setMatrixAt(k, m); head.setMatrixAt(k, m);
+      for (let b = 0; b < 3; b++) {
+        const lp = new THREE.Vector3(0, 4.85 - b * 0.3, 0.135).applyQuaternion(q).add(p);
+        m.compose(lp, q, one);
+        bulbs.setMatrixAt(k * 3 + b, m);
+        bulbs.setColorAt(k * 3 + b, col);
+      }
+      this.addBox(P.x - 0.12, P.x + 0.12, P.z - 0.12, P.z + 0.12, P.y, P.y + 4.2);
+    });
+    pole.castShadow = head.castShadow = true;
+    this.scene.add(pole, head, bulbs);
+    this.lights = { poles, bulbs, last: -1 };
+  }
+  updateTrafficLights(t) {
+    const L = this.lights;
+    if (!L) return;
+    const step = Math.floor(t * 4);
+    if (step === L.last) return;
+    L.last = step;
+    const ON = [new THREE.Color(3, 0.15, 0.1), new THREE.Color(3, 2, 0.1), new THREE.Color(0.2, 3, 0.6)], OFF = [new THREE.Color(0.12, 0.02, 0.02), new THREE.Color(0.12, 0.09, 0.02), new THREE.Color(0.02, 0.1, 0.04)];
+    L.poles.forEach((P, k) => {
+      const s = lightAt(P.c, P.i, P.j, P.axis, t), on = s === 'r' ? 0 : s === 'y' ? 1 : 2;
+      for (let b = 0; b < 3; b++) L.bulbs.setColorAt(k * 3 + b, b === on ? ON[b] : OFF[b]);
+    });
+    L.bulbs.instanceColor.needsUpdate = true;
   }
 
   update(dt, cam, env) {

@@ -110,6 +110,9 @@ const HELP = {
   <tr><td>Soco em combo (jab, direto, gancho)</td><td>Clique no ritmo</td><td>B no ritmo</td><td>👊 no ritmo</td></tr>
   <tr><td>Mapa / pausa</td><td>M / Esc</td><td>Back / Start</td><td>🗺 / ⏸</td></tr>
   <tr><td>Marchas (manual)</td><td>E / Q</td><td>RB / LB</td><td>—</td></tr>
+  <tr><td>Trocar de arma</td><td>Q / E · 1–5 · roda do mouse</td><td>D-pad →</td><td>🔫</td></tr>
+  <tr><td>Mirar / atirar</td><td>Botão direito / clique</td><td>LT / B</td><td>🎯 / 👊</td></tr>
+  <tr><td>Entrar em loja / casa</td><td>F</td><td>Y</td><td>🚗</td></tr>
   </table>`,
   en: `<table>
   <tr><th></th><th>Keyboard/Mouse</th><th>Gamepad</th><th>Touch</th></tr>
@@ -127,6 +130,9 @@ const HELP = {
   <tr><td>Punch combo (jab, cross, uppercut)</td><td>Click in rhythm</td><td>B in rhythm</td><td>👊 in rhythm</td></tr>
   <tr><td>Map / pause</td><td>M / Esc</td><td>Back / Start</td><td>🗺 / ⏸</td></tr>
   <tr><td>Gears (manual)</td><td>E / Q</td><td>RB / LB</td><td>—</td></tr>
+  <tr><td>Switch weapon</td><td>Q / E · 1–5 · mouse wheel</td><td>D-pad →</td><td>🔫</td></tr>
+  <tr><td>Aim / shoot</td><td>Right mouse / click</td><td>LT / B</td><td>🎯 / 👊</td></tr>
+  <tr><td>Enter shop / house</td><td>F</td><td>Y</td><td>🚗</td></tr>
   </table>`,
 };
 
