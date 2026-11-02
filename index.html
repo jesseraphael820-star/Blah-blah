@@ -1,0 +1,924 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Guerra Global</title>
+<style>
+:root{--panel:rgba(12,18,26,.94);--line:#2a3644;--txt:#e9eff5;--mut:#8b9aab;--red:#e5484d;--blue:#4c9be0;--gold:#f2c443;--green:#46b37a}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden;background:#08131c;color:var(--txt);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;user-select:none;-webkit-user-select:none}
+#map{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:crosshair}
+#top{position:fixed;top:0;left:0;right:0;height:50px;display:flex;align-items:center;gap:8px;padding:0 12px;background:linear-gradient(#08131cf0,#08131c00);z-index:5;pointer-events:none}
+#top>*{pointer-events:auto}
+#top h1{font-family:Georgia,"Times New Roman",serif;font-size:18px;margin:0 6px 0 0;letter-spacing:.5px;white-space:nowrap}
+#day{font-variant-numeric:tabular-nums;color:var(--mut);font-size:13px;min-width:70px}
+.sp{background:#1a2532;border:1px solid var(--line);color:var(--txt);border-radius:7px;padding:5px 9px;font-size:13px;cursor:pointer}
+.sp.on{background:#2f4a66;border-color:#4c79a8}
+#top .grow{flex:1}
+#cas{position:fixed;top:56px;left:12px;background:rgba(10,14,20,.9);border:1px solid #232d38;border-radius:10px;padding:10px 14px;z-index:4;min-width:190px;display:none}
+#cas h3{margin:0 0 6px;font-size:13px;letter-spacing:4px;text-align:center;border-bottom:1px solid #333f4c;padding-bottom:6px}
+.crow{display:flex;align-items:center;gap:10px;font-family:"Courier New",monospace;font-size:20px;font-weight:700;line-height:1.35}
+.crow img{width:34px;height:22px;border:1px solid #0006}
+.cwar{padding:4px 0;border-bottom:1px dashed #2c3743}
+.cwar:last-child{border-bottom:0}
+.cmode{font-size:10px;letter-spacing:1px;color:var(--mut);font-family:system-ui}
+#panel{position:fixed;right:12px;top:56px;width:330px;max-height:calc(100% - 68px);overflow-y:auto;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;z-index:6;touch-action:pan-y}
+#ptog{display:none}
+#panel h2{margin:2px 0 6px;font-size:19px;display:flex;align-items:center;gap:8px}
+#panel h2 img{width:36px;height:24px;border:1px solid #0007}
+.tag{font-size:10px;font-weight:700;letter-spacing:1px;padding:2px 6px;border-radius:5px;background:#33414f}
+.tag.you{background:var(--gold);color:#222}.tag.war{background:var(--red)}.tag.ally{background:var(--green)}.tag.dead{background:#555}
+.stats{display:grid;grid-template-columns:auto 1fr;gap:3px 10px;font-size:13px;margin:6px 0}
+.stats b{font-variant-numeric:tabular-nums;text-align:right}
+.mut{color:var(--mut)}.small{font-size:12px}
+.bar{height:6px;background:#26313d;border-radius:3px;overflow:hidden;margin-top:6px}
+.bar i{display:block;height:100%}
+.list{font-size:12.5px;margin:4px 0}
+.list span{display:inline-block;background:#1c2733;border-radius:5px;padding:2px 6px;margin:2px 3px 0 0}
+.list span.m{background:#4a1c22}
+#pact{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+#pact button,.modal button,.req button{font:inherit;font-size:14px;padding:9px 10px;border-radius:8px;border:1px solid var(--line);background:#1b2734;color:var(--txt);cursor:pointer;text-align:left}
+#pact button:hover:not(:disabled){background:#243446}
+#pact button:disabled{opacity:.45;cursor:default}
+#pact button.big{background:#2c5b3f;border-color:#3f8a5d;font-weight:700;text-align:center;font-size:16px}
+#pact button.danger{background:#5a1f25;border-color:#8b2f38}
+#pact button.dark{background:#2b0c10;border-color:#7a1520;font-weight:700}
+#pact button.peace{background:#1e3f55;border-color:#2f6a8e}
+#pact .row{display:flex;gap:6px;align-items:center}
+#pact .row>*{flex:1}
+#pact select{font:inherit;background:#1b2734;color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:8px}
+.hint{font-size:12px;color:var(--mut);margin-top:4px}
+#log{margin-top:8px;font-size:12px;color:var(--mut);max-height:120px;overflow:hidden}
+#log div{padding:1px 0}
+#reqs{position:fixed;left:12px;bottom:12px;width:320px;display:flex;flex-direction:column;gap:6px;z-index:7}
+.req{background:rgba(18,26,36,.97);border:1px solid #4c79a8;border-radius:10px;padding:10px 12px;font-size:14px;animation:pop .2s}
+.req .b{display:flex;gap:6px;margin-top:8px}
+.req button{flex:1;text-align:center;padding:7px}
+.req button.y{background:#2c5b3f;border-color:#3f8a5d}
+#toasts{position:fixed;top:54px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;gap:5px;align-items:center;z-index:8;pointer-events:none;width:min(92vw,460px)}
+.toast{background:rgba(10,14,20,.93);border:1px solid #39475a;border-radius:8px;padding:7px 12px;font-size:13.5px;animation:pop .2s;text-align:center}
+.toast.bad{border-color:var(--red)}.toast.good{border-color:var(--green)}.toast.g{color:var(--mut);font-size:12px}
+@keyframes pop{from{transform:scale(.9);opacity:0}to{transform:none;opacity:1}}
+.modal{position:fixed;inset:0;background:#000a;display:none;align-items:center;justify-content:center;z-index:20}
+.modal .box{background:#111a24;border:1px solid var(--line);border-radius:14px;padding:22px;max-width:360px;width:90%;text-align:center}
+.modal h2{margin:0 0 8px;font-family:Georgia,serif}
+.modal .b{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.modal button{text-align:center}
+@media (max-width:760px){
+  #top h1{font-size:15px}
+  #top{padding:0 8px;gap:5px}
+  .sp{padding:4px 7px;font-size:12px}
+  #panel{left:0;right:0;bottom:0;top:auto;width:auto;max-height:43vh;border-radius:14px 14px 0 0;padding-top:6px}
+  #panel.min{max-height:62px;overflow:hidden}
+  #ptog{display:block;margin:0 auto 4px;width:44px;height:5px;border-radius:3px;background:#55657a;border:0;padding:0;cursor:pointer}
+  #cas{top:52px;left:8px;padding:6px 10px;min-width:0}
+  .crow{font-size:15px}.crow img{width:26px;height:17px}
+  #cas h3{font-size:11px;letter-spacing:3px}
+  #reqs{left:auto;right:8px;width:58vw;top:52px;bottom:auto}
+  .req{font-size:13px;padding:8px 10px}
+  #toasts{top:auto;bottom:calc(43vh + 8px)}
+  .toast{font-size:12.5px;padding:5px 10px}
+}
+</style>
+</head>
+<body>
+<canvas id="map"></canvas>
+<div id="top">
+  <h1>Guerra Global</h1>
+  <span id="day"></span>
+  <span class="grow"></span>
+  <button class="sp" data-spd="0">⏸</button>
+  <button class="sp on" data-spd="1">1x</button>
+  <button class="sp" data-spd="2">2x</button>
+  <button class="sp" data-spd="4">4x</button>
+  <button class="sp" id="newgame" title="Novo jogo">↺</button>
+</div>
+<div id="cas"></div>
+<div id="toasts"></div>
+<div id="panel"><button id="ptog" aria-label="Minimizar painel"></button><div id="pinfo"></div><div id="pact"></div><div id="log"></div></div>
+<div id="reqs"></div>
+<div class="modal" id="modal"><div class="box"><h2 id="mtitle"></h2><div id="mtext" class="mut"></div><div class="b" id="mbtns"></div></div></div>
+
+<script>
+'use strict';
+// ---------- constantes de jogo ----------
+const CFG = {
+  GW: 200, GH: 120,          // grade do mapa (células)
+  S: 4,                      // pixels por célula no buffer do mapa
+  LAND: 0.45,                // fração de terra
+  TPS: 6,                    // ticks (dias) por segundo em 1x
+  TROOPS_PER_CELL: 110,      // tropas iniciais por célula
+  MAX_PER_CELL: 150,         // capacidade de tropas por célula
+  REGEN: 0.45,               // regeneração por célula/dia
+  CAPTURE: 0.42,             // chance de captura em vitória terrestre
+  CAPTURE_SEA: 0.16,         // chance de captura em travessia marítima
+  FOCUS_BONUS: 1.35,         // bônus do foco de ataque do jogador
+  FOCUS_RADIUS: 10,
+  GRACE_DAYS: 90,            // dias iniciais sem IA atacar o jogador
+  RECRUIT_CD: 150, PEACE_CD: 25, ALLY_CD: 30, AID_CD: 10,
+};
+const GW = CFG.GW, GH = CFG.GH, S = CFG.S, NC = GW * GH;
+const $ = id => document.getElementById(id);
+const R = Math.random;
+const ri = (a, b) => a + Math.floor(R() * (b - a + 1));
+const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+const pack = (r, g, b) => ((255 << 24) | (clamp(b|0,0,255) << 16) | (clamp(g|0,0,255) << 8) | clamp(r|0,0,255)) >>> 0;
+const fmt = n => Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+const esc = s => String(s).replace(/[&<>"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
+
+function makeNoise() {
+  const p = new Float32Array(65536);
+  for (let i = 0; i < p.length; i++) p[i] = R();
+  const sm = t => t * t * (3 - 2 * t);
+  const g = (a, b) => p[((b & 255) << 8) | (a & 255)];
+  function v(x, y) {
+    const xi = Math.floor(x), yi = Math.floor(y), u = sm(x - xi), w = sm(y - yi);
+    const a = g(xi, yi), b = g(xi + 1, yi), c = g(xi, yi + 1), d = g(xi + 1, yi + 1);
+    return a + (b - a) * u + (c - a) * w + (a - b - c + d) * u * w;
+  }
+  return (x, y, o = 5) => { let s = 0, amp = 1, f = 1, t = 0; for (let i = 0; i < o; i++) { s += v(x * f, y * f) * amp; t += amp; amp *= .5; f *= 2; } return s / t; };
+}
+
+// ---------- estado ----------
+const owner = new Int16Array(NC), land = new Uint8Array(NC), shade = new Float32Array(NC);
+const ocean = new Uint32Array(NC), coastal = new Uint8Array(NC), flash = new Float32Array(NC);
+let seaA = new Int32Array(0), seaB = new Int32Array(0), coastList = [];
+let C = [], N = 0, rel, allied, warMat, adj;
+let wars = [], warSeq = 1;
+let day = 0, P = -1, phase = 'select', sel = -1, speed = 1, focus = null;
+let reqs = [], logs = [], particles = [];
+let dirty = true, ended = false, nCount = 20;
+
+// ---------- geração do mundo ----------
+const SYL_A = ['Val','Kor','Ost','Bel','Mar','Tor','Zan','Lis','Dra','Ves','Ard','Nor','Sar','Kel','Rho','Gal','Eri','Mon','Tal','Vor','Lum','Bra','Cas','Fen','Hal','Ith','Jor','Kar','Pel','Ruv','Sol','Ul','Tes','Gor','Aur','Zer','Mir','Ost','Del','Qar'];
+const SYL_B = ['dor','ânia','óvia','istão','mark','lândia','ia','eira','grado','heim','ônia','ávia','ar','ênia','ússia','ova','écia','burgo','ica','ária','ena','ôsia'];
+function genNames(n) {
+  const set = new Set();
+  while (set.size < n) set.add(SYL_A[ri(0, SYL_A.length - 1)] + SYL_B[ri(0, SYL_B.length - 1)]);
+  return [...set];
+}
+const FLAG_COLS = [[200,16,46],[245,245,245],[0,56,168],[0,122,61],[252,209,22],[18,18,18],[240,120,0],[110,40,140],[100,170,225],[140,20,30],[0,150,150]];
+function genFlag() {
+  const pick = () => FLAG_COLS[ri(0, FLAG_COLS.length - 1)];
+  const cols = [pick()];
+  while (cols.length < 3) { const c = pick(); if (c !== cols[cols.length - 1]) cols.push(c); }
+  return { type: ['h3','v3','h2','cross','disk','tri','h3'][ri(0, 6)], cols };
+}
+function drawFlag(ctx, f, x, y, w, h) {
+  const c = i => `rgb(${f.cols[i].join(',')})`;
+  ctx.save();
+  switch (f.type) {
+    case 'h3': for (let i = 0; i < 3; i++) { ctx.fillStyle = c(i); ctx.fillRect(x, y + h * i / 3, w, h / 3 + .5); } break;
+    case 'v3': for (let i = 0; i < 3; i++) { ctx.fillStyle = c(i); ctx.fillRect(x + w * i / 3, y, w / 3 + .5, h); } break;
+    case 'h2': ctx.fillStyle = c(0); ctx.fillRect(x, y, w, h / 2); ctx.fillStyle = c(1); ctx.fillRect(x, y + h / 2, w, h / 2); break;
+    case 'cross': ctx.fillStyle = c(0); ctx.fillRect(x, y, w, h); ctx.fillStyle = c(1); ctx.fillRect(x + w * .28, y, w * .16, h); ctx.fillRect(x, y + h * .42, w, h * .16); break;
+    case 'disk': ctx.fillStyle = c(0); ctx.fillRect(x, y, w, h); ctx.fillStyle = c(1); ctx.beginPath(); ctx.arc(x + w / 2, y + h / 2, h * .3, 0, 7); ctx.fill(); break;
+    case 'tri': ctx.fillStyle = c(0); ctx.fillRect(x, y, w, h / 2); ctx.fillStyle = c(1); ctx.fillRect(x, y + h / 2, w, h / 2);
+      ctx.fillStyle = c(2); ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + w * .45, y + h / 2); ctx.lineTo(x, y + h); ctx.fill(); break;
+  }
+  ctx.restore();
+}
+function hslRgb(h, s, l) {
+  s /= 100; l /= 100;
+  const k = n => (n + h / 30) % 12, a = s * Math.min(l, 1 - l);
+  const f = n => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+  return [f(0) * 255, f(8) * 255, f(4) * 255];
+}
+
+function cleanComponents(type, minSize) {
+  const seen = new Uint8Array(NC), stack = [], comp = [];
+  for (let i = 0; i < NC; i++) {
+    if (seen[i] || land[i] !== type) continue;
+    stack.length = 0; comp.length = 0; stack.push(i); seen[i] = 1;
+    let edge = false;
+    while (stack.length) {
+      const c = stack.pop(); comp.push(c);
+      const x = c % GW, y = (c / GW) | 0;
+      if (x === 0 || y === 0 || x === GW - 1 || y === GH - 1) edge = true;
+      if (x > 0 && !seen[c - 1] && land[c - 1] === type) { seen[c - 1] = 1; stack.push(c - 1); }
+      if (x < GW - 1 && !seen[c + 1] && land[c + 1] === type) { seen[c + 1] = 1; stack.push(c + 1); }
+      if (y > 0 && !seen[c - GW] && land[c - GW] === type) { seen[c - GW] = 1; stack.push(c - GW); }
+      if (y < GH - 1 && !seen[c + GW] && land[c + GW] === type) { seen[c + GW] = 1; stack.push(c + GW); }
+    }
+    if (comp.length < minSize && !(type === 0 && edge)) for (const c of comp) land[c] = 1 - type;
+  }
+}
+
+function genWorld(n) {
+  const nz = makeNoise(), nz2 = makeNoise(), nz3 = makeNoise();
+  const val = new Float32Array(NC);
+  for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) {
+    const dx = (x / GW - .5) * 2, dy = (y / GH - .5) * 2, d = Math.sqrt(dx * dx * .85 + dy * dy);
+    val[y * GW + x] = nz(x / 34, y / 34, 5) - d * d * .45;
+  }
+  const thr = Float32Array.from(val).sort()[Math.floor(NC * (1 - CFG.LAND))];
+  for (let i = 0; i < NC; i++) land[i] = val[i] > thr ? 1 : 0;
+  cleanComponents(1, 25); cleanComponents(0, 20);
+
+  // relevo e oceano
+  let mx = 1e-6; for (let i = 0; i < NC; i++) if (land[i]) mx = Math.max(mx, val[i] - thr);
+  const dist = new Int16Array(NC).fill(99), q = [];
+  for (let i = 0; i < NC; i++) if (land[i]) { dist[i] = 0; q.push(i); }
+  for (let h = 0; h < q.length; h++) {
+    const c = q[h], x = c % GW, y = (c / GW) | 0, nd = dist[c] + 1;
+    if (nd > 12) continue;
+    for (const nb of [x > 0 ? c - 1 : -1, x < GW - 1 ? c + 1 : -1, y > 0 ? c - GW : -1, y < GH - 1 ? c + GW : -1])
+      if (nb >= 0 && dist[nb] > nd) { dist[nb] = nd; q.push(nb); }
+  }
+  coastList = [];
+  for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) {
+    const i = y * GW + x, tex = (nz3(x / 4, y / 4, 2) - .5);
+    if (land[i]) {
+      shade[i] = .8 + .28 * Math.pow(Math.max(0, val[i] - thr) / mx, .7) + tex * .12;
+      coastal[i] = ((x > 0 && !land[i - 1]) || (x < GW - 1 && !land[i + 1]) || (y > 0 && !land[i - GW]) || (y < GH - 1 && !land[i + GW])) ? 1 : 0;
+      if (coastal[i]) coastList.push(i);
+    } else {
+      coastal[i] = 0;
+      const t = clamp(1 - (dist[i] - 1) / 10, 0, 1) + tex * .15;
+      ocean[i] = pack(9 + t * 30, 30 + t * 62, 48 + t * 66);
+    }
+  }
+  // travessias marítimas curtas (até 3 células)
+  const sa = [], sb = [];
+  for (const c of coastList) {
+    const x = c % GW, y = (c / GW) | 0;
+    for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) {
+      if (Math.abs(dx) + Math.abs(dy) <= 1 || dx * dx + dy * dy > 10) continue;
+      const tx = x + dx, ty = y + dy;
+      if (tx < 0 || ty < 0 || tx >= GW || ty >= GH) continue;
+      const t = ty * GW + tx;
+      if (t <= c || !land[t]) continue;
+      const m = Math.round(y + dy / 2) * GW + Math.round(x + dx / 2);
+      if (land[m]) continue;
+      sa.push(c); sb.push(t);
+    }
+  }
+  seaA = Int32Array.from(sa); seaB = Int32Array.from(sb);
+
+  // sementes dos países
+  const landCells = []; for (let i = 0; i < NC; i++) if (land[i]) landCells.push(i);
+  let seeds = [], minD = Math.sqrt(landCells.length / n) * .8, tries = 0;
+  while (seeds.length < n && tries < 30000) {
+    tries++; if (tries % 2000 === 0) minD *= .9;
+    const c = landCells[ri(0, landCells.length - 1)], x = c % GW, y = (c / GW) | 0;
+    if (seeds.every(s => (s % GW - x) ** 2 + (((s / GW) | 0) - y) ** 2 >= minD * minD)) seeds.push(c);
+  }
+  let weights = seeds.map(() => .65 + R() * .7);
+  const wx = new Float32Array(NC), wy = new Float32Array(NC);
+  for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) {
+    const i = y * GW + x;
+    wx[i] = x + (nz2(x / 14, y / 14, 3) - .5) * 24; wy[i] = y + (nz2(x / 14 + 40, y / 14 + 40, 3) - .5) * 24;
+  }
+  const assign = () => {
+    const cnt = new Array(seeds.length).fill(0), sx = seeds.map(s => s % GW), sy = seeds.map(s => (s / GW) | 0);
+    for (let i = 0; i < NC; i++) {
+      if (!land[i]) { owner[i] = -1; continue; }
+      let best = 0, bd = 1e18;
+      for (let s = 0; s < seeds.length; s++) {
+        const d = ((wx[i] - sx[s]) ** 2 + (wy[i] - sy[s]) ** 2) * weights[s];
+        if (d < bd) { bd = d; best = s; }
+      }
+      owner[i] = best; cnt[best]++;
+    }
+    return cnt;
+  };
+  let cnt = assign();
+  const keep = seeds.map((_, i) => cnt[i] >= 25);
+  seeds = seeds.filter((_, i) => keep[i]); weights = weights.filter((_, i) => keep[i]);
+  cnt = assign();
+
+  N = seeds.length;
+  const names = genNames(N), hue0 = R() * 360;
+  C = seeds.map((s, i) => ({
+    id: i, name: names[i], col: hslRgb((hue0 + i * 137.508) % 360, 38 + R() * 26, 44 + R() * 16),
+    flag: genFlag(), alive: true, cells: cnt[i], troops: cnt[i] * CFG.TROOPS_PER_CELL * (.8 + R() * .5),
+    casualties: 0, cap: s, aggr: .25 + R() * .6, lx: s % GW, ly: (s / GW) | 0,
+    recruitCD: 0, allyCD: 0, aidCD: 0,
+  }));
+  for (const c of C) {
+    if (owner[c.cap] !== c.id) relocateCapital(c.id, c.cap);
+    const fc = document.createElement('canvas'); fc.width = 36; fc.height = 24;
+    drawFlag(fc.getContext('2d'), c.flag, 0, 0, 36, 24); c.flagURL = fc.toDataURL();
+  }
+  rel = new Float32Array(N * N); allied = new Uint8Array(N * N); adj = new Uint16Array(N * N);
+  for (let a = 0; a < N; a++) for (let b = a + 1; b < N; b++) { const v = -15 + R() * 50; rel[a * N + b] = rel[b * N + a] = v; }
+  wars = []; rebuildWarMat();
+  scanBorders();
+  for (let a = 0; a < N; a++) for (let b = 0; b < N; b++) if (adj[a * N + b]) rel[a * N + b] -= 8;
+  flash.fill(0); particles = []; reqs = []; logs = []; focus = null;
+  day = 0; P = -1; sel = -1; phase = 'select'; ended = false;
+  computeLabels(); dirty = true; reqsChanged = true;
+}
+
+// ---------- utilidades de diplomacia ----------
+const maxT = c => c.cells * CFG.MAX_PER_CELL + 2000;
+const isAllied = (a, b) => !!allied[a * N + b];
+const warOf = (a, b) => { const i = warMat[a * N + b]; return i >= 0 ? wars[i] : null; };
+function rebuildWarMat() {
+  warMat = new Int16Array(N * N).fill(-1);
+  wars.forEach((w, i) => { warMat[w.a * N + w.b] = i; warMat[w.b * N + w.a] = i; });
+  dirty = true;
+}
+function relAdd(a, b, v) { const r = clamp(rel[a * N + b] + v, -100, 100); rel[a * N + b] = rel[b * N + a] = r; }
+function setRel(a, b, v) { rel[a * N + b] = rel[b * N + a] = v; }
+function setAlly(a, b, v) {
+  allied[a * N + b] = allied[b * N + a] = v ? 1 : 0;
+  if (v) relAdd(a, b, 35);
+  if (a === P || b === P) { const o = a === P ? b : a; v ? toast(`🤝 Aliança formada com ${C[o].name}!`, 'good') : toast(`💔 Aliança com ${C[o].name} desfeita.`, 'bad'); }
+  dirty = true;
+}
+const alliesOf = a => { const r = []; for (let o = 0; o < N; o++) if (o !== a && C[o].alive && allied[a * N + o]) r.push(o); return r; };
+const warsOf = a => wars.filter(w => w.a === a || w.b === a);
+const enemyIn = (w, a) => w.a === a ? w.b : w.a;
+const modeName = m => m === 'morte' ? 'Até a morte' : 'Ataque';
+
+function declareWar(a, b, mode, parent = 0, helpFor = -1) {
+  if (a === b || !C[a].alive || !C[b].alive || warMat[a * N + b] >= 0) return null;
+  if (isAllied(a, b)) setAlly(a, b, 0);
+  const w = { id: warSeq++, a, b, mode, start: day, parent, helpFor, casA: 0, casB: 0,
+    a0: C[a].cells, b0: C[b].cells, fa: [], fb: [], fs: [], aid: 0, peaceCD: 0 };
+  wars.push(w); setRel(a, b, -100); rebuildWarMat();
+  const tagM = mode === 'morte' ? ' ☠ ATÉ A MORTE' : '';
+  if (a === P) toast(parent ? `⚔ Você entrou na guerra contra ${C[b].name}${tagM}` : `⚔ Você declarou guerra a ${C[b].name}${tagM}`, 'bad');
+  else if (b === P) toast(parent ? `⚔ ${C[a].name} entrou na guerra contra você!` : `⚔ ${C[a].name} declarou guerra a você!${tagM}`, 'bad');
+  else if (parent && w.helpFor === P) toast(`📣 ${C[a].name} entrou na guerra ao seu lado contra ${C[b].name}!`, 'good');
+  else if (!parent) toast(`${C[a].name} declarou guerra a ${C[b].name}${mode === 'morte' ? ' (até a morte)' : ''}`, 'g');
+  for (const x of [a, b]) for (const o of alliesOf(x)) relAdd(o, x === a ? b : a, -20);
+  if (!parent) {
+    // aliados do defensor podem entrar na guerra
+    for (const x of alliesOf(b)) {
+      if (x === a || isAllied(x, a) || warMat[x * N + a] >= 0) continue;
+      if (x === P) {
+        addReq(`📣 ${C[b].name} (aliado) pede sua ajuda contra ${C[a].name}${tagM}.`, 'help' + w.id,
+          () => { if (wars.includes(w)) declareWar(P, a, mode, w.id, b); },
+          () => { relAdd(P, b, -25); toast(`${C[b].name} ficou decepcionado com você.`, 'bad'); });
+      } else if (R() < .6) declareWar(x, a, mode, w.id, b);
+    }
+  }
+  return w;
+}
+function endWar(w, why) {
+  const i = wars.indexOf(w); if (i < 0) return;
+  wars.splice(i, 1);
+  for (const ch of wars.filter(x => x.parent === w.id)) endWar(ch, 'parent');
+  if (C[w.a].alive && C[w.b].alive) setRel(w.a, w.b, -30);
+  if (focus && (focus.enemy === w.a || focus.enemy === w.b) && (w.a === P || w.b === P)) focus = null;
+  rebuildWarMat();
+  if (why === 'peace' || why === 'parent') {
+    if (w.a === P || w.b === P) toast(`🕊 Paz assinada com ${C[enemyIn(w, P)].name}.`, 'good');
+    else if (!w.parent) addLog(`Paz entre ${C[w.a].name} e ${C[w.b].name}`);
+  }
+  reqs = reqs.filter(r => r.key !== 'peace' + w.id && r.key !== 'help' + w.id); reqsChanged = true;
+}
+function kill(id) {
+  const c = C[id]; if (!c.alive) return;
+  c.alive = false;
+  for (const w of warsOf(id)) endWar(w, 'elim');
+  for (let o = 0; o < N; o++) allied[id * N + o] = allied[o * N + id] = 0;
+  toast(id === P ? `☠ ${c.name} caiu.` : `☠ ${c.name} foi eliminado!`, id === P ? 'bad' : '');
+  if (sel === id && phase === 'game') sel = P;
+  if (id === P && !ended) { ended = true; showModal('Derrota', `${c.name} perdeu todo o território no dia ${day}.`, [['Escolher outro país', () => { phase = 'select'; sel = -1; P = -1; ended = false; focus = null; reqs = []; reqsChanged = true; }], ['Novo mapa', () => genWorld(nCount)]]); }
+  dirty = true;
+}
+function relocateCapital(id, from) {
+  const fx = from % GW, fy = (from / GW) | 0;
+  let best = -1, bd = 1e18;
+  for (let i = 0; i < NC; i++) if (owner[i] === id) { const d = (i % GW - fx) ** 2 + (((i / GW) | 0) - fy) ** 2; if (d < bd) { bd = d; best = i; } }
+  if (best >= 0) C[id].cap = best;
+}
+
+// ---------- simulação ----------
+function scanBorders() {
+  adj.fill(0);
+  for (const w of wars) { w.fa.length = 0; w.fb.length = 0; w.fs.length = 0; }
+  const pair = (o, o2, c1, c2, sea) => {
+    adj[o * N + o2]++; adj[o2 * N + o]++;
+    const wi = warMat[o * N + o2];
+    if (wi >= 0) { const w = wars[wi]; if (w.a === o) { w.fa.push(c1); w.fb.push(c2); } else { w.fa.push(c2); w.fb.push(c1); } w.fs.push(sea); }
+  };
+  for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) {
+    const c = y * GW + x, o = owner[c]; if (o < 0) continue;
+    if (x < GW - 1) { const o2 = owner[c + 1]; if (o2 >= 0 && o2 !== o) pair(o, o2, c, c + 1, 0); }
+    if (y < GH - 1) { const o2 = owner[c + GW]; if (o2 >= 0 && o2 !== o) pair(o, o2, c, c + GW, 0); }
+  }
+  for (let k = 0; k < seaA.length; k++) { const o = owner[seaA[k]], o2 = owner[seaB[k]]; if (o !== o2) pair(o, o2, seaA[k], seaB[k], 1); }
+}
+function capture(cell, to, from) {
+  owner[cell] = to; C[to].cells++; C[from].cells--; flash[cell] = day; dirty = true;
+  if (particles.length < 160 && R() < .5) particles.push({ x: cell % GW, y: (cell / GW) | 0, t: performance.now() });
+  if (C[from].cap === cell) {
+    C[from].troops *= .88;
+    relocateCapital(from, cell);
+    if (from === P) toast(`🏛 Sua capital caiu! Governo transferido.`, 'bad');
+    else if (to === P) toast(`🏛 Você tomou a capital de ${C[from].name}!`, 'good');
+  }
+}
+function battle(w, ca, cb, sea) {
+  const A = C[w.a], B = C[w.b];
+  const da = A.troops / Math.max(A.cells, 1), db = B.troops / Math.max(B.cells, 1);
+  let ba = 1, bb = 1;
+  if (focus && (w.a === P || w.b === P)) {
+    const fx = focus.c % GW, fy = (focus.c / GW) | 0, tc = w.a === P ? cb : ca;
+    if ((tc % GW - fx) ** 2 + (((tc / GW) | 0) - fy) ** 2 < CFG.FOCUS_RADIUS ** 2) { if (w.a === P) ba = CFG.FOCUS_BONUS; else bb = CFG.FOCUS_BONUS; }
+  }
+  const sa = (da + 4) * (.55 + R() * .9) * ba, sb = (db + 4) * (.55 + R() * .9) * bb;
+  const base = (da + db) * .09 * (.5 + R()) + 4;
+  const aWins = sa > sb;
+  let la = base * (aWins ? .6 : 1.3), lb = base * (aWins ? 1.3 : .6);
+  la = Math.min(la, A.troops); lb = Math.min(lb, B.troops);
+  A.troops -= la; A.casualties += la; w.casA += la;
+  B.troops -= lb; B.casualties += lb; w.casB += lb;
+  if (R() < (sea ? CFG.CAPTURE_SEA : CFG.CAPTURE)) aWins ? capture(cb, w.a, w.b) : capture(ca, w.b, w.a);
+}
+function amphibious(w) {
+  const A = C[w.a], B = C[w.b];
+  const da = A.troops / Math.max(A.cells, 1), db = B.troops / Math.max(B.cells, 1);
+  const att = R() < da / (da + db + 1e-6) ? w.a : w.b, def = att === w.a ? w.b : w.a;
+  let target = -1;
+  for (let k = 0; k < 60 && target < 0; k++) { const c = coastList[ri(0, coastList.length - 1)]; if (owner[c] === def) target = c; }
+  if (target < 0) { const own = []; for (let i = 0; i < NC; i++) if (owner[i] === def) own.push(i); if (own.length) target = own[ri(0, own.length - 1)]; }
+  if (target < 0) return;
+  const loss = 20 + R() * 60;
+  C[att].troops = Math.max(0, C[att].troops - loss); C[att].casualties += loss;
+  C[def].troops = Math.max(0, C[def].troops - loss * .7); C[def].casualties += loss * .7;
+  if (att === w.a) { w.casA += loss; w.casB += loss * .7; } else { w.casB += loss; w.casA += loss * .7; }
+  capture(target, att, def);
+}
+function tick() {
+  day++;
+  for (const c of C) if (c.alive) c.troops = Math.max(0, c.troops + c.cells * CFG.REGEN * (1 - c.troops / maxT(c)));
+  scanBorders();
+  for (const w of wars.slice()) {
+    if (!wars.includes(w) || !C[w.a].alive || !C[w.b].alive) continue;
+    const L = w.fa.length;
+    if (L === 0) {
+      if (w.helpFor >= 0 && C[w.helpFor].alive) { const t = C[w.a].troops * .003; C[w.a].troops -= t; C[w.helpFor].troops += t * .9; w.aid += t * .9; }
+      if (R() < .04) amphibious(w);
+      continue;
+    }
+    const n = Math.min(2 + Math.floor(L * .045), 14);
+    const pf = focus && (w.a === P || w.b === P) && focus.enemy === enemyIn(w, P);
+    for (let k = 0; k < n; k++) {
+      let idx = ri(0, L - 1);
+      if (pf && R() < .7) {
+        const fx = focus.c % GW, fy = (focus.c / GW) | 0; let bd = 1e18;
+        for (let s = 0; s < 6; s++) {
+          const j = ri(0, L - 1), tc = w.a === P ? w.fb[j] : w.fa[j];
+          const d = (tc % GW - fx) ** 2 + (((tc / GW) | 0) - fy) ** 2;
+          if (d < bd) { bd = d; idx = j; }
+        }
+      }
+      const ca = w.fa[idx], cb = w.fb[idx];
+      if (owner[ca] !== w.a || owner[cb] !== w.b) continue;
+      battle(w, ca, cb, w.fs[idx]);
+    }
+  }
+  for (const c of C) if (c.alive && c.cells <= 0) kill(c.id);
+  for (const c of C) if (c.alive && c.id !== P && R() < .015) aiThink(c);
+  if (day % 10 === 0) for (let a = 0; a < N; a++) for (let b = a + 1; b < N; b++) {
+    if (warMat[a * N + b] >= 0) continue;
+    const t = allied[a * N + b] ? 60 : 0, r = rel[a * N + b];
+    if (Math.abs(r - t) > 1) relAdd(a, b, r < t ? 1 : -1);
+  }
+  const before = reqs.length;
+  reqs = reqs.filter(r => r.until > day); if (reqs.length !== before) reqsChanged = true;
+  if (day % 8 === 0) computeLabels();
+  if (P >= 0 && C[P].alive && !ended && C.every(c => !c.alive || c.id === P || isAllied(c.id, P))) {
+    ended = true;
+    showModal('Vitória!', `${C[P].name} dominou o continente no dia ${day}. Todos os países restantes são seus aliados.`, [['Continuar jogando', () => {}], ['Novo mapa', () => genWorld(nCount)]]);
+  }
+}
+function aiThink(c) {
+  const id = c.id, my = warsOf(id);
+  for (const w of my) {
+    if (w.mode !== 'ataque' || (w.parent && w.a === id)) continue;
+    const e = enemyIn(w, id), me0 = w.a === id ? w.a0 : w.b0;
+    const lost = 1 - c.cells / Math.max(me0, 1), dur = day - w.start;
+    if (e === P) {
+      if ((lost > .12 || c.troops < C[P].troops * .45) && R() < .35 && !hasReq('peace' + w.id))
+        addReq(`🕊 ${c.name} propõe paz.`, 'peace' + w.id, () => { if (wars.includes(w)) endWar(w, 'peace'); }, () => relAdd(id, P, -5));
+    } else if (!w.parent && ((dur > 140 && R() < .25) || (lost > .25 && R() < .4))) endWar(w, 'peace');
+  }
+  const active = wars.filter(w => !w.parent).length;
+  if (my.length === 0 && active < Math.max(2, N / 4) && c.troops > maxT(c) * .55 && R() < c.aggr * .5) {
+    let best = -1, bs = -1e9;
+    for (let o = 0; o < N; o++) {
+      if (o === id || !C[o].alive || !adj[id * N + o] || isAllied(id, o)) continue;
+      if (o === P && day < CFG.GRACE_DAYS) continue;
+      const ratio = c.troops / (C[o].troops + 1); if (ratio < .9) continue;
+      const s = ratio - rel[id * N + o] / 60 + R() * .6;
+      if (s > bs) { bs = s; best = o; }
+    }
+    if (best >= 0 && bs > 1) declareWar(id, best, R() < .18 ? 'morte' : 'ataque');
+  }
+  if (R() < .2) {
+    const o = ri(0, N - 1);
+    if (o !== id && C[o].alive && !isAllied(id, o) && warMat[id * N + o] < 0 && rel[id * N + o] > 30) {
+      const clash = alliesOf(o).some(x => warMat[id * N + x] >= 0) || alliesOf(id).some(x => warMat[o * N + x] >= 0);
+      if (clash) return;
+      if (o === P) { if (!hasReq('ally' + id)) addReq(`🤝 ${c.name} propõe uma aliança.`, 'ally' + id, () => { if (C[id].alive && warMat[id * N + P] < 0) setAlly(id, P, 1); }, () => relAdd(id, P, -8)); }
+      else { setAlly(id, o, 1); addLog(`${c.name} e ${C[o].name} formaram aliança`); }
+    }
+  }
+}
+function computeLabels() {
+  const sx = new Float64Array(N), sy = new Float64Array(N), n = new Int32Array(N);
+  for (let i = 0; i < NC; i++) { const o = owner[i]; if (o >= 0) { sx[o] += i % GW; sy[o] += (i / GW) | 0; n[o]++; } }
+  const bd = new Float64Array(N).fill(1e18), bc = new Int32Array(N).fill(-1);
+  for (let i = 0; i < NC; i++) {
+    const o = owner[i]; if (o < 0) continue;
+    const d = (i % GW - sx[o] / n[o]) ** 2 + (((i / GW) | 0) - sy[o] / n[o]) ** 2;
+    if (d < bd[o]) { bd[o] = d; bc[o] = i; }
+  }
+  for (const c of C) { c.cells = n[c.id]; if (bc[c.id] >= 0) { c.lx = bc[c.id] % GW; c.ly = (bc[c.id] / GW) | 0; } }
+}
+
+// ---------- ações do jogador ----------
+function actPeace(e) {
+  const w = warOf(P, e); if (!w || w.mode !== 'ataque') return;
+  if (day < w.peaceCD) return;
+  const E = C[e], Pc = C[P];
+  const lostE = 1 - E.cells / Math.max(w.a === e ? w.a0 : w.b0, 1), lostP = 1 - Pc.cells / Math.max(w.a === P ? w.a0 : w.b0, 1);
+  const r = (E.troops + 1) / (Pc.troops + 1);
+  let p = .15 + lostE * 1.5 - lostP + (day - w.start) / 500 + (r < 1 ? .25 * (1 - r) : -.12 * Math.min(r - 1, 2)) - (E.aggr - .5) * .2;
+  if (w.parent && w.a === P) p += .3;
+  if (R() < clamp(p, .03, .95)) endWar(w, 'peace');
+  else { w.peaceCD = day + CFG.PEACE_CD; toast(`${E.name} recusou a proposta de paz.`, 'bad'); }
+}
+function actAlly(o) {
+  const c = C[o]; if (day < c.allyCD || warMat[P * N + o] >= 0) return;
+  if (alliesOf(o).some(x => warMat[P * N + x] >= 0) || warsOf(o).some(w => isAllied(enemyIn(w, o), P))) {
+    c.allyCD = day + CFG.ALLY_CD; toast(`${c.name} recusou: há conflito com seus aliados.`, 'bad'); return;
+  }
+  if (R() < clamp((rel[P * N + o] + 15) / 70, .02, .92)) setAlly(P, o, 1);
+  else { c.allyCD = day + CFG.ALLY_CD; relAdd(P, o, -3); toast(`${c.name} recusou a aliança.`, 'bad'); }
+}
+function actAid(o) {
+  const cost = Math.max(300, C[P].troops * .08);
+  if (C[P].troops < cost || day < C[o].aidCD) return;
+  C[P].troops -= cost; relAdd(P, o, 14); C[o].aidCD = day + CFG.AID_CD;
+  toast(`🎁 Ajuda enviada a ${C[o].name} (relação +14).`, 'good');
+}
+function actHelp(ally, e) {
+  const w = warOf(P, e); if (!w || !isAllied(P, ally)) return;
+  if (isAllied(ally, e)) { toast(`${C[ally].name} também é aliado de ${C[e].name} e ficou neutro.`, 'bad'); return; }
+  if (warMat[ally * N + e] >= 0) { toast(`${C[ally].name} já está em guerra com ${C[e].name}.`); return; }
+  declareWar(ally, e, w.mode, w.id, P);
+}
+function actRecruit() {
+  const c = C[P]; if (day < c.recruitCD) return;
+  c.troops += maxT(c) * .25; c.recruitCD = day + CFG.RECRUIT_CD;
+  toast(`🪖 Mobilização geral: +${fmt(maxT(c) * .25)} tropas.`, 'good');
+}
+
+// ---------- pedidos / notificações ----------
+let reqsChanged = true;
+const hasReq = k => reqs.some(r => r.key === k);
+function addReq(text, key, yes, no) {
+  if (phase !== 'game' || hasReq(key)) return;
+  if (reqs.length >= 3) reqs.shift();
+  reqs.push({ text, key, yes, no, until: day + 45 }); reqsChanged = true;
+}
+function toast(text, cls = '') {
+  if (phase !== 'game') return;
+  addLog(text);
+  const box = $('toasts');
+  while (box.children.length >= 4) box.firstChild.remove();
+  const d = document.createElement('div'); d.className = 'toast ' + cls; d.textContent = text; box.appendChild(d);
+  setTimeout(() => d.remove(), cls === 'g' ? 2500 : 4200);
+}
+function addLog(t) { logs.unshift(`Dia ${day}: ${t}`); if (logs.length > 30) logs.pop(); }
+function showModal(title, text, btns) {
+  $('mtitle').textContent = title; $('mtext').textContent = text;
+  const b = $('mbtns'); b.innerHTML = '';
+  for (const [label, fn] of btns) { const e = document.createElement('button'); e.textContent = label; e.onclick = () => { $('modal').style.display = 'none'; fn(); }; b.appendChild(e); }
+  $('modal').style.display = 'flex';
+}
+
+// ---------- renderização ----------
+const cv = $('map'), ctx = cv.getContext('2d');
+const off = document.createElement('canvas'); off.width = GW * S; off.height = GH * S;
+const octx = off.getContext('2d'), img = octx.createImageData(GW * S, GH * S), u32 = new Uint32Array(img.data.buffer);
+const cam = { x: 0, y: 0, z: 4, fit: 4 };
+let dpr = 1, VW = 0, VH = 0, fitted = false;
+const COL_EDGE = pack(12, 12, 16), COL_WAR = pack(225, 45, 45), COL_COAST = pack(18, 30, 40), COL_ME = pack(5, 5, 8);
+
+function renderOff() {
+  const W = GW * S;
+  for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) {
+    const c = y * GW + x, o = owner[c];
+    let col;
+    if (o < 0) col = ocean[c];
+    else {
+      const k = C[o].col, s = shade[c];
+      let r = k[0] * s, g = k[1] * s, b = k[2] * s;
+      if (o === sel) { r += 32; g += 32; b += 32; }
+      const f = day - flash[c];
+      if (flash[c] > 0 && f < 6) { const t = (1 - f / 6) * .55; r += (255 - r) * t; g += (235 - g) * t; b += (200 - b) * t; }
+      col = pack(r, g, b);
+    }
+    const base = y * S * W + x * S;
+    for (let dy = 0; dy < S; dy++) { const row = base + dy * W; for (let dx = 0; dx < S; dx++) u32[row + dx] = col; }
+  }
+  const edge = (o, o2) => {
+    if (o < 0 || o2 < 0) return [COL_COAST, (o === P || o2 === P) && P >= 0];
+    if (warMat[o * N + o2] >= 0) return [COL_WAR, true];
+    const me = P >= 0 && (o === P || o2 === P);
+    return [me ? COL_ME : COL_EDGE, me];
+  };
+  for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) {
+    const c = y * GW + x, o = owner[c];
+    if (x < GW - 1) {
+      const o2 = owner[c + 1];
+      if (o !== o2) {
+        const [col, thick] = edge(o, o2), px = x * S + S - 1;
+        for (let dy = 0; dy < S; dy++) { const i = (y * S + dy) * W + px; u32[i] = col; if (thick) u32[i + 1] = col; }
+      }
+    }
+    if (y < GH - 1) {
+      const o2 = owner[c + GW];
+      if (o !== o2) {
+        const [col, thick] = edge(o, o2), row = (y * S + S - 1) * W + x * S;
+        for (let dx = 0; dx < S; dx++) { u32[row + dx] = col; if (thick) u32[row + W + dx] = col; }
+      }
+    }
+  }
+  octx.putImageData(img, 0, 0);
+}
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 2); VW = innerWidth; VH = innerHeight;
+  cv.width = VW * dpr; cv.height = VH * dpr;
+  const fit = Math.min(VW / GW, VH / GH);
+  if (!fitted || Math.abs(cam.fit - fit) > .01) {
+    cam.fit = fit; cam.z = fit * (VW < 760 ? 1.5 : .95);
+    cam.x = (VW - GW * cam.z) / 2; cam.y = (VW < 760 ? (VH * .57 - GH * cam.z) / 2 + 10 : (VH - GH * cam.z) / 2);
+    fitted = true;
+  }
+}
+function draw() {
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.fillStyle = '#07111a'; ctx.fillRect(0, 0, VW, VH);
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(off, cam.x, cam.y, GW * cam.z, GH * cam.z);
+  const z = cam.z, sx = x => cam.x + (x + .5) * z, sy = y => cam.y + (y + .5) * z;
+  // explosões
+  const now = performance.now();
+  particles = particles.filter(p => now - p.t < 650);
+  for (const p of particles) {
+    const a = (now - p.t) / 650;
+    ctx.fillStyle = `rgba(255,${150 - a * 100 | 0},40,${(1 - a) * .85})`;
+    ctx.beginPath(); ctx.arc(sx(p.x), sy(p.y), z * (.4 + a * 1.4), 0, 7); ctx.fill();
+  }
+  // capitais
+  for (const c of C) {
+    if (!c.alive) continue;
+    const x = sx(c.cap % GW), y = sy((c.cap / GW) | 0), r = Math.max(2.5, Math.min(6, z * .9));
+    ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fillStyle = c.id === P ? '#f2c443' : '#e8eef5'; ctx.fill();
+    ctx.lineWidth = 1.5; ctx.strokeStyle = '#111'; ctx.stroke();
+  }
+  // rótulos
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
+  for (const c of C) {
+    if (!c.alive) continue;
+    const fs = clamp(Math.sqrt(c.cells) * z * .14, 0, 26);
+    if (fs < 8.5 && c.id !== P && c.id !== sel) continue;
+    const f = Math.max(fs, 10), x = sx(c.lx), y = sy(c.ly);
+    ctx.font = `700 ${f}px system-ui,sans-serif`;
+    const tw = ctx.measureText(c.name).width, fw = f * 1.3, fh = f * .85;
+    const total = fw + 5 + tw, x0 = x - total / 2;
+    ctx.fillStyle = '#000'; ctx.fillRect(x0 - 1, y - fh / 2 - 1, fw + 2, fh + 2);
+    drawFlag(ctx, c.flag, x0, y - fh / 2, fw, fh);
+    ctx.lineWidth = 3.5; ctx.strokeStyle = 'rgba(0,0,0,.8)';
+    ctx.strokeText(c.name, x0 + fw + 5 + tw / 2, y);
+    ctx.fillStyle = c.id === P ? '#ffe28a' : '#fff'; ctx.fillText(c.name, x0 + fw + 5 + tw / 2, y);
+    if (f >= 11 || c.id === P) {
+      const tf = Math.max(9, f * .75); ctx.font = `600 ${tf}px system-ui,sans-serif`;
+      const inWar = P >= 0 && warMat[P * N + c.id] >= 0;
+      const t = '🪖 ' + fmt(c.troops);
+      ctx.lineWidth = 3; ctx.strokeText(t, x, y + f * .95);
+      ctx.fillStyle = inWar ? '#ff8a8a' : c.id === P ? '#bfe0ff' : '#d8e2ec'; ctx.fillText(t, x, y + f * .95);
+    }
+  }
+  // foco de ataque
+  if (focus && phase === 'game') {
+    const x = sx(focus.c % GW), y = sy((focus.c / GW) | 0), r = CFG.FOCUS_RADIUS * z * .5, pulse = 1 + Math.sin(now / 200) * .08;
+    ctx.strokeStyle = '#ff3b3b'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(x, y, r * pulse, 0, 7); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x - r * 1.3, y); ctx.lineTo(x - r * .5, y); ctx.moveTo(x + r * .5, y); ctx.lineTo(x + r * 1.3, y);
+    ctx.moveTo(x, y - r * 1.3); ctx.lineTo(x, y - r * .5); ctx.moveTo(x, y + r * .5); ctx.lineTo(x, y + r * 1.3); ctx.stroke();
+  }
+}
+
+// ---------- interface ----------
+function relBar(v) {
+  const p = (v + 100) / 2, col = v > 30 ? 'var(--green)' : v < -20 ? 'var(--red)' : 'var(--gold)';
+  return `<div class="bar"><i style="width:${p}%;background:${col}"></i></div>`;
+}
+function infoHTML() {
+  if (sel < 0) {
+    return `<h2>⚔ Guerra Global</h2>
+    <p class="mut small" style="margin:4px 0 8px">Escolha um país tocando no mapa. Declare guerras, forme alianças e conquiste o continente.</p>
+    <div class="small" style="line-height:1.55">
+      <b>⚔ Ataque</b> — guerra normal; dá pra propor paz a qualquer momento.<br>
+      <b>☠ Até a morte</b> — sem paz: só acaba quando um dos países perde todo o território.<br>
+      <b>🤝 Alianças</b> — peça ajuda ao aliado: ele entra na guerra e luta até ela acabar.<br>
+      <b>🎯 Foco</b> — durante a guerra, toque no território inimigo para concentrar o ataque ali.
+    </div>`;
+  }
+  const c = C[sel], me = phase === 'game' && sel === P;
+  let tag = '';
+  if (!c.alive) tag = '<span class="tag dead">ELIMINADO</span>';
+  else if (me) tag = '<span class="tag you">VOCÊ</span>';
+  else if (phase === 'game' && P >= 0 && warMat[P * N + sel] >= 0) tag = `<span class="tag war">${warOf(P, sel).mode === 'morte' ? '☠ ATÉ A MORTE' : 'EM GUERRA'}</span>`;
+  else if (phase === 'game' && P >= 0 && isAllied(P, sel)) tag = '<span class="tag ally">ALIADO</span>';
+  let h = `<h2><img src="${c.flagURL}" alt="">${esc(c.name)} ${tag}</h2>
+  <div class="stats">
+    <span class="mut">Território</span><b>${fmt(c.cells)} prov.</b>
+    <span class="mut">Tropas</span><b>${fmt(c.troops)} / ${fmt(maxT(c))}</b>
+    <span class="mut">Baixas</span><b>${fmt(c.casualties)}</b>
+    <span class="mut">Agressividade</span><b>${c.aggr > .65 ? 'Alta' : c.aggr > .4 ? 'Média' : 'Baixa'}</b>
+  </div>`;
+  if (phase === 'game' && P >= 0 && !me && c.alive) h += `<div class="small mut">Relação com você: <b style="color:var(--txt)">${Math.round(rel[P * N + sel])}</b>${relBar(rel[P * N + sel])}</div>`;
+  const ws = warsOf(sel), al = alliesOf(sel);
+  if (ws.length) h += `<div class="list"><span class="mut small">Guerras:</span> ${ws.map(w => `<span class="${w.mode === 'morte' ? 'm' : ''}">${w.mode === 'morte' ? '☠' : '⚔'} ${esc(C[enemyIn(w, sel)].name)}</span>`).join('')}</div>`;
+  if (al.length) h += `<div class="list"><span class="mut small">Aliados:</span> ${al.map(o => `<span>🤝 ${esc(C[o].name)}</span>`).join('')}</div>`;
+  return h;
+}
+function actionsHTML() {
+  if (phase === 'select') {
+    let h = '';
+    if (sel >= 0 && C[sel].alive) h += `<button class="big" data-act="play">▶ Jogar com ${esc(C[sel].name)}</button>`;
+    h += `<div class="row"><select id="ncount">${[8, 12, 16, 20, 26, 32, 40].map(v => `<option value="${v}"${v === nCount ? ' selected' : ''}>${v} países</option>`).join('')}</select><button data-act="newmap">🎲 Novo mapa</button></div>`;
+    return h;
+  }
+  if (sel < 0 || !C[sel].alive || P < 0 || !C[P].alive) return '';
+  const cd = (t, label) => day < t ? `${label} (${t - day}d)` : label;
+  if (sel === P) {
+    let h = `<button data-act="recruit"${day < C[P].recruitCD ? ' disabled' : ''}>🪖 ${cd(C[P].recruitCD, 'Mobilização geral (+25% tropas)')}</button>`;
+    const myWars = warsOf(P), al = alliesOf(P);
+    for (const w of myWars) {
+      const e = enemyIn(w, P);
+      for (const a of al) if (warMat[a * N + e] < 0 && !isAllied(a, e))
+        h += `<button data-act="help" data-a="${a}" data-e="${e}">📣 Pedir a ${esc(C[a].name)} ajuda contra ${esc(C[e].name)}</button>`;
+    }
+    if (!myWars.length) h += `<div class="hint">Você está em paz. Toque em outro país para declarar guerra ou propor aliança.</div>`;
+    else h += `<div class="hint">🎯 Toque no território inimigo para focar o ataque.</div>`;
+    return h;
+  }
+  const w = warOf(P, sel);
+  if (w) {
+    if (w.mode === 'ataque') return `<button class="peace" data-act="peace"${day < w.peaceCD ? ' disabled' : ''}>🕊 ${cd(w.peaceCD, 'Propor paz')}</button>`
+      + alliesOf(P).filter(a => warMat[a * N + sel] < 0 && !isAllied(a, sel)).map(a => `<button data-act="help" data-a="${a}" data-e="${sel}">📣 Pedir ajuda a ${esc(C[a].name)}</button>`).join('')
+      + `<div class="hint">🎯 Toque no território de ${esc(C[sel].name)} para focar o ataque.</div>`;
+    return alliesOf(P).filter(a => warMat[a * N + sel] < 0 && !isAllied(a, sel)).map(a => `<button data-act="help" data-a="${a}" data-e="${sel}">📣 Pedir ajuda a ${esc(C[a].name)}</button>`).join('')
+      + `<div class="hint">☠ Guerra até a morte — sem paz possível. Só termina quando um país perder todo o território.</div>`;
+  }
+  let h = '';
+  if (isAllied(P, sel)) {
+    for (const ww of warsOf(P)) {
+      const e = enemyIn(ww, P);
+      if (warMat[sel * N + e] < 0 && !isAllied(sel, e)) h += `<button data-act="help" data-a="${sel}" data-e="${e}">📣 Pedir ajuda contra ${esc(C[e].name)}</button>`;
+    }
+    h += `<button data-act="aid"${day < C[sel].aidCD ? ' disabled' : ''}>🎁 ${cd(C[sel].aidCD, 'Enviar ajuda (melhora relação)')}</button>`;
+    h += `<button class="danger" data-act="break">💔 Romper aliança</button>`;
+    h += `<div class="hint">Para atacar um aliado, rompa a aliança primeiro.</div>`;
+    return h;
+  }
+  h += `<button class="danger" data-act="war">⚔ Declarar guerra (Ataque)</button>`;
+  h += `<button class="dark" data-act="death">☠ Guerra até a morte</button>`;
+  h += `<button data-act="ally"${day < C[sel].allyCD ? ' disabled' : ''}>🤝 ${cd(C[sel].allyCD, 'Propor aliança')}</button>`;
+  h += `<button data-act="aid"${day < C[sel].aidCD ? ' disabled' : ''}>🎁 ${cd(C[sel].aidCD, 'Enviar ajuda (melhora relação)')}</button>`;
+  return h;
+}
+function casHTML() {
+  if (phase !== 'game' || P < 0 || !C[P].alive) return '';
+  const ws = warsOf(P);
+  if (!ws.length) return '';
+  let h = '<h3>BAIXAS</h3>';
+  for (const w of ws.slice(0, 3)) {
+    const e = enemyIn(w, P), mine = w.a === P ? w.casA : w.casB, theirs = w.a === P ? w.casB : w.casA;
+    h += `<div class="cwar"><div class="cmode">${w.mode === 'morte' ? '☠ ATÉ A MORTE' : '⚔ ATAQUE'}</div>
+      <div class="crow"><img src="${C[P].flagURL}" alt=""><span style="color:#ff5d6c">${fmt(mine)}</span></div>
+      <div class="crow"><img src="${C[e].flagURL}" alt=""><span style="color:#5aa9ff">${fmt(theirs)}</span></div></div>`;
+  }
+  if (ws.length > 3) h += `<div class="cmode">+${ws.length - 3} guerras</div>`;
+  return h;
+}
+const last = { info: '', act: '', cas: '', log: '' };
+function setIf(id, key, html) { if (last[key] !== html) { last[key] = html; $(id).innerHTML = html; } }
+function updateUI() {
+  $('day').textContent = phase === 'game' ? `Dia ${day}` : 'Escolha um país';
+  setIf('pinfo', 'info', infoHTML());
+  setIf('pact', 'act', actionsHTML());
+  const cas = casHTML(); setIf('cas', 'cas', cas); $('cas').style.display = cas ? 'block' : 'none';
+  setIf('log', 'log', phase === 'game' && sel === P ? logs.slice(0, 6).map(l => `<div>${esc(l)}</div>`).join('') : '');
+  if (reqsChanged) {
+    reqsChanged = false;
+    $('reqs').innerHTML = reqs.map((r, i) => `<div class="req">${esc(r.text)}<div class="b"><button class="y" data-req="${i}" data-yes="1">Aceitar</button><button data-req="${i}" data-yes="0">Recusar</button></div></div>`).join('');
+  }
+}
+$('panel').addEventListener('click', e => {
+  if (e.target.id === 'ptog') { $('panel').classList.toggle('min'); return; }
+  const b = e.target.closest('button[data-act]'); if (!b || b.disabled) return;
+  const act = b.dataset.act;
+  if (act === 'play') { P = sel; phase = 'game'; if (VW < 760) { cam.z = cam.fit * 2.2; cam.x = VW / 2 - (C[P].lx + .5) * cam.z; cam.y = VH * .3 - (C[P].ly + .5) * cam.z; } toast(`Você governa ${C[P].name}. Boa sorte!`, 'good'); }
+  else if (act === 'newmap') genWorld(nCount);
+  else if (act === 'war') declareWar(P, sel, 'ataque');
+  else if (act === 'death') declareWar(P, sel, 'morte');
+  else if (act === 'peace') actPeace(sel);
+  else if (act === 'ally') actAlly(sel);
+  else if (act === 'aid') actAid(sel);
+  else if (act === 'break') { setAlly(P, sel, 0); relAdd(P, sel, -30); }
+  else if (act === 'help') actHelp(+b.dataset.a, +b.dataset.e);
+  else if (act === 'recruit') actRecruit();
+  dirty = true; updateUI();
+});
+$('panel').addEventListener('change', e => { if (e.target.id === 'ncount') { nCount = +e.target.value; genWorld(nCount); updateUI(); } });
+$('reqs').addEventListener('click', e => {
+  const b = e.target.closest('button[data-req]'); if (!b) return;
+  const r = reqs[+b.dataset.req]; if (!r) return;
+  reqs.splice(+b.dataset.req, 1); reqsChanged = true;
+  (b.dataset.yes === '1' ? r.yes : r.no)?.();
+  dirty = true; updateUI();
+});
+document.querySelectorAll('[data-spd]').forEach(b => b.addEventListener('click', () => {
+  speed = +b.dataset.spd;
+  document.querySelectorAll('[data-spd]').forEach(x => x.classList.toggle('on', x === b));
+}));
+$('newgame').addEventListener('click', () => showModal('Novo jogo?', 'O progresso atual será perdido.', [['Novo mapa', () => genWorld(nCount)], ['Cancelar', () => {}]]));
+
+// ---------- entrada: arrastar, zoom, toque ----------
+const ptrs = new Map(); let moved = 0, pinch0 = null;
+function zoomAt(mx, my, f) {
+  const nz = clamp(cam.z * f, cam.fit * .7, cam.fit * 9);
+  cam.x = mx - (mx - cam.x) * nz / cam.z; cam.y = my - (my - cam.y) * nz / cam.z; cam.z = nz;
+}
+cv.addEventListener('pointerdown', e => { cv.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY }); moved = ptrs.size > 1 ? 99 : 0; pinch0 = null; });
+cv.addEventListener('pointermove', e => {
+  const p = ptrs.get(e.pointerId); if (!p) return;
+  if (ptrs.size === 1) {
+    const dx = e.clientX - p.x, dy = e.clientY - p.y; moved += Math.abs(dx) + Math.abs(dy);
+    if (moved > 6) { cam.x += dx; cam.y += dy; }
+  } else if (ptrs.size === 2) {
+    const [a, b] = [...ptrs.values()];
+    const d0 = Math.hypot(a.x - b.x, a.y - b.y);
+    p.x = e.clientX; p.y = e.clientY;
+    const [a2, b2] = [...ptrs.values()];
+    const d1 = Math.hypot(a2.x - b2.x, a2.y - b2.y), mx = (a2.x + b2.x) / 2, my = (a2.y + b2.y) / 2;
+    if (pinch0) { cam.x += mx - pinch0.x; cam.y += my - pinch0.y; }
+    pinch0 = { x: mx, y: my };
+    if (d0 > 0) zoomAt(mx, my, d1 / d0);
+    return;
+  }
+  p.x = e.clientX; p.y = e.clientY;
+});
+const endPtr = e => {
+  if (!ptrs.has(e.pointerId)) return;
+  ptrs.delete(e.pointerId);
+  if (ptrs.size === 0 && moved <= 6 && e.type === 'pointerup') tap(e.clientX, e.clientY);
+  pinch0 = null;
+};
+cv.addEventListener('pointerup', endPtr); cv.addEventListener('pointercancel', endPtr);
+cv.addEventListener('wheel', e => { e.preventDefault(); zoomAt(e.clientX, e.clientY, e.deltaY < 0 ? 1.15 : 1 / 1.15); }, { passive: false });
+function tap(px, py) {
+  const x = Math.floor((px - cam.x) / cam.z), y = Math.floor((py - cam.y) / cam.z);
+  if (x < 0 || y < 0 || x >= GW || y >= GH) return;
+  const c = y * GW + x, o = owner[c];
+  if (o < 0) { sel = phase === 'game' ? P : -1; }
+  else {
+    sel = o;
+    if (phase === 'game' && P >= 0 && warMat[P * N + o] >= 0) focus = { c, enemy: o };
+  }
+  $('panel').classList.remove('min');
+  dirty = true; updateUI();
+}
+addEventListener('resize', () => { resize(); });
+addEventListener('keydown', e => {
+  if (e.key === ' ') { const b = document.querySelector(`[data-spd="${speed ? 0 : 1}"]`); b && b.click(); }
+});
+
+// ---------- loop ----------
+let acc = 0, lastT = performance.now(), uiT = 0;
+function frame(t) {
+  const dt = Math.min(250, t - lastT); lastT = t;
+  if (phase === 'game' && speed > 0 && !ended) {
+    acc += dt * CFG.TPS * speed / 1000;
+    let n = 0;
+    while (acc >= 1 && n < 12) { tick(); acc -= 1; n++; }
+    if (n >= 12) acc = 0;
+  } else if (phase === 'game' && ended && speed > 0 && P >= 0 && C[P].alive) {
+    acc += dt * CFG.TPS * speed / 1000; while (acc >= 1) { tick(); acc -= 1; }
+  }
+  if (dirty) { renderOff(); dirty = false; }
+  draw();
+  uiT += dt; if (uiT > 250) { uiT = 0; updateUI(); }
+  requestAnimationFrame(frame);
+}
+resize();
+genWorld(nCount);
+updateUI();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
