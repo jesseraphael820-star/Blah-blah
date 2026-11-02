@@ -244,7 +244,7 @@ let reqs = [], logs = [], anims = [];
 let dirty = true, ended = false, nCount = 20, worldMode = 'real';
 let nukes = [], nukeArmed = false, nukeReady = 0, units = [];
 // opções visuais (salvas só neste navegador)
-const opts = { fx: 'soldados', stripes: true, smooth: true };
+const opts = { fx: 'soldados', stripes: true, smooth: true, soldiers: true, flags: true };
 // tecnologias: custo = base × 1,7^nível, até o nível 10
 const TECH = [
   { k: 'atk', i: '⚔', n: 'Armamento', d: '+7% de força em combate e mais chance de tomar províncias', base: 8000 },
@@ -1060,7 +1060,7 @@ function draw() {
     ctx.fillStyle = '#e8c39e'; ctx.beginPath(); ctx.arc(0, -u * 1.9, u * .38, 0, Math.PI); ctx.fill();
     ctx.restore();
   };
-  if (opts.fx === 'soldados') for (const w of wars) {
+  if (opts.fx === 'soldados' && opts.soldiers) for (const w of wars) {
     if (!w.sold) continue;
     for (const m of w.sold) {
       const ax = sx(m.a % GW), ay = sy((m.a / GW) | 0), bx = sx(m.b % GW), by = sy((m.b / GW) | 0);
@@ -1150,10 +1150,16 @@ function draw() {
       fx0 = px - dir * b * .12; fy0 = py + bob - b * 1.1;
     } else {
       const st = now / 110 + un.ph;
-      soldier(k, px - u * 2.6 * dir, py + u * .4, dir, st);
-      soldier(k, px, py - u * .3, dir, st + 1.4);
-      soldier(k, px + u * 2.6 * dir, py + u * .4, dir, st + 2.8);
-      fx0 = px; fy0 = py - u * 3.2 - b * .2;
+      if (opts.soldiers) {
+        soldier(k, px - u * 2.6 * dir, py + u * .4, dir, st);
+        soldier(k, px, py - u * .3, dir, st + 1.4);
+        soldier(k, px + u * 2.6 * dir, py + u * .4, dir, st + 2.8);
+        fx0 = px; fy0 = py - u * 3.2 - b * .2;
+      } else {
+        ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(px, py, b * .32 + 1.2, 0, 7); ctx.fill();
+        ctx.fillStyle = `rgb(${k.col[0] | 0},${k.col[1] | 0},${k.col[2] | 0})`; ctx.beginPath(); ctx.arc(px, py, b * .32, 0, 7); ctx.fill();
+        fx0 = px - b * .4; fy0 = py - b * .95;
+      }
     }
     const fw2 = b * .8, fh2 = fw2 * .66;
     ctx.fillStyle = '#000'; ctx.fillRect(fx0 - 1, fy0 - 1, fw2 + 2, fh2 + 2); drawFlag(ctx, k.flag, fx0, fy0, fw2, fh2);
@@ -1166,7 +1172,7 @@ function draw() {
     ctx.fillStyle = '#000'; ctx.fillRect(x - fw / 2 - 1, y - fh / 2 - 1, fw + 2, fh + 2);
     drawFlag(ctx, c.flag, x - fw / 2, y - fh / 2, fw, fh);
   };
-  if (opts.fx === 'soldados') for (const w of wars) {
+  if (opts.fx === 'soldados' && opts.flags) for (const w of wars) {
     if (!w.marks) continue;
     for (const m of w.marks) {
       const ax = sx(m.a % GW), ay = sy((m.a / GW) | 0), bx = sx(m.b % GW), by = sy((m.b / GW) | 0);
@@ -1453,6 +1459,9 @@ $('cfg').addEventListener('click', () => {
     <label><input type="radio" name="fx" value="soldados"${opts.fx === 'soldados' ? ' checked' : ''}> Soldados e bandeiras nas frentes</label>
     <label><input type="radio" name="fx" value="cinza"${opts.fx === 'cinza' ? ' checked' : ''}> Frente cinza (só o território avançando e recuando)</label>
     <label><input type="radio" name="fx" value="listras"${opts.fx === 'listras' ? ' checked' : ''}> Listras (só listras avançando e recuando na frente)</label></div>
+    <div class="opt"><b>Na frente de batalha</b>
+    <label><input type="checkbox" id="o-soldiers"${opts.soldiers ? ' checked' : ''}> Mostrar soldados</label>
+    <label><input type="checkbox" id="o-flags"${opts.flags ? ' checked' : ''}> Mostrar bandeiras nas frentes</label></div>
     <div class="opt"><b>Território</b>
     <label><input type="checkbox" id="o-stripes"${opts.stripes ? ' checked' : ''}> Território ocupado listrado (vira seu ao fazer a paz)</label>
     <label><input type="checkbox" id="o-smooth"${opts.smooth ? ' checked' : ''}> Bordas internas sombreadas</label></div>`;
@@ -1461,6 +1470,8 @@ $('mtext').addEventListener('change', e => {
   if (e.target.name === 'fx') opts.fx = e.target.value;
   else if (e.target.id === 'o-stripes') opts.stripes = e.target.checked;
   else if (e.target.id === 'o-smooth') opts.smooth = e.target.checked;
+  else if (e.target.id === 'o-soldiers') opts.soldiers = e.target.checked;
+  else if (e.target.id === 'o-flags') opts.flags = e.target.checked;
   saveOpts(); dirty = true;
 });
 $('newgame').addEventListener('click', () => showModal('Novo jogo?', 'O progresso atual será perdido.', [['Novo mapa', () => newWorld()], ['Cancelar', () => {}]]));
