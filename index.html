@@ -81,6 +81,10 @@ html,body{margin:0;height:100%;overflow:hidden;background:#08131c;color:var(--tx
 .cch .tr2{height:6px;background:#4a1c22;border-radius:3px;overflow:hidden}
 .cch .tr2 i{display:block;height:100%;background:var(--green)}
 .cch b{color:var(--txt);font-variant-numeric:tabular-nums}
+#air{position:fixed;left:calc(92px + env(safe-area-inset-left,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px));width:66px;height:66px;border-radius:50%;background:radial-gradient(#173a5a,#0a1622);border:2px solid #6fb6ff;color:#cfe6ff;font-size:24px;line-height:1;z-index:7;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer;box-shadow:0 4px 18px #000a;font-family:inherit}
+#air small{font-size:9.5px;font-weight:800;letter-spacing:.3px}
+#air.cd{border-color:#4a5563;color:#8b9aab;background:#161d26}
+#air.armed{background:radial-gradient(#1f5fa0,#0a2440);border-color:#9fd0ff;color:#fff;animation:arm .7s infinite alternate}
 #nuke{position:fixed;left:calc(16px + env(safe-area-inset-left,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px));width:66px;height:66px;border-radius:50%;background:radial-gradient(#5a4600,#1c1500);border:2px solid var(--gold);color:var(--gold);font-size:26px;line-height:1;z-index:7;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer;box-shadow:0 4px 18px #000a;font-family:inherit}
 #nuke small{font-size:9.5px;font-weight:800;letter-spacing:.5px}
 #nuke.cd{border-color:#4a5563;color:#8b9aab;background:#161d26}
@@ -147,10 +151,12 @@ html,body{margin:0;height:100%;overflow:hidden;background:#08131c;color:var(--tx
   #cas h3{font-size:11px;letter-spacing:3px}
   #reqs{left:auto;right:8px;width:58vw;top:52px;bottom:auto}
   .req{font-size:13px;padding:8px 10px}
-  #toasts{top:auto;bottom:calc(43vh + 8px)}
+  #toasts{top:auto;bottom:calc(43vh + 80px)}
   .toast{font-size:12.5px;padding:5px 10px}
   #nuke{bottom:calc(43vh + 12px);left:10px;width:58px;height:58px;font-size:22px}
   #panel.min~#nuke{bottom:74px}
+  #air{bottom:calc(43vh + 12px);left:74px;width:58px;height:58px;font-size:20px}
+  #panel.min~#air{bottom:74px}
 }
 </style>
 </head>
@@ -175,6 +181,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#08131c;color:var(--tx
 <div id="panel"><button id="ptog" aria-label="Minimizar painel"></button><div id="pinfo"></div><div id="pact"></div><div id="log"></div></div>
 <div id="reqs"></div>
 <button id="nuke" hidden aria-label="Bomba nuclear"></button>
+<button id="air" class="" hidden aria-label="Bombardeio aéreo"></button>
 <datalist id="clist"></datalist>
 <div class="modal" id="modal"><div class="box"><h2 id="mtitle"></h2><div id="mtext" class="mut"></div><div class="b" id="mbtns"></div></div></div>
 
@@ -202,6 +209,7 @@ const CFG = {
   NUKE_CD_MS: 30000,         // recarga da bomba nuclear do jogador (tempo real)
   AI_NUKE_CD_MS: 90000,      // recarga das potências nucleares da IA
   NUKE_R: 5, NUKE_FLY_MS: 1500, NUKE_FX_MS: 2600, RAD_DAYS: 80,
+  RAID_COST: 4000, RAID_CD: 12, RAID_R: 3, BOMB_DAYS: 20, RAID_STRIKE_MS: 1100,  // bombardeio aéreo (custo $, recarga em dias)
 };
 let GW = CFG.GW, GH = CFG.GH, S = CFG.S, NC = GW * GH;
 const $ = id => document.getElementById(id);
@@ -226,11 +234,12 @@ function makeNoise() {
 }
 
 // ---------- estado ----------
+let bomb, raids = [], airArmed = false;
 let owner, land, shade, ocean, coastal, flash, rad, core, frontMark;
 function alloc(gw, gh, s) {
   GW = gw; GH = gh; NC = gw * gh; S = s;
   owner = new Int16Array(NC); land = new Uint8Array(NC); shade = new Float32Array(NC);
-  ocean = new Uint32Array(NC); coastal = new Uint8Array(NC); flash = new Float32Array(NC); rad = new Float32Array(NC);
+  ocean = new Uint32Array(NC); coastal = new Uint8Array(NC); flash = new Float32Array(NC); rad = new Float32Array(NC); bomb = new Float32Array(NC);
   core = new Int16Array(NC); frontMark = new Uint8Array(NC);
   off.width = GW * S; off.height = GH * S;
   img = octx.createImageData(GW * S, GH * S); u32 = new Uint32Array(img.data.buffer);
@@ -252,6 +261,7 @@ const TECH = [
   { k: 'eco', i: '🏭', n: 'Indústria', d: '+12% de renda por dia', base: 6000 },
   { k: 'log', i: '🚚', n: 'Logística', d: '−6% de manutenção e +15% de recrutamento natural', base: 6000 },
   { k: 'nav', i: '⚓', n: 'Marinha', d: '+15% de velocidade dos navios e +12% de força no desembarque', base: 5000 },
+  { k: 'air', i: '✈', n: 'Força Aérea', d: '+15% de dano nos bombardeios e defesa antiaérea mais forte', base: 7000 },
 ];
 const TECH_MAX = 10;
 const techCost = (c, k) => Math.round(TECH.find(t => t.k === k).base * 1.7 ** c.tech[k] / 100) * 100;
@@ -484,7 +494,7 @@ function makeCountries(list) {
     casualties: 0, cap: d.cap, aggr: .25 + R() * .6, lx: 0, ly: 0,
     recruitCD: 0, allyCD: 0, aidCD: 0,
     econ: d.econ || 1, money: cnt[i] * 60 * (d.econ || 1) + 3000, net: 0,
-    tech: { atk: 0, def: 0, eco: 0, log: 0, nav: 0 }, clickLv: 0, clickTotal: 0,
+    tech: { atk: 0, def: 0, eco: 0, log: 0, nav: 0, air: 0 }, clickLv: 0, clickTotal: 0, raidReady: 0,
   }));
   computeLabels();
   for (const c of C) {
@@ -499,7 +509,7 @@ function makeCountries(list) {
   wars = []; rebuildWarMat();
   scanBorders();
   for (let a = 0; a < N; a++) for (let b = 0; b < N; b++) if (adj[a * N + b]) rel[a * N + b] -= 8;
-  anims = []; nukes = []; nukeArmed = false; nukeReady = 0; $('vs').hidden = true; reqs = []; logs = []; focus = null;
+  anims = []; nukes = []; raids = []; airArmed = false; nukeArmed = false; nukeReady = 0; $('vs').hidden = true; reqs = []; logs = []; focus = null;
   day = 0; P = -1; sel = -1; phase = 'select'; ended = false;
   dirty = true; reqsChanged = true;
 }
@@ -527,7 +537,8 @@ const enemyIn = (w, a) => w.a === a ? w.b : w.a;
 const modeName = m => m === 'morte' ? 'Até a morte' : 'Ataque';
 
 function sideStrength(w, side) {
-  let s = (C[side].troops + C[side].cells * 40) * (1 + .07 * C[side].tech.atk) * (1 + .05 * C[side].tech.def);
+  const T = C[side].tech;
+  let s = C[side].troops * (1 + .1 * T.atk) * (1 + .07 * T.def) * (1 + .05 * T.air) + C[side].cells * 15;
   for (const x of wars) if (x.parent === w.id && x.helpFor === side && C[x.a].alive) s += (C[x.a].troops + C[x.a].cells * 40) * .5;
   return s;
 }
@@ -661,8 +672,10 @@ function battle(w, ca, cb, sea) {
     if ((tc % GW - fx) ** 2 + (((tc / GW) | 0) - fy) ** 2 < CFG.FOCUS_RADIUS ** 2) { if (w.a === P) ba = CFG.FOCUS_BONUS; else bb = CFG.FOCUS_BONUS; }
   }
   if (rad[ca] && day - rad[ca] < CFG.RAD_DAYS) ba *= .45;
+  if (bomb[ca] && day - bomb[ca] < CFG.BOMB_DAYS) ba *= .6;
+  if (bomb[cb] && day - bomb[cb] < CFG.BOMB_DAYS) bb *= .6;
   if (rad[cb] && day - rad[cb] < CFG.RAD_DAYS) bb *= .45;
-  const sa = (da + 4) * (.55 + R() * .9) * ba * (1 + .07 * A.tech.atk), sb = (db + 4) * (.55 + R() * .9) * bb * (1 + .07 * B.tech.atk);
+  const sa = (da + 4) * (.55 + R() * .9) * ba * (1 + .1 * A.tech.atk), sb = (db + 4) * (.55 + R() * .9) * bb * (1 + .1 * B.tech.atk);
   const base = (da + db) * .09 * (.5 + R()) + 4;
   const aWins = sa > sb;
   let la = base * (aWins ? .6 : 1.3) / (1 + .1 * A.tech.def), lb = base * (aWins ? 1.3 : .6) / (1 + .1 * B.tech.def);
@@ -782,6 +795,10 @@ function aiThink(c) {
     } else if (!w.parent && ((dur > 140 && R() < .25) || (lost > .25 && R() < .4))) endWar(w, 'peace');
   }
   const active = wars.filter(w => !w.parent).length;
+  if (my.length && day >= c.raidReady && c.money > CFG.RAID_COST * 2.5 && R() < .35) {
+    const w = my[ri(0, my.length - 1)], e = enemyIn(w, id), fr = w.a === id ? w.fb : w.fa;
+    launchRaid(id, fr.length ? fr[ri(0, fr.length - 1)] : C[e].cap);
+  }
   if (c.nuclear && performance.now() > c.nukeReady) {
     for (const w of my) {
       const e = enemyIn(w, id), lost = 1 - c.cells / Math.max(w.a === id ? w.a0 : w.b0, 1);
@@ -969,6 +986,7 @@ function renderOff() {
         if (near) { r += (128 - r) * near; g += (128 - g) * near; b += (132 - b) * near; }
       }
       if (o === sel) { r += 32; g += 32; b += 32; }
+      if (bomb[c] && day - bomb[c] < CFG.BOMB_DAYS) { const t = (1 - (day - bomb[c]) / CFG.BOMB_DAYS) * .45; r += (52 - r) * t; g += (44 - g) * t; b += (38 - b) * t; }
       if (rad[c] && day - rad[c] < CFG.RAD_DAYS) { const t = (1 - (day - rad[c]) / CFG.RAD_DAYS) * .6; r += (64 - r) * t; g += (78 - g) * t; b += (34 - b) * t; }
       const f = day - flash[c];
       if (flash[c] > 0 && f < 10) { const t = (1 - f / 10) * .22; r += (255 - r) * t; g += (255 - g) * t; b += (255 - b) * t; }
@@ -1212,6 +1230,7 @@ function draw() {
       ctx.fillStyle = inWar ? '#ff8a8a' : c.id === P ? '#bfe0ff' : '#d8e2ec'; ctx.fillText(t, x, y + f * .95);
     }
   }
+  drawRaids(now, z);
   shakeAmt = drawNukes(now, z);
   floaters = floaters.filter(f => now - f.t < 900);
   for (const f of floaters) {
@@ -1324,7 +1343,8 @@ function actionsHTML() {
   }
   const w = warOf(P, sel);
   if (w) {
-    const ship = `<button data-act="ship"${day < (w.shipCD || 0) ? ' disabled' : ''}>🚢 ${cd(w.shipCD || 0, 'Enviar invasão (navio ou marcha)')}</button>`
+    const airB = `<button data-act="air"${day < C[P].raidReady || C[P].money < CFG.RAID_COST ? ' disabled' : ''}>✈ ${cd(C[P].raidReady, `Bombardeio aéreo (${fmtM(CFG.RAID_COST)}) — toque no alvo`)}</button>`;
+    const ship = airB + `<button data-act="ship"${day < (w.shipCD || 0) ? ' disabled' : ''}>🚢 ${cd(w.shipCD || 0, 'Enviar invasão (navio ou marcha)')}</button>`
       + (w.fa.length ? '' : `<div class="hint">Sem fronteira com ${esc(C[sel].name)}: mande navios, ou tropas por terra se não houver mar.</div>`);
     if (w.mode === 'ataque') return ship + `<button class="peace" data-act="peace"${day < w.peaceCD ? ' disabled' : ''}>🕊 ${cd(w.peaceCD, 'Propor paz')}</button>`
       + `<button class="peace" data-act="peacepay"${day < w.peaceCD || C[P].money < peacePrice(sel) ? ' disabled' : ''}>🕊💸 ${cd(w.peaceCD, `Paz pagando ${fmtM(peacePrice(sel))} (mais chance)`)}</button>`
@@ -1408,6 +1428,7 @@ $('panel').addEventListener('click', e => {
   else if (act === 'death') declareWar(P, sel, 'morte');
   else if (act === 'peace') actPeace(sel);
   else if (act === 'ship') actShip(sel);
+  else if (act === 'air') { airArmed = true; nukeArmed = false; toast('✈ Toque no território inimigo para bombardear.'); airButton(); }
   else if (act === 'ally') actAlly(sel);
   else if (act === 'aid') actAid(sel);
   else if (act === 'gift') actGift(sel);
@@ -1634,9 +1655,125 @@ function nukeButton() {
 }
 $('nuke').addEventListener('click', () => {
   if (performance.now() < nukeReady) { toast(`☢ Recarregando: ${Math.ceil((nukeReady - performance.now()) / 1000)}s`); return; }
-  nukeArmed = !nukeArmed;
+  nukeArmed = !nukeArmed; if (nukeArmed) { airArmed = false; airButton(); }
   if (nukeArmed) toast('☢ Toque no território de um país em guerra com você.', 'bad');
   nukeButton();
+});
+
+// ---------- aviões e bombardeio aéreo ----------
+function launchRaid(from, cell) {
+  const A = C[from], e = owner[cell]; if (e < 0) return false;
+  if (A.money < CFG.RAID_COST) { if (from === P) toast('💸 Dinheiro insuficiente para o bombardeio.', 'bad'); return false; }
+  if (day < A.raidReady) { if (from === P) toast(`✈ Aviões reabastecendo: ${A.raidReady - day} dias.`); return false; }
+  const tx = cell % GW, ty = (cell / GW) | 0;
+  let src = A.cap, bd = 1e18;
+  for (let i = 0; i < NC; i++) if (owner[i] === from) { const d = (i % GW - tx) ** 2 + (((i / GW) | 0) - ty) ** 2; if (d < bd) { bd = d; src = i; } }
+  A.money -= CFG.RAID_COST; A.raidReady = day + CFG.RAID_CD;
+  const E = C[e], pShot = clamp(.12 + .07 * (E.tech.air - A.tech.air) + .03 * E.tech.def, .02, .75);
+  const planes = [0, 1, 2].map(i => ({ off: (i - 1) * 1.6, lag: Math.abs(i - 1) * .06, shot: R() < pShot }));
+  const dist = Math.sqrt(bd), fly = clamp(700 + dist * 28, 900, 2800);
+  const booms = Array.from({ length: 9 }, () => ({ dx: (R() - .5) * 2 * CFG.RAID_R, dy: (R() - .5) * 2 * CFG.RAID_R, d: R() * .8 }));
+  raids.push({ from, to: e, src, dst: cell, t: performance.now(), fly, planes, booms, hit: false });
+  if (from === P) toast(`✈ Esquadrilha decolou para bombardear ${E.name}!`, 'good');
+  else if (e === P) toast(`✈ Aviões de ${A.name} estão vindo bombardear você!`, 'bad');
+  return true;
+}
+function strikeRaid(r) {
+  const A = C[r.from], E = C[r.to]; if (!E.alive) return;
+  const alive = r.planes.filter(p => !p.shot).length, shot = 3 - alive;
+  const tx = r.dst % GW, ty = (r.dst / GW) | 0, R2 = CFG.RAID_R;
+  if (alive) for (let y = ty - R2; y <= ty + R2; y++) for (let x = tx - R2; x <= tx + R2; x++) {
+    if (x < 0 || y < 0 || x >= GW || y >= GH || (x - tx) ** 2 + (y - ty) ** 2 > R2 * R2) continue;
+    const c = y * GW + x; if (owner[c] === r.to) bomb[c] = Math.max(day, 1);
+  }
+  const loss = Math.min(E.troops * .3, E.troops * .035 * alive * (1 + .15 * A.tech.air) / (1 + .06 * E.tech.def));
+  E.troops -= loss; E.casualties += loss; E.money = Math.max(0, E.money - 250 * alive);
+  const w = warOf(r.from, r.to); if (w) { if (w.a === r.to) w.casA += loss; else w.casB += loss; }
+  const sh = shot ? ` · ${shot} avião${shot > 1 ? 'ões' : ''} abatido${shot > 1 ? 's' : ''}` : '';
+  if (r.from === P) toast(alive ? `💥 Bombardeio em ${E.name}: −${fmt(loss)} tropas${sh}` : `✈ Todos os aviões foram abatidos sobre ${E.name}!`, alive ? 'good' : 'bad');
+  else if (r.to === P) toast(alive ? `💥 ${A.name} bombardeou você: −${fmt(loss)} tropas${sh}` : `🎯 Sua defesa antiaérea derrubou todos os aviões de ${A.name}!`, alive ? 'bad' : 'good');
+  dirty = true;
+}
+function updateRaids(now) {
+  for (const r of raids) if (!r.hit && now - r.t >= r.fly) { r.hit = true; strikeRaid(r); }
+  raids = raids.filter(r => now - r.t < r.fly * 2 + CFG.RAID_STRIKE_MS);
+}
+function drawPlane(x, y, ang, col, sz, alpha) {
+  ctx.save(); ctx.translate(x, y); ctx.rotate(ang); ctx.globalAlpha = alpha;
+  ctx.fillStyle = `rgb(${col[0] | 0},${col[1] | 0},${col[2] | 0})`; ctx.strokeStyle = '#000'; ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(sz, 0); ctx.lineTo(sz * .2, -sz * .12); ctx.lineTo(-sz * .1, -sz * .85); ctx.lineTo(-sz * .32, -sz * .85); ctx.lineTo(-sz * .22, -sz * .14);
+  ctx.lineTo(-sz * .7, -sz * .12); ctx.lineTo(-sz * .85, -sz * .42); ctx.lineTo(-sz * .98, -sz * .42); ctx.lineTo(-sz * .92, 0);
+  ctx.lineTo(-sz * .98, sz * .42); ctx.lineTo(-sz * .85, sz * .42); ctx.lineTo(-sz * .7, sz * .12); ctx.lineTo(-sz * .22, sz * .14);
+  ctx.lineTo(-sz * .32, sz * .85); ctx.lineTo(-sz * .1, sz * .85); ctx.lineTo(sz * .2, sz * .12); ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  ctx.fillStyle = 'rgba(200,230,255,.85)'; ctx.beginPath(); ctx.ellipse(sz * .45, 0, sz * .16, sz * .07, 0, 0, 7); ctx.fill();
+  ctx.restore();
+}
+function drawRaids(now, z) {
+  const sz = clamp(z * 1.3, 8, 15);
+  for (const r of raids) {
+    const k = r.from === P ? C[r.from].col : C[r.from].col;
+    const sx0 = cam.x + (r.src % GW + .5) * z, sy0 = cam.y + (((r.src / GW) | 0) + .5) * z;
+    const sx1 = cam.x + (r.dst % GW + .5) * z, sy1 = cam.y + (((r.dst / GW) | 0) + .5) * z;
+    const el = now - r.t, dx = sx1 - sx0, dy = sy1 - sy0, L = Math.hypot(dx, dy) || 1, ux = dx / L, uy = dy / L, ang = Math.atan2(dy, dx);
+    // alvo marcado durante a ida
+    if (el < r.fly) {
+      const pul = .5 + .5 * Math.sin(now / 100);
+      ctx.strokeStyle = `rgba(255,200,60,${.4 + pul * .4})`; ctx.lineWidth = 1.5; ctx.setLineDash([3, 3]);
+      ctx.beginPath(); ctx.arc(sx1, sy1, CFG.RAID_R * z, 0, 7); ctx.stroke(); ctx.setLineDash([]);
+    }
+    // explosões do bombardeio
+    const se = el - r.fly;
+    if (se >= 0 && se < CFG.RAID_STRIKE_MS && r.planes.some(p => !p.shot)) {
+      for (const b of r.booms) {
+        const t = se / CFG.RAID_STRIKE_MS - b.d * .5; if (t < 0 || t > .5) continue;
+        const a = 1 - t / .5, bx = sx1 + b.dx * z, by = sy1 + b.dy * z, rr = z * (.5 + t * 2.2);
+        const g = ctx.createRadialGradient(bx, by, 0, bx, by, rr);
+        g.addColorStop(0, `rgba(255,250,210,${a})`); g.addColorStop(.5, `rgba(255,150,40,${a * .85})`); g.addColorStop(1, 'rgba(90,40,20,0)');
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(bx, by, rr, 0, 7); ctx.fill();
+      }
+    }
+    for (const p of r.planes) {
+      let f, back = false;
+      const e2 = el / r.fly - p.lag;
+      if (e2 < 1) f = Math.max(0, e2);
+      else if (el < r.fly + CFG.RAID_STRIKE_MS * .4) f = 1 + (el - r.fly) / r.fly * .4;   // passa do alvo
+      else { back = true; f = 1 - (el - r.fly - CFG.RAID_STRIKE_MS * .4) / r.fly; }
+      if (p.shot && e2 > .85) {
+        // abatido: cai girando com fumaça
+        const fall = (el - r.fly * (.85 + p.lag)) / 900; if (fall > 1) continue;
+        const bx = sx0 + ux * L * .85 - uy * p.off * sz + fall * sz, by = sy0 + uy * L * .85 + ux * p.off * sz + fall * sz * 2;
+        ctx.fillStyle = `rgba(60,60,60,${(1 - fall) * .6})`; ctx.beginPath(); ctx.arc(bx - sz, by - sz, sz * (.4 + fall), 0, 7); ctx.fill();
+        drawPlane(bx, by, ang + fall * 8, [90, 40, 30], sz * (1 - fall * .5), 1 - fall);
+        if (fall < .3) { ctx.fillStyle = `rgba(255,140,40,${1 - fall / .3})`; ctx.beginPath(); ctx.arc(bx, by, sz * .6, 0, 7); ctx.fill(); }
+        continue;
+      }
+      if (f < 0 || (back && f < 0)) continue;
+      const ff = clamp(f, -1, 1.5);
+      const px = sx0 + ux * L * ff - uy * p.off * sz, py = sy0 + uy * L * ff + ux * p.off * sz;
+      const a2 = back ? ang + Math.PI : ang;
+      ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px - Math.cos(a2) * sz * 2.6, py - Math.sin(a2) * sz * 2.6); ctx.stroke();
+      drawPlane(px, py, a2, k, sz, 1);
+      // flak perto do alvo
+      if (!back && ff > .7 && ff < 1.1 && R() < .25) { ctx.fillStyle = 'rgba(220,220,220,.55)'; ctx.beginPath(); ctx.arc(px + (R() - .5) * sz * 3, py + (R() - .5) * sz * 3, sz * .3, 0, 7); ctx.fill(); }
+    }
+  }
+}
+function airButton() {
+  const b = $('air'), show = phase === 'game' && P >= 0 && C[P].alive && warsOf(P).length > 0;
+  b.hidden = !show; if (!show) { airArmed = false; return; }
+  const left = C[P].raidReady - day, poor = C[P].money < CFG.RAID_COST;
+  const html = airArmed ? '✈<small>ALVO?</small>' : left > 0 ? `✈<small>${left}d</small>` : `✈<small>${fmtM(CFG.RAID_COST)}</small>`;
+  b.className = airArmed ? 'armed' : left > 0 || poor ? 'cd' : '';
+  if (b.innerHTML !== html) b.innerHTML = html;
+}
+$('air').addEventListener('click', () => {
+  if (day < C[P].raidReady) { toast(`✈ Aviões reabastecendo: ${C[P].raidReady - day} dias.`); return; }
+  if (C[P].money < CFG.RAID_COST) { toast(`💸 O bombardeio custa ${fmtM(CFG.RAID_COST)}.`, 'bad'); return; }
+  airArmed = !airArmed; if (airArmed) { nukeArmed = false; nukeButton(); toast('✈ Toque no território inimigo para bombardear.'); }
+  airButton();
 });
 
 // ---------- entrada: arrastar, zoom, toque ----------
@@ -1676,6 +1813,11 @@ function tap(px, py) {
   const x = Math.floor((px - cam.x) / cam.z), y = Math.floor((py - cam.y) / cam.z);
   if (x < 0 || y < 0 || x >= GW || y >= GH) return;
   const c = y * GW + x, o = owner[c];
+  if (airArmed) {
+    if (o >= 0 && P >= 0 && warMat[P * N + o] >= 0) { airArmed = false; launchRaid(P, c); airButton(); }
+    else toast('✈ Escolha um país que está em guerra com você.', 'bad');
+    return;
+  }
   if (nukeArmed) {
     if (o >= 0 && P >= 0 && warMat[P * N + o] >= 0) { nukeArmed = false; launchNuke(P, c); nukeButton(); }
     else toast('☢ Escolha um país que está em guerra com você.', 'bad');
@@ -1712,9 +1854,9 @@ function frame(t) {
     acc += dt * CFG.TPS * speed / 1000; while (acc >= 1) { tick(); acc -= 1; }
   }
   if (dirty && t - lastRO > 60) { renderOff(); dirty = false; lastRO = t; }
-  updateNukes(t);
+  updateNukes(t); updateRaids(t);
   draw();
-  uiT += dt; if (uiT > 250) { uiT = 0; updateUI(); nukeButton(); }
+  uiT += dt; if (uiT > 250) { uiT = 0; updateUI(); nukeButton(); airButton(); }
   requestAnimationFrame(frame);
 }
 resize();
