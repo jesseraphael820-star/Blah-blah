@@ -59,6 +59,27 @@ html,body{margin:0;height:100%;overflow:hidden;background:#08131c;color:var(--tx
 #toasts{position:fixed;top:54px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;gap:5px;align-items:center;z-index:8;pointer-events:none;width:min(92vw,460px)}
 .toast{background:rgba(10,14,20,.93);border:1px solid #39475a;border-radius:8px;padding:7px 12px;font-size:13.5px;animation:pop .2s;text-align:center}
 .toast.bad{border-color:var(--red)}.toast.good{border-color:var(--green)}.toast.g{color:var(--mut);font-size:12px}
+[hidden]{display:none!important}
+#vs{position:fixed;left:50%;top:calc(58px + env(safe-area-inset-top,0px));transform:translateX(-50%);width:min(94vw,500px);background:rgba(10,14,20,.97);border:1px solid #6a2830;border-radius:14px;padding:14px 16px 10px;z-index:9;cursor:pointer;animation:vsin .35s ease-out;box-shadow:0 10px 40px #000a}
+#vs .t{text-align:center;font-size:12px;letter-spacing:4px;color:#ff6b6b;font-weight:800;margin-bottom:10px}
+#vs .s{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:10px}
+#vs .side{display:flex;flex-direction:column;align-items:center;gap:5px;min-width:0}
+#vs .side img{width:66px;height:44px;border:1px solid #000}
+#vs .nm{font-weight:800;font-size:16px;text-align:center;overflow-wrap:anywhere}
+#vs .pc{font-size:12px;font-weight:700;color:#7fdca6;text-align:center}
+#vs .pc.e{color:#ff8a8a}
+#vs .x{font-family:Georgia,serif;font-size:28px;font-weight:900;color:#ff5d6c}
+#vs .bars{margin-top:12px;display:flex;flex-direction:column;gap:7px}
+#vs .bl{display:grid;grid-template-columns:30px 1fr 44px;align-items:center;gap:8px;font-weight:800;font-variant-numeric:tabular-nums;text-align:right}
+#vs .bl img{width:30px;height:20px;border:1px solid #000}
+#vs .tr{height:12px;background:#1d2733;border-radius:6px;overflow:hidden}
+#vs .tr i{display:block;height:100%;width:0;border-radius:6px;transition:width .9s cubic-bezier(.2,.8,.2,1)}
+#vs .ft{font-size:11px;color:var(--mut);text-align:center;margin-top:8px}
+@keyframes vsin{from{transform:translate(-50%,-16px);opacity:0}to{transform:translate(-50%,0);opacity:1}}
+.cch{display:grid;grid-template-columns:auto 1fr auto;gap:6px;align-items:center;font-size:11px;color:var(--mut);margin-top:3px}
+.cch .tr2{height:6px;background:#4a1c22;border-radius:3px;overflow:hidden}
+.cch .tr2 i{display:block;height:100%;background:var(--green)}
+.cch b{color:var(--txt);font-variant-numeric:tabular-nums}
 @keyframes pop{from{transform:scale(.9);opacity:0}to{transform:none;opacity:1}}
 .modal{position:fixed;inset:0;background:#000a;display:none;align-items:center;justify-content:center;z-index:20}
 .modal .box{background:#111a24;border:1px solid var(--line);border-radius:14px;padding:22px;max-width:360px;width:90%;text-align:center}
@@ -96,6 +117,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#08131c;color:var(--tx
 </div>
 <div id="cas"></div>
 <div id="toasts"></div>
+<div id="vs" hidden></div>
 <div id="panel"><button id="ptog" aria-label="Minimizar painel"></button><div id="pinfo"></div><div id="pact"></div><div id="log"></div></div>
 <div id="reqs"></div>
 <div class="modal" id="modal"><div class="box"><h2 id="mtitle"></h2><div id="mtext" class="mut"></div><div class="b" id="mbtns"></div></div></div>
@@ -147,7 +169,7 @@ let seaA = new Int32Array(0), seaB = new Int32Array(0), coastList = [];
 let C = [], N = 0, rel, allied, warMat, adj;
 let wars = [], warSeq = 1;
 let day = 0, P = -1, phase = 'select', sel = -1, speed = 1, focus = null;
-let reqs = [], logs = [], particles = [];
+let reqs = [], logs = [], anims = [];
 let dirty = true, ended = false, nCount = 20;
 
 // ---------- geração do mundo ----------
@@ -306,7 +328,7 @@ function genWorld(n) {
   wars = []; rebuildWarMat();
   scanBorders();
   for (let a = 0; a < N; a++) for (let b = 0; b < N; b++) if (adj[a * N + b]) rel[a * N + b] -= 8;
-  flash.fill(0); particles = []; reqs = []; logs = []; focus = null;
+  flash.fill(0); anims = []; $('vs').hidden = true; reqs = []; logs = []; focus = null;
   day = 0; P = -1; sel = -1; phase = 'select'; ended = false;
   computeLabels(); dirty = true; reqsChanged = true;
 }
@@ -333,12 +355,39 @@ const warsOf = a => wars.filter(w => w.a === a || w.b === a);
 const enemyIn = (w, a) => w.a === a ? w.b : w.a;
 const modeName = m => m === 'morte' ? 'Até a morte' : 'Ataque';
 
+function sideStrength(w, side) {
+  let s = C[side].troops + C[side].cells * 40;
+  for (const x of wars) if (x.parent === w.id && x.helpFor === side && C[x.a].alive) s += (C[x.a].troops + C[x.a].cells * 40) * .5;
+  return s;
+}
+function winChance(w) {
+  const a = sideStrength(w, P) ** 1.4, b = sideStrength(w, enemyIn(w, P)) ** 1.4;
+  return clamp(Math.round(100 * a / (a + b)), 1, 99);
+}
+let vsTimer = 0;
+function showVs(w) {
+  setTimeout(() => {
+    if (!wars.includes(w) || phase !== 'game' || P < 0) return;
+    const e = enemyIn(w, P), wc = winChance(w), el = $('vs');
+    el.innerHTML = `<div class="t">${w.mode === 'morte' ? '☠ GUERRA ATÉ A MORTE' : '⚔ GUERRA DECLARADA'}</div>
+    <div class="s"><div class="side"><img src="${C[P].flagURL}" alt=""><div class="nm">${esc(C[P].name)}</div><div class="pc">${wc}% de chance de vencer</div></div>
+    <div class="x">VS</div>
+    <div class="side"><img src="${C[e].flagURL}" alt=""><div class="nm">${esc(C[e].name)}</div><div class="pc e">${100 - wc}%</div></div></div>
+    <div class="bars"><div class="bl"><img src="${C[P].flagURL}" alt=""><div class="tr"><i data-w="${wc}" style="background:var(--green)"></i></div><span>${wc}%</span></div>
+    <div class="bl"><img src="${C[e].flagURL}" alt=""><div class="tr"><i data-w="${100 - wc}" style="background:var(--red)"></i></div><span>${100 - wc}%</span></div></div>
+    <div class="ft">Toque para fechar</div>`;
+    el.hidden = false; el.style.animation = 'none'; void el.offsetWidth; el.style.animation = '';
+    requestAnimationFrame(() => requestAnimationFrame(() => el.querySelectorAll('i[data-w]').forEach(i => { i.style.width = i.dataset.w + '%'; })));
+    clearTimeout(vsTimer); vsTimer = setTimeout(() => { el.hidden = true; }, 6500);
+  }, 0);
+}
 function declareWar(a, b, mode, parent = 0, helpFor = -1) {
   if (a === b || !C[a].alive || !C[b].alive || warMat[a * N + b] >= 0) return null;
   if (isAllied(a, b)) setAlly(a, b, 0);
   const w = { id: warSeq++, a, b, mode, start: day, parent, helpFor, casA: 0, casB: 0,
     a0: C[a].cells, b0: C[b].cells, fa: [], fb: [], fs: [], aid: 0, peaceCD: 0 };
   wars.push(w); setRel(a, b, -100); rebuildWarMat();
+  if ((a === P || b === P) && (!parent || $('vs').hidden)) showVs(w);
   const tagM = mode === 'morte' ? ' ☠ ATÉ A MORTE' : '';
   if (a === P) toast(parent ? `⚔ Você entrou na guerra contra ${C[b].name}${tagM}` : `⚔ Você declarou guerra a ${C[b].name}${tagM}`, 'bad');
   else if (b === P) toast(parent ? `⚔ ${C[a].name} entrou na guerra contra você!` : `⚔ ${C[a].name} declarou guerra a você!${tagM}`, 'bad');
@@ -406,7 +455,7 @@ function scanBorders() {
 }
 function capture(cell, to, from) {
   owner[cell] = to; C[to].cells++; C[from].cells--; flash[cell] = day; dirty = true;
-  if (particles.length < 160 && R() < .5) particles.push({ x: cell % GW, y: (cell / GW) | 0, t: performance.now() });
+  if (anims.length < 500) anims.push({ c: cell, from, to, t: performance.now() });
   if (C[from].cap === cell) {
     C[from].troops *= .88;
     relocateCapital(from, cell);
@@ -455,12 +504,14 @@ function tick() {
     if (L === 0) {
       if (w.helpFor >= 0 && C[w.helpFor].alive) { const t = C[w.a].troops * .003; C[w.a].troops -= t; C[w.helpFor].troops += t * .9; w.aid += t * .9; }
       if (R() < .04) amphibious(w);
-      w.marks = null;
+      w.marks = null; w.sold = null;
       continue;
     }
     if (!w.marks || day % 6 === 0) {
-      const k = Math.min(6, Math.ceil(L / 30)); w.marks = [];
+      const k = Math.min(4, Math.ceil(L / 40)); w.marks = [];
       for (let i = 0; i < k; i++) { const j = Math.floor((i + .5) * L / k); w.marks.push({ a: w.fa[j], b: w.fb[j] }); }
+      const ns = Math.min(12, Math.ceil(L / 8)); w.sold = [];
+      for (let i = 0; i < ns; i++) { const j = Math.floor((i + .25 + R() * .5) * L / ns); w.sold.push({ a: w.fa[j], b: w.fb[j], ph: R() * 6.28 }); }
     }
     const n = Math.min(2 + Math.floor(L * .045), 14);
     const pf = focus && (w.a === P || w.b === P) && focus.enemy === enemyIn(w, P);
@@ -620,7 +671,7 @@ function renderOff() {
       let r = k[0] * s, g = k[1] * s, b = k[2] * s;
       if (o === sel) { r += 32; g += 32; b += 32; }
       const f = day - flash[c];
-      if (flash[c] > 0 && f < 6) { const t = (1 - f / 6) * .55; r += (255 - r) * t; g += (235 - g) * t; b += (200 - b) * t; }
+      if (flash[c] > 0 && f < 10) { const t = (1 - f / 10) * .22; r += (255 - r) * t; g += (255 - g) * t; b += (255 - b) * t; }
       col = pack(r, g, b);
     }
     const base = y * S * W + x * S;
@@ -667,37 +718,68 @@ function draw() {
   ctx.imageSmoothingEnabled = false;
   ctx.drawImage(off, cam.x, cam.y, GW * cam.z, GH * cam.z);
   const z = cam.z, sx = x => cam.x + (x + .5) * z, sy = y => cam.y + (y + .5) * z;
-  // explosões
   const now = performance.now();
-  particles = particles.filter(p => now - p.t < 650);
-  for (const p of particles) {
-    const a = (now - p.t) / 650;
-    ctx.fillStyle = `rgba(255,${150 - a * 100 | 0},40,${(1 - a) * .85})`;
-    ctx.beginPath(); ctx.arc(sx(p.x), sy(p.y), z * (.4 + a * 1.4), 0, 7); ctx.fill();
+  // conquista: a cor antiga encolhe e revela o novo dono, com um contorno que se expande
+  const AD = 560;
+  anims = anims.filter(a => now - a.t < AD);
+  for (const a of anims) {
+    const k = (now - a.t) / AD, e = 1 - Math.pow(1 - k, 3);
+    const x = cam.x + (a.c % GW) * z, y = cam.y + ((a.c / GW) | 0) * z, s = shade[a.c];
+    const f = C[a.from].col, t = C[a.to].col, ins = z * e / 2;
+    ctx.fillStyle = `rgb(${f[0] * s | 0},${f[1] * s | 0},${f[2] * s | 0})`;
+    ctx.fillRect(x + ins, y + ins, z - ins * 2, z - ins * 2);
+    const r = z * (.5 + e * .8);
+    ctx.strokeStyle = `rgba(${Math.min(255, t[0] + 110) | 0},${Math.min(255, t[1] + 110) | 0},${Math.min(255, t[2] + 110) | 0},${(1 - k) * .9})`;
+    ctx.lineWidth = Math.max(1, z * .16);
+    ctx.strokeRect(x + z / 2 - r, y + z / 2 - r, r * 2, r * 2);
   }
-  // bandeiras lutando nas frentes
-  const fw = clamp(z * 2.4, 11, 24), fh = fw * .66;
-  const mark = (c, x, y, tilt) => {
-    ctx.save(); ctx.translate(x, y); ctx.rotate(tilt);
-    ctx.fillStyle = '#000'; ctx.fillRect(-fw / 2 - 1, -fh / 2 - 1, fw + 2, fh + 2);
-    drawFlag(ctx, c.flag, -fw / 2, -fh / 2, fw, fh);
+  // soldados andando ao longo das frentes
+  const u = clamp(z * .5, 2, 5.5);
+  const soldier = (c, x, y, dir, step) => {
+    const k = c.col, dark = `rgb(${k[0] * .55 | 0},${k[1] * .55 | 0},${k[2] * .55 | 0})`;
+    const legs = Math.sin(step) * u * .75;
+    ctx.save(); ctx.translate(x, y); ctx.scale(dir, 1); ctx.lineCap = 'round';
+    for (const pass of [0, 1]) {
+      ctx.strokeStyle = pass ? dark : '#000'; ctx.lineWidth = pass ? u * .55 : u * .55 + 1.6;
+      ctx.beginPath();
+      ctx.moveTo(0, -u * .2); ctx.lineTo(legs, u * 1.3);
+      ctx.moveTo(0, -u * .2); ctx.lineTo(-legs, u * 1.3);
+      ctx.moveTo(0, -u * .2); ctx.lineTo(0, -u * 1.5);
+      ctx.moveTo(-u * .3, -u * 1.15); ctx.lineTo(u * 1.4, -u * .95);
+      ctx.stroke();
+    }
+    ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(0, -u * 2, u * .62 + .8, 0, 7); ctx.fill();
+    ctx.fillStyle = `rgb(${k[0] | 0},${k[1] | 0},${k[2] | 0})`; ctx.beginPath(); ctx.arc(0, -u * 2, u * .58, Math.PI, 0); ctx.fill();
+    ctx.fillStyle = '#e8c39e'; ctx.beginPath(); ctx.arc(0, -u * 1.9, u * .38, 0, Math.PI); ctx.fill();
     ctx.restore();
   };
   for (const w of wars) {
-    if (!w.marks) continue;
-    w.marks.forEach((m, i) => {
+    if (!w.sold) continue;
+    for (const m of w.sold) {
       const ax = sx(m.a % GW), ay = sy((m.a / GW) | 0), bx = sx(m.b % GW), by = sy((m.b / GW) | 0);
       let dx = bx - ax, dy = by - ay; const d = Math.hypot(dx, dy) || 1; dx /= d; dy /= d;
-      const mx = (ax + bx) / 2, my = (ay + by) / 2;
-      const hit = Math.max(0, Math.sin(now / 140 + i * 1.7 + w.id * 2.3));
-      const gap = fw * .62 - hit * fw * .2;
-      mark(C[w.a], mx - dx * gap, my - dy * gap, -hit * .18);
-      mark(C[w.b], mx + dx * gap, my + dy * gap, hit * .18);
-      if (hit > .9) {
-        ctx.fillStyle = `rgba(255,220,90,${(hit - .9) * 9})`;
-        ctx.beginPath(); ctx.arc(mx, my, fw * .3, 0, 7); ctx.fill();
-      }
-    });
+      const tx = -dy, ty = dx, walk = now / 1100 + m.ph, off = Math.sin(walk) * z * 1.6, v = Math.cos(walk);
+      const dirA = Math.abs(tx) > .5 ? (v * tx >= 0 ? 1 : -1) : (dx >= 0 ? 1 : -1);
+      const dirB = Math.abs(tx) > .5 ? (-v * tx >= 0 ? 1 : -1) : (dx >= 0 ? -1 : 1);
+      soldier(C[w.a], ax - dx * z * .3 + tx * off, ay - dy * z * .3 + ty * off, dirA, now / 110 + m.ph);
+      soldier(C[w.b], bx + dx * z * .3 - tx * off, by + dy * z * .3 - ty * off, dirB, now / 110 + m.ph + 1);
+    }
+  }
+  // bandeiras fincadas nas frentes
+  const fw = clamp(z * 2.2, 11, 22), fh = fw * .66;
+  const mark = (c, x, y) => {
+    ctx.fillStyle = '#000'; ctx.fillRect(x - fw / 2 - 1, y - fh / 2 - 1, fw + 2, fh + 2);
+    drawFlag(ctx, c.flag, x - fw / 2, y - fh / 2, fw, fh);
+  };
+  for (const w of wars) {
+    if (!w.marks) continue;
+    for (const m of w.marks) {
+      const ax = sx(m.a % GW), ay = sy((m.a / GW) | 0), bx = sx(m.b % GW), by = sy((m.b / GW) | 0);
+      let dx = bx - ax, dy = by - ay; const d = Math.hypot(dx, dy) || 1; dx /= d; dy /= d;
+      const mx = (ax + bx) / 2, my = (ay + by) / 2, gap = fw * .65;
+      mark(C[w.a], mx - dx * gap, my - dy * gap);
+      mark(C[w.b], mx + dx * gap, my + dy * gap);
+    }
   }
   // capitais
   for (const c of C) {
@@ -829,7 +911,8 @@ function casHTML() {
     const e = enemyIn(w, P), mine = w.a === P ? w.casA : w.casB, theirs = w.a === P ? w.casB : w.casA;
     h += `<div class="cwar"><div class="cmode">${w.mode === 'morte' ? '☠ ATÉ A MORTE' : '⚔ ATAQUE'}</div>
       <div class="crow"><img src="${C[P].flagURL}" alt=""><span style="color:#ff5d6c">${fmt(mine)}</span></div>
-      <div class="crow"><img src="${C[e].flagURL}" alt=""><span style="color:#5aa9ff">${fmt(theirs)}</span></div></div>`;
+      <div class="crow"><img src="${C[e].flagURL}" alt=""><span style="color:#5aa9ff">${fmt(theirs)}</span></div>
+      <div class="cch"><span>Vitória</span><div class="tr2"><i style="width:${winChance(w)}%"></i></div><b>${winChance(w)}%</b></div></div>`;
   }
   if (ws.length > 3) h += `<div class="cmode">+${ws.length - 3} guerras</div>`;
   return h;
@@ -875,6 +958,7 @@ document.querySelectorAll('[data-spd]').forEach(b => b.addEventListener('click',
   speed = +b.dataset.spd;
   document.querySelectorAll('[data-spd]').forEach(x => x.classList.toggle('on', x === b));
 }));
+$('vs').addEventListener('click', () => { $('vs').hidden = true; });
 $('newgame').addEventListener('click', () => showModal('Novo jogo?', 'O progresso atual será perdido.', [['Novo mapa', () => genWorld(nCount)], ['Cancelar', () => {}]]));
 
 // ---------- entrada: arrastar, zoom, toque ----------
