@@ -455,7 +455,12 @@ function tick() {
     if (L === 0) {
       if (w.helpFor >= 0 && C[w.helpFor].alive) { const t = C[w.a].troops * .003; C[w.a].troops -= t; C[w.helpFor].troops += t * .9; w.aid += t * .9; }
       if (R() < .04) amphibious(w);
+      w.marks = null;
       continue;
+    }
+    if (!w.marks || day % 6 === 0) {
+      const k = Math.min(6, Math.ceil(L / 30)); w.marks = [];
+      for (let i = 0; i < k; i++) { const j = Math.floor((i + .5) * L / k); w.marks.push({ a: w.fa[j], b: w.fb[j] }); }
     }
     const n = Math.min(2 + Math.floor(L * .045), 14);
     const pf = focus && (w.a === P || w.b === P) && focus.enemy === enemyIn(w, P);
@@ -669,6 +674,30 @@ function draw() {
     const a = (now - p.t) / 650;
     ctx.fillStyle = `rgba(255,${150 - a * 100 | 0},40,${(1 - a) * .85})`;
     ctx.beginPath(); ctx.arc(sx(p.x), sy(p.y), z * (.4 + a * 1.4), 0, 7); ctx.fill();
+  }
+  // bandeiras lutando nas frentes
+  const fw = clamp(z * 2.4, 11, 24), fh = fw * .66;
+  const mark = (c, x, y, tilt) => {
+    ctx.save(); ctx.translate(x, y); ctx.rotate(tilt);
+    ctx.fillStyle = '#000'; ctx.fillRect(-fw / 2 - 1, -fh / 2 - 1, fw + 2, fh + 2);
+    drawFlag(ctx, c.flag, -fw / 2, -fh / 2, fw, fh);
+    ctx.restore();
+  };
+  for (const w of wars) {
+    if (!w.marks) continue;
+    w.marks.forEach((m, i) => {
+      const ax = sx(m.a % GW), ay = sy((m.a / GW) | 0), bx = sx(m.b % GW), by = sy((m.b / GW) | 0);
+      let dx = bx - ax, dy = by - ay; const d = Math.hypot(dx, dy) || 1; dx /= d; dy /= d;
+      const mx = (ax + bx) / 2, my = (ay + by) / 2;
+      const hit = Math.max(0, Math.sin(now / 140 + i * 1.7 + w.id * 2.3));
+      const gap = fw * .62 - hit * fw * .2;
+      mark(C[w.a], mx - dx * gap, my - dy * gap, -hit * .18);
+      mark(C[w.b], mx + dx * gap, my + dy * gap, hit * .18);
+      if (hit > .9) {
+        ctx.fillStyle = `rgba(255,220,90,${(hit - .9) * 9})`;
+        ctx.beginPath(); ctx.arc(mx, my, fw * .3, 0, 7); ctx.fill();
+      }
+    });
   }
   // capitais
   for (const c of C) {
