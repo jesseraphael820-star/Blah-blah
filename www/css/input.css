@@ -1,0 +1,63 @@
+.vcursor { position: fixed; left: 0; top: 0; width: 24px; height: 24px; margin: -2px 0 0 -3px; pointer-events: none; z-index: 2147483000; filter: drop-shadow(0 2px 3px rgba(0,0,0,.5)); will-change: transform; }
+.vcursor.real { opacity: 0; }
+.vcursor.grabbed { opacity: 0; }
+
+.vcontrols { position: fixed; left: 0; right: 0; bottom: 0; height: 0; z-index: 2147482000; pointer-events: none; --joy: 120px; transition: opacity .2s; }
+.vcontrols > * { pointer-events: auto; }
+.joy { position: absolute; left: max(18px, env(safe-area-inset-left)); bottom: calc(var(--tb, 0px) + 14px); width: var(--joy); height: var(--joy); border-radius: 50%; touch-action: none; }
+.joy-ring { position: absolute; inset: 0; border-radius: 50%; background: radial-gradient(circle, rgba(20,24,36,.35) 40%, rgba(20,24,36,.55)); border: 2px solid rgba(255,255,255,.22); backdrop-filter: blur(6px); box-shadow: 0 6px 20px rgba(0,0,0,.35), inset 0 0 20px rgba(76,141,255,.12); }
+.joy-knob { position: absolute; left: 50%; top: 50%; width: 44%; height: 44%; margin: -22% 0 0 -22%; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff, #c9d6f2 45%, #8ea2c9); box-shadow: 0 4px 12px rgba(0,0,0,.45); transition: transform .12s var(--ease); }
+.joy.on .joy-knob { transition: none; }
+.joy.on .joy-ring { border-color: var(--accent); }
+.vpad { position: absolute; right: max(16px, env(safe-area-inset-right)); bottom: calc(var(--tb, 0px) + 12px); display: grid; grid-template-columns: repeat(3, 54px); grid-template-rows: 54px 54px; gap: 10px; touch-action: none; }
+.vbtn { width: 54px; height: 54px; border-radius: 50%; background: rgba(20,24,36,.5); border: 2px solid rgba(255,255,255,.25); color: #fff; font-weight: 800; font-size: 16px; backdrop-filter: blur(6px); box-shadow: 0 4px 14px rgba(0,0,0,.35); display: grid; place-items: center; touch-action: none; transition: transform .08s, background .15s; }
+.vbtn.on { transform: scale(.92); background: var(--accent); border-color: transparent; }
+.vb-l { grid-column: 2; grid-row: 2; width: 62px; height: 62px; margin: -4px; background: rgba(76,141,255,.35); }
+.vb-r { grid-column: 3; grid-row: 2; }
+.vb-dbl { grid-column: 2; grid-row: 1; font-size: 14px; }
+.vb-lock { grid-column: 1; grid-row: 2; }
+.vb-lock.locked { background: var(--warn); color: #241400; border-color: transparent; }
+.vwheel { grid-column: 3; grid-row: 1; width: 54px; height: 54px; border-radius: 14px; background: rgba(20,24,36,.5); border: 2px solid rgba(255,255,255,.25); color: #fff; display: grid; place-items: center; backdrop-filter: blur(6px); touch-action: none; }
+.vwheel.on { background: var(--accent-soft); border-color: var(--accent); }
+.vb-a, .vb-b { display: none; }
+.vpad.keys-mode .vb-a { display: grid; grid-column: 1; grid-row: 1; background: rgba(47,208,138,.4); }
+.vpad.keys-mode .vb-b { display: grid; grid-column: 1; grid-row: 2; background: rgba(255,90,106,.4); }
+.vpad.keys-mode .vb-lock { display: none; }
+.vcontrols.left-handed .joy { left: auto; right: max(18px, env(safe-area-inset-right)); }
+.vcontrols.left-handed .vpad { right: auto; left: max(16px, env(safe-area-inset-left)); }
+
+.vtoolbar { position: fixed; top: 32%; left: max(4px, env(safe-area-inset-left)); transform: translateY(-50%); flex-direction: column; z-index: 2147482500; display: flex; gap: 4px; padding: 4px; border-radius: 12px; background: rgba(16,19,30,.55); border: 1px solid rgba(255,255,255,.12); backdrop-filter: blur(10px); opacity: .55; transition: opacity .2s; }
+.vtoolbar:hover, .vtoolbar:active { opacity: 1; }
+.vt-btn { width: 34px; height: 30px; border-radius: 8px; display: grid; place-items: center; color: #fff; }
+.vt-btn:hover { background: rgba(255,255,255,.12); }
+.vt-btn.on { background: var(--accent); }
+.vrelease { position: fixed; top: max(8px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); z-index: 2147482600; display: flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 99px; background: var(--warn); color: #231300; font-weight: 700; font-size: 12px; box-shadow: 0 6px 16px rgba(0,0,0,.4); }
+
+/* portrait: controls docked below the PC screen */
+.pc-view.docked .vcontrols { height: var(--dock); background: linear-gradient(180deg, #0b0f1a, #070a12); border-top: 1px solid var(--border); }
+.pc-view.docked .joy { bottom: calc(50% - var(--joy) / 2); }
+.pc-view.docked .vcontrols { --tb: 0px; }
+.pc-view.docked .vpad { bottom: calc(50% - 64px); }
+.pc-view.docked.kbd-open .vcontrols > * { visibility: hidden; }
+
+.vkbd { position: fixed; left: 0; right: 0; bottom: 0; z-index: 2147482800; padding: 6px max(6px, env(safe-area-inset-right)) max(6px, env(safe-area-inset-bottom)) max(6px, env(safe-area-inset-left)); background: rgba(14,17,27,.94); border-top: 1px solid var(--border-strong); backdrop-filter: blur(16px); display: flex; flex-direction: column; gap: 4px; animation: rise .2s var(--ease); touch-action: none; max-height: 330px; }
+.pc-view:not(.docked) .vkbd { max-width: 1000px; margin: 0 auto; border-radius: 14px 14px 0 0; border: 1px solid var(--border-strong); }
+.vk-strip { display: flex; gap: 4px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
+.vk-strip::-webkit-scrollbar { display: none; }
+.vk-sc { flex: none; height: 28px; padding: 0 10px; border-radius: 7px; background: rgba(76,141,255,.16); color: #b9d2ff; font-size: 12px; font-weight: 600; }
+.vk-close { margin-left: auto; background: rgba(255,255,255,.08); color: #fff; }
+.vk-row { display: flex; gap: 4px; }
+.vk { flex: 1; min-width: 0; height: clamp(30px, 6.2vh, 42px); border-radius: 7px; background: #262c3d; color: #eef1f8; font-size: 14px; box-shadow: 0 2px 0 rgba(0,0,0,.45); touch-action: none; overflow: hidden; white-space: nowrap; }
+.vk.mod { background: #1c2130; color: var(--text-2); font-size: 12px; }
+.vk.on { background: var(--accent); color: #fff; }
+.vk.down { background: #3b4562; transform: translateY(1px); box-shadow: none; }
+.vhover { filter: brightness(1.25); }
+
+.pc-view.ctl-on:not(.docked) .toasts { bottom: auto; top: 52px; }
+.vcontrols.left-handed ~ .vtoolbar { left: auto; right: max(4px, env(safe-area-inset-right)); }
+.pc-view.docked .vtoolbar { top: auto; bottom: calc(var(--dock) - 46px); left: 50%; transform: translateX(-50%); flex-direction: row; }
+.vtoolbar:not(.open) > :not(.vt-handle) { display: none; }
+.vtoolbar:not(.open) { padding: 2px; opacity: .45; }
+.vtoolbar.open { opacity: 1; }
+.vtoolbar.open .vt-handle { color: var(--accent); }
+.vt-handle { height: 34px; }

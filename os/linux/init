@@ -1,0 +1,35 @@
+#!/bin/busybox sh
+/bin/busybox --install -s
+export PATH=/bin:/sbin:/usr/bin:/usr/sbin HOME=/root TERM=linux
+mount -t proc proc /proc
+mount -t sysfs sys /sys
+mount -t devtmpfs dev /dev 2>/dev/null
+mount -t tmpfs tmp /tmp
+hostname vpc-linux
+ip link set lo up 2>/dev/null
+if [ -e /sys/class/net/eth0 ]; then (udhcpc -i eth0 -q -n -t 3 >/dev/null 2>&1 && echo "[rede] eth0 configurada: $(ip -4 addr show eth0 | awk '/inet/{print $2}')" > /tmp/net.log) & fi
+if grep -q 9p /proc/filesystems && mount -t 9p -o trans=virtio,version=9p2000.L host9p /mnt/host 2>/dev/null; then
+  HOSTFS="/mnt/host (pasta compartilhada com o Virtual PC)"
+else
+  HOSTFS="indisponivel"
+fi
+clear
+cat <<BANNER
+  __     __ ____   ____   _     _
+  \ \   / /|  _ \ / ___| | |   (_)_ __  _   ___  __
+   \ \ / / | |_) | |     | |   | | '_ \| | | \ \/ /
+    \ V /  |  __/| |___  | |___| | | | | |_| |>  <
+     \_/   |_|    \____| |_____|_|_| |_|\__,_/_/\_\\
+
+ Linux $(uname -r) (i686) rodando de verdade no emulador x86 v86.
+ CPU:$(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2)
+ RAM: $(free -m | awk '/Mem/{print $2}') MB
+ Arquivos: $HOSTFS
+ Rede: $( [ -e /sys/class/net/eth0 ] && echo "eth0 (DHCP em andamento, veja: ip addr)" || echo "desligada" )
+ Comandos: ls, cat, vi, top, free, df, ps, wget, sh ... (BusyBox)
+
+BANNER
+cd /root
+while true; do
+  setsid cttyhack sh -l
+done

@@ -1,0 +1,22 @@
+{
+  "name": "virtual-pc",
+  "version": "1.0.0",
+  "description": "Virtual PC — computadores virtuais completos no celular (desktop, emulação x86 real, PC remoto).",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "node scripts/serve.mjs 8080",
+    "test": "node tests/v86-boot.test.mjs && node tests/v86-linux.test.mjs && node tests/e2e.test.mjs",
+    "test:e2e": "node tests/e2e.test.mjs",
+    "icons": "node scripts/make-icons.mjs",
+    "android:sync": "npx cap sync android",
+    "android:build": "npx cap sync android && cd android && ./gradlew assembleDebug",
+    "android:release": "npx cap sync android && cd android && ./gradlew assembleRelease"
+  },
+  "devDependencies": {
+    "@capacitor/android": "^7.0.0",
+    "@capacitor/cli": "^7.0.0",
+    "@capacitor/core": "^7.0.0"
+  },
+  "license": "UNLICENSED"
+}

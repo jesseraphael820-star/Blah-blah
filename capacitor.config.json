@@ -1,0 +1,7 @@
+{
+  "appId": "app.virtualpc.mobile",
+  "appName": "Virtual PC",
+  "webDir": "www",
+  "server": { "androidScheme": "https", "cleartext": true },
+  "android": { "allowMixedContent": true, "captureInput": true, "webContentsDebuggingEnabled": false, "backgroundColor": "#070a12" }
+}
