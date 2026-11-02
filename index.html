@@ -105,9 +105,19 @@ html,body{margin:0;height:100%;overflow:hidden;background:#08131c;color:var(--tx
 .rk img{width:20px;height:13px;vertical-align:-2px;border:1px solid #0008}
 .rk tr.me td{background:#3a3210;color:#ffe28a}
 .modal .box{max-height:90vh;overflow:auto;max-width:440px}
+#money{font:inherit;font-size:13px;font-weight:700;color:var(--gold);background:#1f1a08;border:1px solid #5a4a12;border-radius:8px;padding:4px 9px;cursor:pointer;white-space:nowrap;font-variant-numeric:tabular-nums}
+#money small{font-size:11px;font-weight:600;margin-left:4px}
+#money small.up{color:#5fd39a}#money small.dn{color:#ff7a7a}
+.shop{background:#141f2a;border:1px solid var(--line);border-radius:10px;padding:8px;display:flex;flex-direction:column;gap:6px}
+.shop-h{font-size:13px;font-weight:700}.shop-h .mut{font-weight:400;font-size:11px}
+#pact .shop button{display:flex;flex-direction:column;align-items:center;gap:1px;text-align:center;padding:7px 4px;font-weight:700;background:#1f3324;border-color:#335a3f}
+#pact .shop button small{font-size:11px;font-weight:600;color:var(--gold)}
+.econ{display:flex;justify-content:space-between;gap:8px;font-size:12px;color:var(--mut)}
+.econ b{color:var(--txt);font-variant-numeric:tabular-nums}
+@media (max-width:440px){#money{font-size:12px;padding:3px 6px}#money small{display:none}#day{font-size:11px;min-width:0}}
 @keyframes pop{from{transform:scale(.9);opacity:0}to{transform:none;opacity:1}}
 .modal{position:fixed;inset:0;background:#000a;display:none;align-items:center;justify-content:center;z-index:20}
-.modal .box{background:#111a24;border:1px solid var(--line);border-radius:14px;padding:22px;max-width:360px;width:90%;text-align:center}
+.modal .box{background:#111a24;border:1px solid var(--line);border-radius:14px;padding:22px;max-width:460px;width:90%;text-align:center}
 .modal h2{margin:0 0 8px;font-family:Georgia,serif}
 .modal .b{display:flex;flex-direction:column;gap:8px;margin-top:14px}
 .modal button{text-align:center}
@@ -135,6 +145,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#08131c;color:var(--tx
 <div id="top">
   <h1>Guerra Global</h1>
   <span id="day"></span>
+  <button id="money" hidden title="Seu tesouro — toque para comprar soldados"></button>
   <span class="grow"></span>
   <button class="sp" data-spd="0">⏸</button>
   <button class="sp on" data-spd="1">1x</button>
@@ -171,6 +182,9 @@ const CFG = {
   FOCUS_RADIUS: 10,
   GRACE_DAYS: 90,            // dias iniciais sem IA atacar o jogador
   RECRUIT_CD: 150, PEACE_CD: 25, ALLY_CD: 30, AID_CD: 10,
+  TROOP_PRICE: 1,            // $ por soldado
+  UPKEEP: .006,              // $ por soldado por dia
+  GIFT: 2000,                // valor do presente em dinheiro
   NUKE_CD_MS: 30000,         // recarga da bomba nuclear do jogador (tempo real)
   AI_NUKE_CD_MS: 90000,      // recarga das potências nucleares da IA
   NUKE_R: 5, NUKE_FLY_MS: 1500, NUKE_FX_MS: 2600, RAD_DAYS: 80,
@@ -373,6 +387,10 @@ function genWorld(n) {
 const POWER = { US: 2.6, CN: 2.3, RU: 1.5, IN: 2, GB: 2.2, FR: 2.2, DE: 2, JP: 2, KR: 2.3, KP: 2, IL: 2.6, TR: 1.9, IR: 1.6, PK: 1.9, EG: 1.4,
   UA: 1.6, PL: 1.7, IT: 1.8, BR: 1.3, SA: 1.1, ES: 1.6, TW: 2.2, VN: 1.7, ID: 1.2, NG: 1.1, MX: 1.1, AU: .7, CA: .45, GL: .12, MN: .4,
   KZ: .6, DZ: .8, LY: .5, NE: .5, ML: .5, TD: .5, MR: .4, SD: .7, AR: .8, CD: .7, AQ: .1 };
+const ECON = { US: 3.2, CN: 2.6, JP: 2.6, DE: 2.6, GB: 2.4, FR: 2.4, IT: 2, KR: 2.4, CA: 1.1, AU: 1, ES: 1.9, NL: 2.6, CH: 2.6, SE: 1.6,
+  NO: 1.6, BE: 2.4, AT: 2.2, IE: 2.4, DK: 2.2, FI: 1.4, PL: 1.6, IL: 2.4, SA: 1.4, AE: 2.4, QA: 2.6, KW: 2.2, SG: 2.6, TW: 2.4, IN: 1.3,
+  BR: 1.1, MX: 1.2, RU: .7, TR: 1.4, ID: 1.1, TH: 1.2, MY: 1.3, VN: 1.2, PH: 1.1, EG: 1, IR: .9, AR: .8, ZA: 1, NG: .8, PK: .9, BD: 1,
+  UA: .9, CL: 1, CO: 1, PE: .9, GL: .1, MN: .3, KZ: .6, DZ: .6, LY: .5, CD: .4, KP: .4, AF: .4, SO: .3, TD: .3, NE: .3, ML: .3, SD: .4 };
 const NUKES = new Set(['US', 'RU', 'CN', 'GB', 'FR', 'IN', 'PK', 'IL', 'KP']);
 let splitOrig = -1, stateGrid = null;
 const FIMG = [];
@@ -397,7 +415,7 @@ function genReal(split = -1) {
   WORLD.countries.forEach((w, i) => {
     if (i === split) return;
     remap[i] = list.length;
-    list.push({ name: w.n, flag: countryFlag(i), cap: -1, mult: (POWER[w.a] || 1) * clamp((60 / Math.max(cnt[i], 1)) ** .35, 1, 2.6), nuclear: NUKES.has(w.a), orig: i });
+    list.push({ name: w.n, flag: countryFlag(i), cap: -1, mult: (POWER[w.a] || 1) * clamp((60 / Math.max(cnt[i], 1)) ** .35, 1, 2.6), nuclear: NUKES.has(w.a), orig: i, econ: ECON[w.a] || 1 });
   });
   if (split >= 0) {
     const sc = new Map(), pw = WORLD.countries[split];
@@ -405,7 +423,7 @@ function genReal(split = -1) {
     for (const [st, n] of [...sc].sort((a, b) => a[0] - b[0])) {
       stMap.set(st, list.length);
       list.push({ name: WORLD.states.list[st - 1].n, flag: { ...countryFlag(split), band: true }, cap: -1,
-        mult: (POWER[pw.a] || 1) * clamp((60 / n) ** .35, 1, 2.6), nuclear: false, orig: split, state: true, parent: pw.n });
+        mult: (POWER[pw.a] || 1) * clamp((60 / n) ** .35, 1, 2.6), nuclear: false, orig: split, state: true, parent: pw.n, econ: ECON[pw.a] || 1 });
     }
   }
   const first = stMap.size ? stMap.values().next().value : -1;
@@ -437,6 +455,7 @@ function makeCountries(list) {
     troops: cnt[i] * CFG.TROOPS_PER_CELL * d.mult * (.8 + R() * .5),
     casualties: 0, cap: d.cap, aggr: .25 + R() * .6, lx: 0, ly: 0,
     recruitCD: 0, allyCD: 0, aidCD: 0,
+    econ: d.econ || 1, money: cnt[i] * 60 * (d.econ || 1) + 3000, net: 0,
   }));
   computeLabels();
   for (const c of C) {
@@ -686,6 +705,18 @@ function tick() {
     if (u.prog >= u.path.length - 1) { units.splice(units.indexOf(u), 1); landUnit(u, w); }
   }
   for (const c of C) if (c.alive && c.cells <= 0) kill(c.id);
+  const atWar = new Uint8Array(N); for (const w of wars) { atWar[w.a] = 1; atWar[w.b] = 1; }
+  for (const c of C) {
+    if (!c.alive) continue;
+    c.inc = income(c); c.up = c.troops * CFG.UPKEEP; c.net = c.inc - c.up;
+    c.money += c.net;
+    if (c.money < 0) { c.money = 0; c.troops *= .996; if (c.id === P && day % 20 === 0) toast('💸 Sem dinheiro! Soldados estão desertando. Reduza o exército ou conquiste mais terras.', 'bad'); }
+    // IA compra tropas a cada 5 dias
+    if (c.id !== P && day % 5 === c.id % 5) {
+      const target = maxT(c) * (atWar[c.id] ? 1.6 : .9);
+      if (c.troops < target && c.money > 500) { const spend = Math.min(c.money * (atWar[c.id] ? .7 : .35), (target - c.troops) * CFG.TROOP_PRICE); c.money -= spend; c.troops += spend / CFG.TROOP_PRICE; }
+    }
+  }
   for (const c of C) if (c.alive && c.id !== P && R() < .015) aiThink(c);
   if (day % 10 === 0) for (let a = 0; a < N; a++) for (let b = a + 1; b < N; b++) {
     if (warMat[a * N + b] >= 0) continue;
@@ -788,7 +819,24 @@ function computeLabels() {
 }
 
 // ---------- ações do jogador ----------
-function actPeace(e) {
+function income(c) { return (c.cells * 2.2 + 40) * c.econ * (warsOf(c.id).length ? .9 : 1); }
+const fmtM = n => { const a = Math.abs(n), sg = n < 0 ? '−' : ''; return sg + '$' + (a >= 1e6 ? (a / 1e6).toFixed(1).replace('.', ',') + ' mi' : a >= 1e4 ? Math.round(a / 1e3) + ' mil' : a >= 1e3 ? (a / 1e3).toFixed(1).replace('.', ',') + ' mil' : Math.round(a)); };
+const buyCap = c => maxT(c) * 2;
+function actBuy(n) {
+  const c = C[P], room = Math.max(0, buyCap(c) - c.troops);
+  const amount = Math.floor(Math.min(n === 'max' ? c.money / CFG.TROOP_PRICE : n, room));
+  if (amount <= 0) { toast(room <= 0 ? '🪖 Limite de tropas atingido (2× a capacidade).' : '💸 Dinheiro insuficiente.', 'bad'); return; }
+  if (amount * CFG.TROOP_PRICE > c.money + .5) { toast('💸 Dinheiro insuficiente.', 'bad'); return; }
+  c.money -= amount * CFG.TROOP_PRICE; c.troops += amount;
+  toast(`🪖 +${fmt(amount)} soldados comprados por ${fmtM(amount * CFG.TROOP_PRICE)}.`, 'good');
+}
+function actGift(o) {
+  if (C[P].money < CFG.GIFT || day < C[o].aidCD) return;
+  C[P].money -= CFG.GIFT; C[o].money += CFG.GIFT; relAdd(P, o, 12); C[o].aidCD = day + CFG.AID_CD;
+  toast(`💸 ${fmtM(CFG.GIFT)} enviados a ${C[o].name} (relação +12).`, 'good');
+}
+const peacePrice = e => Math.round(Math.max(3000, C[e].troops * .12) / 100) * 100;
+function actPeace(e, pay = false) {
   const w = warOf(P, e); if (!w || w.mode !== 'ataque') return;
   if (day < w.peaceCD) return;
   const E = C[e], Pc = C[P];
@@ -796,6 +844,10 @@ function actPeace(e) {
   const r = (E.troops + 1) / (Pc.troops + 1);
   let p = .15 + lostE * 1.5 - lostP + (day - w.start) / 500 + (r < 1 ? .25 * (1 - r) : -.12 * Math.min(r - 1, 2)) - (E.aggr - .5) * .2;
   if (w.parent && w.a === P) p += .3;
+  if (pay) {
+    const cost = peacePrice(e); if (Pc.money < cost) { toast('💸 Dinheiro insuficiente para a indenização.', 'bad'); return; }
+    Pc.money -= cost; E.money += cost; p += .4; toast(`💸 Você pagou ${fmtM(cost)} de indenização a ${E.name}.`);
+  }
   if (R() < clamp(p, .03, .95)) endWar(w, 'peace');
   else { w.peaceCD = day + CFG.PEACE_CD; toast(`${E.name} recusou a proposta de paz.`, 'bad'); }
 }
@@ -1148,6 +1200,8 @@ function infoHTML() {
     <span class="mut">Território</span><b>${fmt(c.cells)} prov.</b>
     <span class="mut">Tropas</span><b>${fmt(c.troops)} / ${fmt(maxT(c))}</b>
     <span class="mut">Baixas</span><b>${fmt(c.casualties)}</b>
+    <span class="mut">Dinheiro</span><b>${fmtM(c.money)}</b>
+    <span class="mut">Saldo por dia</span><b style="color:${c.net >= 0 ? '#5fd39a' : '#ff7a7a'}">${c.net >= 0 ? '+' : ''}${fmtM(c.net)}</b>
     <span class="mut">Agressividade</span><b>${c.aggr > .65 ? 'Alta' : c.aggr > .4 ? 'Média' : 'Baixa'}</b>
   </div>`;
   if (phase === 'game' && P >= 0 && !me && c.alive) h += `<div class="small mut">Relação com você: <b style="color:var(--txt)">${Math.round(rel[P * N + sel])}</b>${relBar(rel[P * N + sel])}</div>`;
@@ -1173,7 +1227,13 @@ function actionsHTML() {
   if (sel < 0 || !C[sel].alive || P < 0 || !C[P].alive) return '';
   const cd = (t, label) => day < t ? `${label} (${t - day}d)` : label;
   if (sel === P) {
-    let h = `<button data-act="recruit"${day < C[P].recruitCD ? ' disabled' : ''}>🪖 ${cd(C[P].recruitCD, 'Mobilização geral (+25% tropas)')}</button>`;
+    const me = C[P], full = me.troops >= buyCap(me);
+    let h = `<div class="shop"><div class="shop-h">🪖 Comprar soldados <span class="mut">($${CFG.TROOP_PRICE} cada · manutenção $${Math.round(CFG.UPKEEP * 1000)}/mil/dia)</span></div>
+      <div class="row"><button data-act="buy" data-n="1000"${full || me.money < 1000 * CFG.TROOP_PRICE ? ' disabled' : ''}>+1 mil<small>${fmtM(1000 * CFG.TROOP_PRICE)}</small></button>
+      <button data-act="buy" data-n="10000"${full || me.money < 10000 * CFG.TROOP_PRICE ? ' disabled' : ''}>+10 mil<small>${fmtM(10000 * CFG.TROOP_PRICE)}</small></button>
+      <button data-act="buy" data-n="max"${full || me.money < 100 ? ' disabled' : ''}>Máximo<small>${full ? 'limite' : 'todo o dinheiro'}</small></button></div></div>`;
+    h += `<div class="econ"><span>Renda <b>+${fmtM(me.inc || income(me))}</b></span><span>Manutenção <b>−${fmtM(me.up || me.troops * CFG.UPKEEP)}</b></span></div>`;
+    h += `<button data-act="recruit"${day < C[P].recruitCD ? ' disabled' : ''}>🪖 ${cd(C[P].recruitCD, 'Mobilização geral (+25% tropas)')}</button>`;
     const myWars = warsOf(P), al = alliesOf(P);
     for (const w of myWars) {
       const e = enemyIn(w, P);
@@ -1189,6 +1249,7 @@ function actionsHTML() {
     const ship = `<button data-act="ship"${day < (w.shipCD || 0) ? ' disabled' : ''}>🚢 ${cd(w.shipCD || 0, 'Enviar invasão (navio ou marcha)')}</button>`
       + (w.fa.length ? '' : `<div class="hint">Sem fronteira com ${esc(C[sel].name)}: mande navios, ou tropas por terra se não houver mar.</div>`);
     if (w.mode === 'ataque') return ship + `<button class="peace" data-act="peace"${day < w.peaceCD ? ' disabled' : ''}>🕊 ${cd(w.peaceCD, 'Propor paz')}</button>`
+      + `<button class="peace" data-act="peacepay"${day < w.peaceCD || C[P].money < peacePrice(sel) ? ' disabled' : ''}>🕊💸 ${cd(w.peaceCD, `Paz pagando ${fmtM(peacePrice(sel))} (mais chance)`)}</button>`
       + alliesOf(P).filter(a => warMat[a * N + sel] < 0 && !isAllied(a, sel)).map(a => `<button data-act="help" data-a="${a}" data-e="${sel}">📣 Pedir ajuda a ${esc(C[a].name)}</button>`).join('')
       + `<div class="hint">🎯 Toque no território de ${esc(C[sel].name)} para focar o ataque.</div>`;
     return ship + alliesOf(P).filter(a => warMat[a * N + sel] < 0 && !isAllied(a, sel)).map(a => `<button data-act="help" data-a="${a}" data-e="${sel}">📣 Pedir ajuda a ${esc(C[a].name)}</button>`).join('')
@@ -1200,7 +1261,8 @@ function actionsHTML() {
       const e = enemyIn(ww, P);
       if (warMat[sel * N + e] < 0 && !isAllied(sel, e)) h += `<button data-act="help" data-a="${sel}" data-e="${e}">📣 Pedir ajuda contra ${esc(C[e].name)}</button>`;
     }
-    h += `<button data-act="aid"${day < C[sel].aidCD ? ' disabled' : ''}>🎁 ${cd(C[sel].aidCD, 'Enviar ajuda (melhora relação)')}</button>`;
+    h += `<button data-act="aid"${day < C[sel].aidCD ? ' disabled' : ''}>🎁 ${cd(C[sel].aidCD, 'Enviar tropas de presente (melhora relação)')}</button>`;
+    h += `<button data-act="gift"${day < C[sel].aidCD || C[P].money < CFG.GIFT ? ' disabled' : ''}>💸 ${cd(C[sel].aidCD, `Enviar ${fmtM(CFG.GIFT)} (melhora relação)`)}</button>`;
     h += `<button class="danger" data-act="break">💔 Romper aliança</button>`;
     h += `<div class="hint">Para atacar um aliado, rompa a aliança primeiro.</div>`;
     return h;
@@ -1208,7 +1270,8 @@ function actionsHTML() {
   h += `<button class="danger" data-act="war">⚔ Declarar guerra (Ataque)</button>`;
   h += `<button class="dark" data-act="death">☠ Guerra até a morte</button>`;
   h += `<button data-act="ally"${day < C[sel].allyCD ? ' disabled' : ''}>🤝 ${cd(C[sel].allyCD, 'Propor aliança')}</button>`;
-  h += `<button data-act="aid"${day < C[sel].aidCD ? ' disabled' : ''}>🎁 ${cd(C[sel].aidCD, 'Enviar ajuda (melhora relação)')}</button>`;
+  h += `<button data-act="aid"${day < C[sel].aidCD ? ' disabled' : ''}>🎁 ${cd(C[sel].aidCD, 'Enviar tropas de presente (melhora relação)')}</button>`;
+  h += `<button data-act="gift"${day < C[sel].aidCD || C[P].money < CFG.GIFT ? ' disabled' : ''}>💸 ${cd(C[sel].aidCD, `Enviar ${fmtM(CFG.GIFT)} (melhora relação)`)}</button>`;
   return h;
 }
 const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
@@ -1243,6 +1306,9 @@ const last = { info: '', act: '', cas: '', log: '' };
 function setIf(id, key, html) { if (last[key] !== html) { last[key] = html; $(id).innerHTML = html; } }
 function updateUI() {
   $('day').textContent = phase === 'game' ? fmtDate(day) : 'Escolha um país';
+  const mb = $('money'), showM = phase === 'game' && P >= 0 && C[P].alive;
+  mb.hidden = !showM;
+  if (showM) { const c = C[P], h = `💰 ${fmtM(c.money)} <small class="${c.net >= 0 ? 'up' : 'dn'}">${c.net >= 0 ? '+' : ''}${fmtM(c.net)}/dia</small>`; if (mb.innerHTML !== h) mb.innerHTML = h; }
   setIf('pinfo', 'info', infoHTML());
   setIf('pact', 'act', actionsHTML());
   const cas = casHTML(); setIf('cas', 'cas', cas); $('cas').style.display = cas ? 'block' : 'none';
@@ -1266,6 +1332,9 @@ $('panel').addEventListener('click', e => {
   else if (act === 'ship') actShip(sel);
   else if (act === 'ally') actAlly(sel);
   else if (act === 'aid') actAid(sel);
+  else if (act === 'gift') actGift(sel);
+  else if (act === 'buy') actBuy(b.dataset.n === 'max' ? 'max' : +b.dataset.n);
+  else if (act === 'peacepay') actPeace(sel, true);
   else if (act === 'break') { setAlly(P, sel, 0); relAdd(P, sel, -30); }
   else if (act === 'help') actHelp(+b.dataset.a, +b.dataset.e);
   else if (act === 'recruit') actRecruit();
@@ -1291,15 +1360,16 @@ document.querySelectorAll('[data-spd]').forEach(b => b.addEventListener('click',
   document.querySelectorAll('[data-spd]').forEach(x => x.classList.toggle('on', x === b));
 }));
 $('vs').addEventListener('click', () => { $('vs').hidden = true; });
+$('money').addEventListener('click', () => { sel = P; $('panel').classList.remove('min'); dirty = true; updateUI(); });
 $('rank').addEventListener('click', () => {
   showModal('Ranking mundial', '', [['Fechar', () => {}]]);
   const alive = C.filter(c => c.alive).sort((a, b) => b.cells - a.cells);
   const rows = alive.slice(0, 12);
   if (P >= 0 && C[P].alive && !rows.includes(C[P])) rows.push(C[P]);
   const atWar = wars.filter(w => !w.parent).length;
-  $('mtext').innerHTML = `<div class="rk-sum"><span><b>${alive.length}</b> países vivos</span><span><b>${atWar}</b> guerras</span><span><b>${fmt(C.reduce((s, c) => s + c.casualties, 0))}</b> baixas no mundo</span></div>
-  <div class="rk-wrap"><table class="rk"><thead><tr><th>#</th><th>País</th><th>Prov.</th><th>Tropas</th><th>Baixas</th></tr></thead><tbody>
-  ${rows.map(c => `<tr class="${c.id === P ? 'me' : ''}"><td>${alive.indexOf(c) + 1}</td><td><img src="${c.flagURL}" alt=""> ${esc(c.name)}${c.nuclear ? ' ☢' : ''}</td><td>${fmt(c.cells)}</td><td>${fmt(c.troops)}</td><td>${fmt(c.casualties)}</td></tr>`).join('')}
+  $('mtext').innerHTML = `<div class="rk-sum"><span><b>${alive.length}</b> países vivos</span><span><b>${fmtM(alive.reduce((s, c) => s + (c.inc || 0), 0))}</b>/dia de PIB mundial</span><span><b>${atWar}</b> guerras</span><span><b>${fmt(C.reduce((s, c) => s + c.casualties, 0))}</b> baixas no mundo</span></div>
+  <div class="rk-wrap"><table class="rk"><thead><tr><th>#</th><th>País</th><th>Prov.</th><th>Tropas</th><th>Dinheiro</th><th>Baixas</th></tr></thead><tbody>
+  ${rows.map(c => `<tr class="${c.id === P ? 'me' : ''}"><td>${alive.indexOf(c) + 1}</td><td><img src="${c.flagURL}" alt=""> ${esc(c.name)}${c.nuclear ? ' ☢' : ''}</td><td>${fmt(c.cells)}</td><td>${fmt(c.troops)}</td><td>${fmtM(c.money)}</td><td>${fmt(c.casualties)}</td></tr>`).join('')}
   </tbody></table></div>`;
 });
 $('cfg').addEventListener('click', () => {
@@ -1414,7 +1484,7 @@ function detonate(n) {
   for (const [o, h] of hits) {
     const k = C[o]; if (!k.alive) continue;
     const frac = clamp((o === target ? .15 : 0) + h / Math.max(k.cells, 1) * 2.5, 0, o === target ? .7 : .5);
-    const loss = k.troops * frac; k.troops -= loss; k.casualties += loss;
+    const loss = k.troops * frac; k.troops -= loss; k.casualties += loss; if (o === target) k.money *= .85;
     const w = warOf(n.from, o); if (w) { if (w.a === o) w.casA += loss; else w.casB += loss; }
     if (o === target) total = loss;
     if ((k.cap % GW - tx) ** 2 + (((k.cap / GW) | 0) - ty) ** 2 <= r * r) { k.troops *= .8; relocateCapital(o, k.cap); if (o === P) toast('🏛 Sua capital foi destruída! Governo transferido.', 'bad'); }
