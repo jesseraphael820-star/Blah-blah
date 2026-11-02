@@ -466,6 +466,7 @@ export class Game {
         pos: head.clone().addScaledVector(dir, 1.35).addScaledVector(side, 0.55 * sgn).add(new THREE.Vector3(0, 0.08, 0)),
         look: head.clone().add(new THREE.Vector3(0, -0.04, 0)),
       };
+      this.cineSnap = true;
       this.hud.subtitle(spk.name, line.text);
       this.skipLine = false;
       await this.voice.say(line.text, spk.human, spk.voice);
@@ -578,6 +579,8 @@ export class Game {
   updateCamera(dt) {
     const P = this.player, cam = this.cam, inp = this.input;
     if (this.cine) {
+      if (this.cineSnap) { this.cineSnap = false; this.camera.position.copy(this.cine.pos); this.cineLook = this.cine.look.clone(); this.camera.fov = 42; }
+      this.cine.pos.y += dt * 0.01; // slow push for a living shot
       this.camera.position.lerp(this.cine.pos, 1 - Math.exp(-dt * 5));
       if (!this.cineLook) this.cineLook = this.cine.look.clone();
       this.cineLook.lerp(this.cine.look, 1 - Math.exp(-dt * 6));
