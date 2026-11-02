@@ -18,4 +18,5 @@ Jogo de estratégia de guerra no mapa-múndi atual (193 países com bandeiras re
 - **🔬 Tecnologia**: Armamento, Defesa, Indústria, Logística, Marinha e Força Aérea (até o nível 10). Exército e tecnologia pesam mais que o tamanho do país.
 - **👆 Clique**: toque no seu território para ganhar dinheiro; melhore o clique para ganhar mais por toque.
 - **🏆 Ranking**, data no calendário, indicador de avanço/recuo e gráfico de território em cada guerra.
+- **🎬 Estilo de vídeo**: mapa satélite (só países em guerra pintados), divisões com bandeirinhas, tropas escritas na linha de frente, data grande e título da guerra.
 - **⚙ Configurações**: animação de guerra com soldados e bandeiras, frente cinza ou listras que avançam e recuam; território ocupado listrado; bordas sombreadas.

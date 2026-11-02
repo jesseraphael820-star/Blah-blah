@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>Guerra Global</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Black&display=swap">
 <style>
 :root{--panel:rgba(12,18,26,.94);--line:#2a3644;--txt:#e9eff5;--mut:#8b9aab;--red:#e5484d;--blue:#4c9be0;--gold:#f2c443;--green:#46b37a}
 *{box-sizing:border-box}
@@ -133,6 +135,11 @@ html,body{margin:0;height:100%;overflow:hidden;background:#08131c;color:var(--tx
 .clk-v{font-size:28px;font-weight:800;color:var(--gold);text-align:center;font-variant-numeric:tabular-nums}
 .clk-v small{display:block;font-size:11px;color:var(--mut);font-weight:600}
 .stats b.tl{font-size:12px;letter-spacing:.5px}
+#day.big{font-family:"Archivo Black",system-ui,sans-serif;font-size:21px;color:#fff;text-shadow:0 2px 0 #000,0 0 6px #000;letter-spacing:.5px}
+#wartitle{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom,0px));z-index:5;pointer-events:none;text-align:center;font-family:"Archivo Black",system-ui,sans-serif;color:#fff;text-shadow:0 3px 0 #000,0 0 10px #000,2px 0 0 #000,-2px 0 0 #000;max-width:min(72vw,940px)}
+#wartitle .wt1{font-size:clamp(16px,2.6vw,34px);line-height:1.05;letter-spacing:.5px;overflow-wrap:anywhere}
+#wartitle .wt2{font-size:clamp(12px,1.9vw,26px);line-height:1.1;margin-top:2px}
+@media (max-width:760px){#wartitle{left:auto;right:8px;transform:none;text-align:right;bottom:calc(43vh + 12px);max-width:calc(100vw - 150px)}#wartitle .wt1{font-size:14px}#wartitle .wt2{font-size:11px}#day.big{font-size:14px}}
 @keyframes pop{from{transform:scale(.9);opacity:0}to{transform:none;opacity:1}}
 .modal{position:fixed;inset:0;background:#000a;display:none;align-items:center;justify-content:center;z-index:20}
 .modal .box{background:#111a24;border:1px solid var(--line);border-radius:14px;padding:22px;max-width:460px;width:90%;text-align:center}
@@ -180,6 +187,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#08131c;color:var(--tx
 <div id="vs" hidden></div>
 <div id="panel"><button id="ptog" aria-label="Minimizar painel"></button><div id="pinfo"></div><div id="pact"></div><div id="log"></div></div>
 <div id="reqs"></div>
+<div id="wartitle" hidden></div>
 <button id="nuke" hidden aria-label="Bomba nuclear"></button>
 <button id="air" class="" hidden aria-label="Bombardeio aéreo"></button>
 <datalist id="clist"></datalist>
@@ -253,7 +261,7 @@ let reqs = [], logs = [], anims = [];
 let dirty = true, ended = false, nCount = 20, worldMode = 'real';
 let nukes = [], nukeArmed = false, nukeReady = 0, units = [];
 // opções visuais (salvas só neste navegador)
-const opts = { fx: 'soldados', stripes: true, smooth: true, soldiers: true, flags: true };
+const opts = { fx: 'soldados', stripes: true, smooth: true, soldiers: true, flags: true, divs: true, frontNums: true, hud: true, map: 'cor' };
 // tecnologias: custo = base × 1,7^nível, até o nível 10
 const TECH = [
   { k: 'atk', i: '⚔', n: 'Armamento', d: '+7% de força em combate e mais chance de tomar províncias', base: 8000 },
@@ -333,7 +341,10 @@ function cleanComponents(type, minSize) {
 }
 
 // terreno comum: oceano, costa, travessias marítimas
+let latOfRow = y => 55 - y / GH * 110, terr = new Uint8Array(0);
 function finishTerrain(elev) {
+  terr = new Uint8Array(NC * 3);
+  const nzB = makeNoise();
   const nz3 = makeNoise();
   const dist = new Int16Array(NC).fill(99), q = [];
   for (let i = 0; i < NC; i++) if (land[i]) { dist[i] = 0; q.push(i); }
@@ -348,6 +359,18 @@ function finishTerrain(elev) {
     const i = y * GW + x, tex = (nz3(x / 4, y / 4, 2) - .5);
     if (land[i]) {
       shade[i] = .8 + .28 * elev(i) + tex * .12;
+      {
+        const n = nzB(x / 7, y / 7, 3), a = Math.abs(latOfRow(y)) + (n - .5) * 14;
+        let t;
+        if (a > 68) t = [218, 224, 230];
+        else if (a > 58) t = n > .5 ? [146, 146, 126] : [92, 104, 82];
+        else if (a > 46) t = [50, 76, 50];
+        else if (a > 34) t = n > .55 ? [128, 128, 84] : [78, 106, 60];
+        else if (a > 16) t = n > .48 ? [198, 172, 124] : [156, 142, 94];
+        else t = n > .6 ? [62, 98, 50] : [36, 80, 40];
+        const k = shade[i] * (.92 + n * .16);
+        terr[i * 3] = clamp(t[0] * k, 0, 255); terr[i * 3 + 1] = clamp(t[1] * k, 0, 255); terr[i * 3 + 2] = clamp(t[2] * k, 0, 255);
+      }
       coastal[i] = ((x > 0 && !land[i - 1]) || (x < GW - 1 && !land[i + 1]) || (y > 0 && !land[i - GW]) || (y < GH - 1 && !land[i + GW])) ? 1 : 0;
       if (coastal[i]) coastList.push(i);
     } else {
@@ -385,6 +408,7 @@ function genWorld(n) {
   for (let i = 0; i < NC; i++) land[i] = val[i] > thr ? 1 : 0;
   cleanComponents(1, 25); cleanComponents(0, 20);
   let mx = 1e-6; for (let i = 0; i < NC; i++) if (land[i]) mx = Math.max(mx, val[i] - thr);
+  latOfRow = y => 55 - y / GH * 110;
   finishTerrain(i => Math.pow(Math.max(0, val[i] - thr) / mx, .7));
 
   const landCells = []; for (let i = 0; i < NC; i++) if (land[i]) landCells.push(i);
@@ -447,6 +471,7 @@ function genReal(split = -1) {
   let k = 0;
   for (let r = 0; r < WORLD.runs.length; r += 2) for (let j = 0; j < WORLD.runs[r + 1]; j++) { owner[k] = WORLD.runs[r] - 1; land[k] = owner[k] >= 0 ? 1 : 0; k++; }
   if (!stateGrid && WORLD.states) { stateGrid = new Int16Array(NC); let q = 0; const sr = WORLD.states.runs; for (let r = 0; r < sr.length; r += 2) for (let j = 0; j < sr[r + 1]; j++) stateGrid[q++] = sr[r]; }
+  latOfRow = y => WORLD.lat0 - (y + .5) * WORLD.step;
   finishTerrain(() => .45);
   const cnt = new Array(WORLD.countries.length).fill(0); for (let i = 0; i < NC; i++) if (owner[i] >= 0) cnt[owner[i]]++;
   const list = [], remap = new Int32Array(WORLD.countries.length).fill(-1), stMap = new Map();
@@ -748,6 +773,7 @@ function tick() {
     if (u.prog >= u.path.length - 1) { units.splice(units.indexOf(u), 1); landUnit(u, w); }
   }
   for (const c of C) if (c.alive && c.cells <= 0) kill(c.id);
+  if (day % 6 === 0) updateDivs();
   const atWar = new Uint8Array(N); for (const w of wars) { atWar[w.a] = 1; atWar[w.b] = 1; }
   for (const c of C) {
     if (!c.alive) continue;
@@ -824,6 +850,21 @@ function aiThink(c) {
       if (o === P) { if (!hasReq('ally' + id)) addReq(`🤝 ${c.name} propõe uma aliança.`, 'ally' + id, () => { if (C[id].alive && warMat[id * N + P] < 0) setAlly(id, P, 1); }, () => relAdd(id, P, -8)); }
       else { setAlly(id, o, 1); addLog(`${c.name} e ${C[o].name} formaram aliança`); }
     }
+  }
+}
+// bandeirinhas de divisões: espalhadas no território e enfileiradas na frente
+function updateDivs() {
+  const need = new Uint8Array(N); for (const w of wars) { need[w.a] = 1; need[w.b] = 1; }
+  const lists = C.map(c => need[c.id] ? [] : null);
+  for (let i = 0; i < NC; i++) { const o = owner[i]; if (o >= 0 && need[o]) lists[o].push(i); }
+  for (const c of C) {
+    const L = lists[c.id]; if (!L || !L.length) { c.divs = null; continue; }
+    const k = Math.min(26, Math.ceil(L.length / 16)); c.divs = [];
+    for (let j = 0; j < k; j++) c.divs.push(L[Math.min(L.length - 1, Math.floor((j + R() * .9) * L.length / k))]);
+  }
+  for (const w of wars) {
+    const L = w.fa.length, k = Math.min(22, Math.ceil(L / 4)); w.fdA = []; w.fdB = [];
+    for (let j = 0; j < k; j++) { const i = Math.floor((j + .5) * L / k); if (!w.fs[i]) { w.fdA.push(w.fa[i]); w.fdB.push(w.fb[i]); } }
   }
 }
 function computeLabels() {
@@ -972,7 +1013,8 @@ let dpr = 1, VW = 0, VH = 0, fitted = false;
 const COL_EDGE = pack(12, 12, 16), COL_WAR = pack(225, 45, 45), COL_WAR_G = pack(58, 58, 64), COL_COAST = pack(18, 30, 40), COL_ME = pack(5, 5, 8);
 
 function renderOff() {
-  const W = GW * S;
+  const W = GW * S, inWar = new Uint8Array(N); for (const w of wars) { inWar[w.a] = 1; inWar[w.b] = 1; }
+  const sat = opts.map === 'sat';
   for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) {
     const c = y * GW + x, o = owner[c];
     let col;
@@ -981,6 +1023,11 @@ function renderOff() {
       const k = C[o].col; let s = shade[c];
       if (opts.smooth && ((x > 0 && owner[c - 1] !== o) || (x < GW - 1 && owner[c + 1] !== o) || (y > 0 && owner[c - GW] !== o) || (y < GH - 1 && owner[c + GW] !== o))) s *= .84;
       let r = k[0] * s, g = k[1] * s, b = k[2] * s;
+      if (sat) {
+        const al = inWar[o] || o === P ? .55 : o === sel ? .35 : .1, e = s / shade[c];
+        const tr = terr[c * 3] * e, tg = terr[c * 3 + 1] * e, tb = terr[c * 3 + 2] * e;
+        r = tr + (r - tr) * al; g = tg + (g - tg) * al; b = tb + (b - tb) * al;
+      }
       if (opts.fx === 'cinza') {
         const near = frontMark[c] ? .5 : ((x > 0 && frontMark[c - 1]) || (x < GW - 1 && frontMark[c + 1]) || (y > 0 && frontMark[c - GW]) || (y < GH - 1 && frontMark[c + GW])) ? .24 : 0;
         if (near) { r += (128 - r) * near; g += (128 - g) * near; b += (132 - b) * near; }
@@ -1200,6 +1247,51 @@ function draw() {
       mark(C[w.b], mx + dx * gap, my + dy * gap);
     }
   }
+  // divisões (bandeirinhas)
+  if (opts.divs) {
+    const dw = clamp(z * 1.15, 6, 13), dh = dw * .66;
+    const dflag = (c, x, y) => {
+      if (x < -dw || y < -dh || x > VW + dw || y > VH + dh) return;
+      ctx.fillStyle = 'rgba(0,0,0,.75)'; ctx.fillRect(x - dw / 2 - 1, y - dh / 2 - 1, dw + 2, dh + 2);
+      drawFlag(ctx, c.flag, x - dw / 2, y - dh / 2, dw, dh);
+    };
+    for (const c of C) if (c.alive && c.divs) for (const cell of c.divs) if (owner[cell] === c.id && !frontMark[cell]) dflag(c, sx(cell % GW), sy((cell / GW) | 0));
+    for (const w of wars) {
+      if (!w.fdA) continue;
+      for (let j = 0; j < w.fdA.length; j++) {
+        const a = w.fdA[j], b = w.fdB[j];
+        const ax = a % GW, ay = (a / GW) | 0, bx = b % GW, by = (b / GW) | 0;
+        if (owner[a] === w.a) dflag(C[w.a], sx(ax - (bx - ax) * .7), sy(ay - (by - ay) * .7));
+        if (owner[b] === w.b) dflag(C[w.b], sx(bx + (bx - ax) * .7), sy(by + (by - ay) * .7));
+      }
+    }
+  }
+  // número de tropas escrito ao longo da linha de frente
+  if (opts.frontNums) {
+    const fs = clamp(z * 1.9, 11, 24);
+    ctx.font = `${fs}px "Archivo Black", system-ui, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
+    for (const w of wars) {
+      const L = w.fa.length; if (L < 6) continue;
+      if (!(w.a === P || w.b === P || C[w.a].cells > 60 || C[w.b].cells > 60)) continue;
+      let mx = 0, my = 0, n = 0, nx = 0, ny = 0;
+      const step = Math.max(1, Math.floor(L / 150));
+      for (let j = 0; j < L; j += step) { if (w.fs[j]) continue; const a = w.fa[j], b = w.fb[j]; mx += (a % GW + b % GW) / 2; my += (((a / GW) | 0) + ((b / GW) | 0)) / 2; nx += a % GW - b % GW; ny += ((a / GW) | 0) - ((b / GW) | 0); n++; }
+      if (n < 4) continue; mx /= n; my /= n;
+      let sxx = 0, syy = 0, sxy = 0;
+      for (let j = 0; j < L; j += step) { if (w.fs[j]) continue; const a = w.fa[j]; const dx = a % GW - mx, dy = ((a / GW) | 0) - my; sxx += dx * dx; syy += dy * dy; sxy += dx * dy; }
+      let ang = .5 * Math.atan2(2 * sxy, sxx - syy);
+      const len = Math.hypot(nx, ny) || 1; nx /= len; ny /= len;   // normal apontando para o lado A
+      if (ang > Math.PI / 2) ang -= Math.PI; if (ang < -Math.PI / 2) ang += Math.PI;
+      const cx = sx(mx), cy = sy(my); if (cx < -200 || cy < -200 || cx > VW + 200 || cy > VH + 200) continue;
+      const off = fs * .9 + z * 1.2;
+      for (const [k, sg] of [[C[w.a], 1], [C[w.b], -1]]) {
+        const tx = cx + nx * off * sg, ty = cy + ny * off * sg, t = fmt(k.troops).replace(/ /g, ',');
+        ctx.save(); ctx.translate(tx, ty); ctx.rotate(ang);
+        ctx.lineWidth = Math.max(3, fs * .22); ctx.strokeStyle = 'rgba(0,0,0,.85)'; ctx.strokeText(t, 0, 0);
+        ctx.fillStyle = '#fff'; ctx.fillText(t, 0, 0); ctx.restore();
+      }
+    }
+  }
   // capitais
   for (const c of C) {
     if (!c.alive || (c.cells < 6 && z < 7 && c.id !== P && c.id !== sel)) continue;
@@ -1373,6 +1465,10 @@ function actionsHTML() {
   return h;
 }
 const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+const MESES_L = ['JANEIRO', 'FEVEREIRO', 'MARÇO', 'ABRIL', 'MAIO', 'JUNHO', 'JULHO', 'AGOSTO', 'SETEMBRO', 'OUTUBRO', 'NOVEMBRO', 'DEZEMBRO'];
+function fmtDateBig(d) { const t = new Date(2026, 0, 1 + d); return `${t.getFullYear()}/${String(t.getMonth() + 1).padStart(2, '0')}/${String(t.getDate()).padStart(2, '0')}`; }
+function fmtDateLong(d) { const t = new Date(2026, 0, 1 + d); return `${t.getDate()} ${MESES_L[t.getMonth()]} ${t.getFullYear()}`; }
+function warName(w) { return `GUERRA ${C[w.a].name.toUpperCase()}–${C[w.b].name.toUpperCase()}`; }
 function fmtDate(d) { const t = new Date(2026, 0, 1 + d); return `${t.getDate()} ${MESES[t.getMonth()]} ${t.getFullYear()}`; }
 function spark(w) {
   const h = w.hist || []; if (h.length < 2) return '';
@@ -1403,7 +1499,14 @@ function casHTML() {
 const last = { info: '', act: '', cas: '', log: '' };
 function setIf(id, key, html) { if (last[key] !== html) { last[key] = html; $(id).innerHTML = html; } }
 function updateUI() {
-  $('day').textContent = phase === 'game' ? fmtDate(day) : 'Escolha um país';
+  $('day').textContent = phase === 'game' ? (opts.hud ? fmtDateBig(day) : fmtDate(day)) : 'Escolha um país';
+  $('day').classList.toggle('big', phase === 'game' && opts.hud);
+  const wt = $('wartitle'), myW = phase === 'game' && P >= 0 && C[P].alive && opts.hud ? warsOf(P).sort((a, b) => (b.casA + b.casB) - (a.casA + a.casB))[0] : null;
+  wt.hidden = !myW;
+  if (myW) {
+    const h = `<div class="wt1">${esc(warName(myW))}</div><div class="wt2">${fmtDateLong(myW.start)} – EM ANDAMENTO</div>`;
+    if (wt.innerHTML !== h) wt.innerHTML = h;
+  }
   const mb = $('money'), showM = phase === 'game' && P >= 0 && C[P].alive;
   mb.hidden = !showM;
   if (showM) { const c = C[P], h = `💰 ${fmtM(c.money)} <small class="${c.net >= 0 ? 'up' : 'dn'}">${c.net >= 0 ? '+' : ''}${fmtM(c.net)}/dia</small>`; if (mb.innerHTML !== h) mb.innerHTML = h; }
@@ -1480,6 +1583,13 @@ $('cfg').addEventListener('click', () => {
     <label><input type="radio" name="fx" value="soldados"${opts.fx === 'soldados' ? ' checked' : ''}> Soldados e bandeiras nas frentes</label>
     <label><input type="radio" name="fx" value="cinza"${opts.fx === 'cinza' ? ' checked' : ''}> Frente cinza (só o território avançando e recuando)</label>
     <label><input type="radio" name="fx" value="listras"${opts.fx === 'listras' ? ' checked' : ''}> Listras (só listras avançando e recuando na frente)</label></div>
+    <div class="opt"><b>Mapa</b>
+    <label><input type="radio" name="map" value="cor"${opts.map === 'cor' ? ' checked' : ''}> Colorido (todos os países pintados)</label>
+    <label><input type="radio" name="map" value="sat"${opts.map === 'sat' ? ' checked' : ''}> Satélite (só países em guerra pintados)</label></div>
+    <div class="opt"><b>Estilo de vídeo</b>
+    <label><input type="checkbox" id="o-divs"${opts.divs ? ' checked' : ''}> Divisões (bandeirinhas no território e na frente)</label>
+    <label><input type="checkbox" id="o-fnums"${opts.frontNums ? ' checked' : ''}> Número de tropas escrito na linha de frente</label>
+    <label><input type="checkbox" id="o-hud"${opts.hud ? ' checked' : ''}> Data grande e título da guerra</label></div>
     <div class="opt"><b>Na frente de batalha</b>
     <label><input type="checkbox" id="o-soldiers"${opts.soldiers ? ' checked' : ''}> Mostrar soldados</label>
     <label><input type="checkbox" id="o-flags"${opts.flags ? ' checked' : ''}> Mostrar bandeiras nas frentes</label></div>
@@ -1493,6 +1603,10 @@ $('mtext').addEventListener('change', e => {
   else if (e.target.id === 'o-smooth') opts.smooth = e.target.checked;
   else if (e.target.id === 'o-soldiers') opts.soldiers = e.target.checked;
   else if (e.target.id === 'o-flags') opts.flags = e.target.checked;
+  else if (e.target.name === 'map') opts.map = e.target.value;
+  else if (e.target.id === 'o-divs') opts.divs = e.target.checked;
+  else if (e.target.id === 'o-fnums') opts.frontNums = e.target.checked;
+  else if (e.target.id === 'o-hud') { opts.hud = e.target.checked; updateUI(); }
   saveOpts(); dirty = true;
 });
 $('newgame').addEventListener('click', () => showModal('Novo jogo?', 'O progresso atual será perdido.', [['Novo mapa', () => newWorld()], ['Cancelar', () => {}]]));
