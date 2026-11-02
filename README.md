@@ -10,6 +10,7 @@ Jogo de estratégia de guerra no mapa-múndi atual (193 países com bandeiras re
 - Arraste para mover, pinça/scroll para zoom. Velocidade 1x/2x/4x, espaço pausa.
 - **☢ Bomba nuclear**: em guerra, toque no botão ☢ e depois no território inimigo. Recarga de 30 segundos. Deixa a área radioativa (defesa mais fraca).
 
-`world-data.js` é gerado por `tools/build-world.js` (Natural Earth via world-atlas, bandeiras de flag-icons).
+`world-data.js` é gerado por `tools/build-world.js` (Natural Earth via world-atlas, bandeiras de flag-icons) e depois `tools/build-states.js` (estados: Natural Earth admin-1 10m, baixe `ne_10m_admin_1_states_provinces.geojson` para `tools/`).
 - **🚢 Navios e marchas**: sem fronteira com o inimigo, frotas cruzam o mar e desembarcam; se não houver caminho por mar, as tropas vão andando por terra.
-- **⚙ Configurações**: animação de guerra com soldados e bandeiras ou só a frente cinza; território ocupado listrado; bordas sombreadas.
+- **🗺 Estados**: no mundo real, escolha um país e divida-o em estados para jogar com um estado (guerra de estados).
+- **⚙ Configurações**: animação de guerra com soldados e bandeiras, frente cinza ou listras animadas; território ocupado listrado; bordas sombreadas.
