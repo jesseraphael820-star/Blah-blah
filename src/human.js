@@ -53,6 +53,7 @@ export class Human {
     const pants = mat(o.pants, 0.9);
     const shoes = mat(o.shoes ?? 0x1a1a1a, 0.5);
     const hairM = mat(o.hair, 0.9);
+    const browM = mat(new THREE.Color(o.hair).multiplyScalar(0.45).lerp(new THREE.Color(0x2a1a10), 0.5).getHex(), 0.9);
     const lipM = mat(0x8a4a3e, 0.5), dark = mat(0x1a0606, 1), white = mat(0xf4f4f0, 0.3), iris = mat(o.eyes ?? 0x3a2412, 0.2);
     const scale = o.scale, bulk = o.bulk;
 
@@ -91,7 +92,7 @@ export class Human {
       part(e, sph(0.005, 6, 4), dark, 0, 0, 0.022, false);
       const lid = part(e, sph(0.022, 10, 6), skin, 0, 0.002, 0.002, false); lid.scale.set(1, 0.05, 1);
       e.userData.lid = lid;
-      const brow = part(this.head, box(0.045, 0.009, 0.012), hairM, 0.042 * sx, 0.055, 0.11, false);
+      const brow = part(this.head, box(0.046, 0.01, 0.012), browM, 0.042 * sx, 0.055, 0.116, false);
       brow.userData.sx = sx; this.brows.push(brow);
       this.eyes.push(e);
     }
