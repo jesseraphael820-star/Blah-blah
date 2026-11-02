@@ -11,3 +11,5 @@ Jogo de estratégia de guerra no mapa-múndi atual (193 países com bandeiras re
 - **☢ Bomba nuclear**: em guerra, toque no botão ☢ e depois no território inimigo. Recarga de 30 segundos. Deixa a área radioativa (defesa mais fraca).
 
 `world-data.js` é gerado por `tools/build-world.js` (Natural Earth via world-atlas, bandeiras de flag-icons).
+- **🚢 Navios e marchas**: sem fronteira com o inimigo, frotas cruzam o mar e desembarcam; se não houver caminho por mar, as tropas vão andando por terra.
+- **⚙ Configurações**: animação de guerra com soldados e bandeiras ou só a frente cinza; território ocupado listrado; bordas sombreadas.

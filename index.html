@@ -87,6 +87,9 @@ html,body{margin:0;height:100%;overflow:hidden;background:#08131c;color:var(--tx
 @keyframes arm{to{box-shadow:0 0 28px #ff3030}}
 #pact input{font:inherit;background:#1b2734;color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:8px;width:100%}
 .tag.nuc{background:#5a4600;color:var(--gold)}
+#mtext .opt{display:flex;flex-direction:column;gap:9px;margin:10px 0 4px;text-align:left;color:var(--txt);font-size:14px}
+#mtext .opt label{display:flex;gap:9px;align-items:center;cursor:pointer}
+#mtext .opt input{accent-color:var(--gold);width:17px;height:17px;flex:none}
 @keyframes pop{from{transform:scale(.9);opacity:0}to{transform:none;opacity:1}}
 .modal{position:fixed;inset:0;background:#000a;display:none;align-items:center;justify-content:center;z-index:20}
 .modal .box{background:#111a24;border:1px solid var(--line);border-radius:14px;padding:22px;max-width:360px;width:90%;text-align:center}
@@ -122,6 +125,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#08131c;color:var(--tx
   <button class="sp on" data-spd="1">1x</button>
   <button class="sp" data-spd="2">2x</button>
   <button class="sp" data-spd="4">4x</button>
+  <button class="sp" id="cfg" title="Configurações">⚙</button>
   <button class="sp" id="newgame" title="Novo jogo">↺</button>
 </div>
 <div id="cas"></div>
@@ -178,11 +182,12 @@ function makeNoise() {
 }
 
 // ---------- estado ----------
-let owner, land, shade, ocean, coastal, flash, rad;
+let owner, land, shade, ocean, coastal, flash, rad, core, frontMark;
 function alloc(gw, gh, s) {
   GW = gw; GH = gh; NC = gw * gh; S = s;
   owner = new Int16Array(NC); land = new Uint8Array(NC); shade = new Float32Array(NC);
   ocean = new Uint32Array(NC); coastal = new Uint8Array(NC); flash = new Float32Array(NC); rad = new Float32Array(NC);
+  core = new Int16Array(NC); frontMark = new Uint8Array(NC);
   off.width = GW * S; off.height = GH * S;
   img = octx.createImageData(GW * S, GH * S); u32 = new Uint32Array(img.data.buffer);
   fitted = false; resize();
@@ -193,7 +198,11 @@ let wars = [], warSeq = 1;
 let day = 0, P = -1, phase = 'select', sel = -1, speed = 1, focus = null;
 let reqs = [], logs = [], anims = [];
 let dirty = true, ended = false, nCount = 20, worldMode = 'real';
-let nukes = [], nukeArmed = false, nukeReady = 0;
+let nukes = [], nukeArmed = false, nukeReady = 0, units = [];
+// opções visuais (salvas só neste navegador)
+const opts = { fx: 'soldados', stripes: true, smooth: true };
+try { Object.assign(opts, JSON.parse(localStorage.getItem('gg-opts') || '{}')); } catch (e) {}
+const saveOpts = () => { try { localStorage.setItem('gg-opts', JSON.stringify(opts)); } catch (e) {} };
 
 // ---------- geração do mundo ----------
 const SYL_A = ['Val','Kor','Ost','Bel','Mar','Tor','Zan','Lis','Dra','Ves','Ard','Nor','Sar','Kel','Rho','Gal','Eri','Mon','Tal','Vor','Lum','Bra','Cas','Fen','Hal','Ith','Jor','Kar','Pel','Ruv','Sol','Ul','Tes','Gor','Aur','Zer','Mir','Ost','Del','Qar'];
@@ -377,6 +386,7 @@ function makeCountries(list) {
     if (c.flag.url) c.flagURL = c.flag.url;
     else { const fc = document.createElement('canvas'); fc.width = 36; fc.height = 24; drawFlag(fc.getContext('2d'), c.flag, 0, 0, 36, 24); c.flagURL = fc.toDataURL(); }
   }
+  core.set(owner); units = [];
   rel = new Float32Array(N * N); allied = new Uint8Array(N * N); adj = new Uint16Array(N * N);
   for (let a = 0; a < N; a++) for (let b = a + 1; b < N; b++) { const v = -15 + R() * 50; rel[a * N + b] = rel[b * N + a] = v; }
   wars = []; rebuildWarMat();
@@ -464,6 +474,7 @@ function declareWar(a, b, mode, parent = 0, helpFor = -1) {
 function endWar(w, why) {
   const i = wars.indexOf(w); if (i < 0) return;
   wars.splice(i, 1);
+  for (let c = 0; c < NC; c++) { const o = owner[c]; if (o >= 0 && core[c] !== o && ((o === w.a && core[c] === w.b) || (o === w.b && core[c] === w.a))) core[c] = o; }
   for (const ch of wars.filter(x => x.parent === w.id)) endWar(ch, 'parent');
   if (C[w.a].alive && C[w.b].alive) setRel(w.a, w.b, -30);
   if (focus && (focus.enemy === w.a || focus.enemy === w.b) && (w.a === P || w.b === P)) focus = null;
@@ -477,6 +488,7 @@ function endWar(w, why) {
 function kill(id) {
   const c = C[id]; if (!c.alive) return;
   c.alive = false;
+  for (let i = 0; i < NC; i++) if (core[i] === id && owner[i] >= 0) core[i] = owner[i];
   for (const w of warsOf(id)) endWar(w, 'elim');
   for (let o = 0; o < N; o++) allied[id * N + o] = allied[o * N + id] = 0;
   toast(id === P ? `☠ ${c.name} caiu.` : `☠ ${c.name} foi eliminado!`, id === P ? 'bad' : '');
@@ -493,12 +505,12 @@ function relocateCapital(id, from) {
 
 // ---------- simulação ----------
 function scanBorders() {
-  adj.fill(0);
+  adj.fill(0); frontMark.fill(0);
   for (const w of wars) { w.fa.length = 0; w.fb.length = 0; w.fs.length = 0; }
   const pair = (o, o2, c1, c2, sea) => {
     adj[o * N + o2]++; adj[o2 * N + o]++;
     const wi = warMat[o * N + o2];
-    if (wi >= 0) { const w = wars[wi]; if (w.a === o) { w.fa.push(c1); w.fb.push(c2); } else { w.fa.push(c2); w.fb.push(c1); } w.fs.push(sea); }
+    if (wi >= 0) { const w = wars[wi]; if (!sea) { frontMark[c1] = 1; frontMark[c2] = 1; } if (w.a === o) { w.fa.push(c1); w.fb.push(c2); } else { w.fa.push(c2); w.fb.push(c1); } w.fs.push(sea); }
   };
   for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) {
     const c = y * GW + x, o = owner[c]; if (o < 0) continue;
@@ -507,7 +519,20 @@ function scanBorders() {
   }
   for (let k = 0; k < seaA.length; k++) { const o = owner[seaA[k]], o2 = owner[seaB[k]]; if (o !== o2) pair(o, o2, seaA[k], seaB[k], 1); }
 }
+function support(c, side) {
+  const x = c % GW, y = (c / GW) | 0; let k = 0;
+  if (x > 0 && owner[c - 1] === side) k++; if (x < GW - 1 && owner[c + 1] === side) k++;
+  if (y > 0 && owner[c - GW] === side) k++; if (y < GH - 1 && owner[c + GW] === side) k++;
+  return k;
+}
+// captura + alisamento: vizinhos do perdedor cercados por 3 lados também caem (sem "pontas" soltas)
 function capture(cell, to, from) {
+  captureCell(cell, to, from);
+  const x = cell % GW, y = (cell / GW) | 0;
+  for (const n of [x > 0 ? cell - 1 : -1, x < GW - 1 ? cell + 1 : -1, y > 0 ? cell - GW : -1, y < GH - 1 ? cell + GW : -1])
+    if (n >= 0 && owner[n] === from && C[from].cap !== n && support(n, to) >= 3) captureCell(n, to, from);
+}
+function captureCell(cell, to, from) {
   owner[cell] = to; C[to].cells++; C[from].cells--; flash[cell] = day; dirty = true;
   if (anims.length < 500) anims.push({ c: cell, from, to, t: performance.now() });
   if (C[from].cap === cell) {
@@ -558,8 +583,11 @@ function tick() {
     if (!wars.includes(w) || !C[w.a].alive || !C[w.b].alive) continue;
     const L = w.fa.length;
     if (L === 0) {
-      if (w.helpFor >= 0 && C[w.helpFor].alive) { const t = C[w.a].troops * .003; C[w.a].troops -= t; C[w.helpFor].troops += t * .9; w.aid += t * .9; }
-      if (R() < .04) amphibious(w);
+      for (const side of [w.a, w.b]) {
+        if (side === P || units.some(u => u.war === w.id && u.from === side) || R() > .03) continue;
+        const other = side === w.a ? w.b : w.a;
+        if (C[side].troops > 2000 && (side === w.a || C[side].troops > C[other].troops * .8)) sendExpedition(w, side);
+      }
       w.marks = null; w.sold = null;
       continue;
     }
@@ -571,8 +599,11 @@ function tick() {
     }
     const n = Math.min(2 + Math.floor(L * .045), 14);
     const pf = focus && (w.a === P || w.b === P) && focus.enemy === enemyIn(w, P);
+    const aStrong = C[w.a].troops / Math.max(C[w.a].cells, 1) >= C[w.b].troops / Math.max(C[w.b].cells, 1);
+    const press = j => aStrong ? support(w.fb[j], w.a) : support(w.fa[j], w.b);
     for (let k = 0; k < n; k++) {
       let idx = ri(0, L - 1);
+      if (!pf) { const j = ri(0, L - 1); if (press(j) > press(idx)) idx = j; }
       if (pf && R() < .7) {
         const fx = focus.c % GW, fy = (focus.c / GW) | 0; let bd = 1e18;
         for (let s = 0; s < 6; s++) {
@@ -585,6 +616,12 @@ function tick() {
       if (owner[ca] !== w.a || owner[cb] !== w.b) continue;
       battle(w, ca, cb, w.fs[idx]);
     }
+  }
+  for (const u of units.slice()) {
+    const w = wars.find(x => x.id === u.war);
+    if (!w || !C[u.from].alive || !C[u.to].alive) { if (C[u.from].alive) C[u.from].troops += u.troops; units.splice(units.indexOf(u), 1); continue; }
+    u.prog += u.speed;
+    if (u.prog >= u.path.length - 1) { units.splice(units.indexOf(u), 1); landUnit(u, w); }
   }
   for (const c of C) if (c.alive && c.cells <= 0) kill(c.id);
   for (const c of C) if (c.alive && c.id !== P && R() < .015) aiThink(c);
@@ -641,20 +678,21 @@ function aiThink(c) {
   }
 }
 function computeLabels() {
-  const comp = new Int32Array(NC).fill(-1), stack = [];
+  const comp = new Int32Array(NC).fill(-1), stack = [], buf = [], small = [];
   const best = new Int32Array(N).fill(0), bestId = new Int32Array(N).fill(-1), mx = new Float64Array(N), my = new Float64Array(N), n = new Int32Array(N);
   let id = 0;
   for (let i = 0; i < NC; i++) {
     const o = owner[i]; if (o < 0 || comp[i] >= 0) continue;
-    let k = 0, sx = 0, sy = 0; stack.push(i); comp[i] = id;
+    let k = 0, sx = 0, sy = 0; stack.push(i); comp[i] = id; buf.length = 0;
     while (stack.length) {
-      const c = stack.pop(), x = c % GW, y = (c / GW) | 0; k++; sx += x; sy += y;
+      const c = stack.pop(), x = c % GW, y = (c / GW) | 0; k++; sx += x; sy += y; buf.push(c);
       if (x > 0 && comp[c - 1] < 0 && owner[c - 1] === o) { comp[c - 1] = id; stack.push(c - 1); }
       if (x < GW - 1 && comp[c + 1] < 0 && owner[c + 1] === o) { comp[c + 1] = id; stack.push(c + 1); }
       if (y > 0 && comp[c - GW] < 0 && owner[c - GW] === o) { comp[c - GW] = id; stack.push(c - GW); }
       if (y < GH - 1 && comp[c + GW] < 0 && owner[c + GW] === o) { comp[c + GW] = id; stack.push(c + GW); }
     }
     n[o] += k;
+    if (k <= 12) small.push({ o, id, cells: buf.slice() });
     if (k > best[o]) { best[o] = k; bestId[o] = id; mx[o] = sx / k; my[o] = sy / k; }
     id++;
   }
@@ -665,6 +703,21 @@ function computeLabels() {
     if (d < bd[o]) { bd[o] = d; bc[o] = i; }
   }
   for (const c of C) { c.cells = n[c.id]; if (bc[c.id] >= 0) { c.lx = bc[c.id] % GW; c.ly = (bc[c.id] / GW) | 0; } }
+  if (phase !== 'game') return;
+  for (const sm of small) {
+    if (bestId[sm.o] === sm.id) continue;
+    const around = new Set();
+    for (const c of sm.cells) {
+      const x = c % GW, y = (c / GW) | 0;
+      for (const nb of [x > 0 ? c - 1 : -1, x < GW - 1 ? c + 1 : -1, y > 0 ? c - GW : -1, y < GH - 1 ? c + GW : -1])
+        if (nb >= 0 && owner[nb] >= 0 && owner[nb] !== sm.o) around.add(owner[nb]);
+    }
+    if (around.size !== 1) continue;
+    const X = [...around][0];
+    if (warMat[X * N + sm.o] < 0) continue;
+    for (const c of sm.cells) if (owner[c] === sm.o && C[sm.o].cap !== c) captureCell(c, X, sm.o);
+    if (X === P) toast(`⭕ Cerco: ${sm.cells.length} províncias de ${C[sm.o].name} capturadas.`, 'good');
+  }
 }
 
 // ---------- ações do jogador ----------
@@ -735,7 +788,7 @@ const off = document.createElement('canvas'); off.width = GW * S; off.height = G
 const octx = off.getContext('2d'); let img, u32;
 const cam = { x: 0, y: 0, z: 4, fit: 4 };
 let dpr = 1, VW = 0, VH = 0, fitted = false;
-const COL_EDGE = pack(12, 12, 16), COL_WAR = pack(225, 45, 45), COL_COAST = pack(18, 30, 40), COL_ME = pack(5, 5, 8);
+const COL_EDGE = pack(12, 12, 16), COL_WAR = pack(225, 45, 45), COL_WAR_G = pack(58, 58, 64), COL_COAST = pack(18, 30, 40), COL_ME = pack(5, 5, 8);
 
 function renderOff() {
   const W = GW * S;
@@ -744,20 +797,31 @@ function renderOff() {
     let col;
     if (o < 0) col = ocean[c];
     else {
-      const k = C[o].col, s = shade[c];
+      const k = C[o].col; let s = shade[c];
+      if (opts.smooth && ((x > 0 && owner[c - 1] !== o) || (x < GW - 1 && owner[c + 1] !== o) || (y > 0 && owner[c - GW] !== o) || (y < GH - 1 && owner[c + GW] !== o))) s *= .84;
       let r = k[0] * s, g = k[1] * s, b = k[2] * s;
+      if (opts.fx === 'cinza') {
+        const near = frontMark[c] ? .5 : ((x > 0 && frontMark[c - 1]) || (x < GW - 1 && frontMark[c + 1]) || (y > 0 && frontMark[c - GW]) || (y < GH - 1 && frontMark[c + GW])) ? .24 : 0;
+        if (near) { r += (128 - r) * near; g += (128 - g) * near; b += (132 - b) * near; }
+      }
       if (o === sel) { r += 32; g += 32; b += 32; }
       if (rad[c] && day - rad[c] < CFG.RAD_DAYS) { const t = (1 - (day - rad[c]) / CFG.RAD_DAYS) * .6; r += (64 - r) * t; g += (78 - g) * t; b += (34 - b) * t; }
       const f = day - flash[c];
       if (flash[c] > 0 && f < 10) { const t = (1 - f / 10) * .22; r += (255 - r) * t; g += (255 - g) * t; b += (255 - b) * t; }
       col = pack(r, g, b);
+      const co = core[c];
+      if (opts.stripes && co !== o && co >= 0 && C[co].alive && warMat[o * N + co] >= 0) {
+        const kc = C[co].col, sc = shade[c] * .92, col2 = pack(kc[0] * sc, kc[1] * sc, kc[2] * sc), base = y * S * W + x * S;
+        for (let dy = 0; dy < S; dy++) { const row = base + dy * W; for (let dx = 0; dx < S; dx++) u32[row + dx] = ((x * S + dx + y * S + dy) % 6) < 2 ? col2 : col; }
+        continue;
+      }
     }
     const base = y * S * W + x * S;
     for (let dy = 0; dy < S; dy++) { const row = base + dy * W; for (let dx = 0; dx < S; dx++) u32[row + dx] = col; }
   }
   const edge = (o, o2) => {
     if (o < 0 || o2 < 0) return [COL_COAST, (o === P || o2 === P) && P >= 0];
-    if (warMat[o * N + o2] >= 0) return [COL_WAR, true];
+    if (warMat[o * N + o2] >= 0) return [opts.fx === 'cinza' ? COL_WAR_G : COL_WAR, true];
     const me = P >= 0 && (o === P || o2 === P);
     return [me ? COL_ME : COL_EDGE, me];
   };
@@ -832,7 +896,7 @@ function draw() {
     ctx.fillStyle = '#e8c39e'; ctx.beginPath(); ctx.arc(0, -u * 1.9, u * .38, 0, Math.PI); ctx.fill();
     ctx.restore();
   };
-  for (const w of wars) {
+  if (opts.fx === 'soldados') for (const w of wars) {
     if (!w.sold) continue;
     for (const m of w.sold) {
       const ax = sx(m.a % GW), ay = sy((m.a / GW) | 0), bx = sx(m.b % GW), by = sy((m.b / GW) | 0);
@@ -844,13 +908,51 @@ function draw() {
       soldier(C[w.b], bx + dx * z * .3 - tx * off, by + dy * z * .3 - ty * off, dirB, now / 110 + m.ph + 1);
     }
   }
+  // navios e tropas em marcha
+  for (const un of units) {
+    const L1 = un.path.length - 1, fp = Math.min(L1, un.prog + un.speed * Math.min(acc, 1));
+    const i0 = Math.floor(fp), t = fp - i0, c0 = un.path[i0], c1 = un.path[Math.min(i0 + 1, L1)];
+    const px = cam.x + ((c0 % GW) * (1 - t) + (c1 % GW) * t + .5) * z, py = cam.y + (((c0 / GW) | 0) * (1 - t) + ((c1 / GW) | 0) * t + .5) * z;
+    const ahead = un.path[Math.min(L1, i0 + 3)], dir = (ahead % GW) >= (c0 % GW) ? 1 : -1;
+    const k = C[un.from];
+    if (un.from === P || un.to === P) {
+      ctx.save(); ctx.setLineDash([4, 5]); ctx.strokeStyle = un.from === P ? 'rgba(255,255,255,.55)' : 'rgba(255,90,90,.6)'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(px, py);
+      for (let j = i0 + 4; j < L1; j += 4) ctx.lineTo(cam.x + (un.path[j] % GW + .5) * z, cam.y + (((un.path[j] / GW) | 0) + .5) * z);
+      ctx.lineTo(cam.x + (un.path[L1] % GW + .5) * z, cam.y + (((un.path[L1] / GW) | 0) + .5) * z); ctx.stroke(); ctx.restore();
+    }
+    const b = clamp(z * 1.7, 9, 22);
+    let fx0, fy0;
+    if (un.kind === 'boat') {
+      const bob = Math.sin(now / 300 + un.ph) * 1.2;
+      ctx.save(); ctx.translate(px, py + bob); ctx.scale(dir, 1);
+      ctx.strokeStyle = 'rgba(255,255,255,.5)'; ctx.lineWidth = 1.2; ctx.beginPath();
+      ctx.moveTo(-b * .85, b * .05); ctx.lineTo(-b * 1.9, -b * .35); ctx.moveTo(-b * .85, b * .3); ctx.lineTo(-b * 1.9, b * .6); ctx.stroke();
+      ctx.fillStyle = '#2a2f37'; ctx.strokeStyle = '#000'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(-b * .9, 0); ctx.lineTo(b, 0); ctx.lineTo(b * .62, b * .4); ctx.lineTo(-b * .72, b * .4); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#c9cfd8'; ctx.fillRect(-b * .4, -b * .3, b * .55, b * .3); ctx.strokeRect(-b * .4, -b * .3, b * .55, b * .3);
+      ctx.strokeStyle = '#111'; ctx.lineWidth = 1.3; ctx.beginPath(); ctx.moveTo(-b * .12, -b * .3); ctx.lineTo(-b * .12, -b * 1.1); ctx.stroke();
+      ctx.restore();
+      fx0 = px - dir * b * .12; fy0 = py + bob - b * 1.1;
+    } else {
+      const st = now / 110 + un.ph;
+      soldier(k, px - u * 2.6 * dir, py + u * .4, dir, st);
+      soldier(k, px, py - u * .3, dir, st + 1.4);
+      soldier(k, px + u * 2.6 * dir, py + u * .4, dir, st + 2.8);
+      fx0 = px; fy0 = py - u * 3.2 - b * .2;
+    }
+    const fw2 = b * .8, fh2 = fw2 * .66;
+    ctx.fillStyle = '#000'; ctx.fillRect(fx0 - 1, fy0 - 1, fw2 + 2, fh2 + 2); drawFlag(ctx, k.flag, fx0, fy0, fw2, fh2);
+    ctx.font = `700 ${Math.max(9, b * .55)}px system-ui,sans-serif`; ctx.textAlign = 'center'; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.85)';
+    const lbl = fmt(un.troops); ctx.strokeText(lbl, px, py + b * .95); ctx.fillStyle = '#fff'; ctx.fillText(lbl, px, py + b * .95);
+  }
   // bandeiras fincadas nas frentes
   const fw = clamp(z * 2.2, 11, 22), fh = fw * .66;
   const mark = (c, x, y) => {
     ctx.fillStyle = '#000'; ctx.fillRect(x - fw / 2 - 1, y - fh / 2 - 1, fw + 2, fh + 2);
     drawFlag(ctx, c.flag, x - fw / 2, y - fh / 2, fw, fh);
   };
-  for (const w of wars) {
+  if (opts.fx === 'soldados') for (const w of wars) {
     if (!w.marks) continue;
     for (const m of w.marks) {
       const ax = sx(m.a % GW), ay = sy((m.a / GW) | 0), bx = sx(m.b % GW), by = sy((m.b / GW) | 0);
@@ -962,10 +1064,12 @@ function actionsHTML() {
   }
   const w = warOf(P, sel);
   if (w) {
-    if (w.mode === 'ataque') return `<button class="peace" data-act="peace"${day < w.peaceCD ? ' disabled' : ''}>🕊 ${cd(w.peaceCD, 'Propor paz')}</button>`
+    const ship = `<button data-act="ship"${day < (w.shipCD || 0) ? ' disabled' : ''}>🚢 ${cd(w.shipCD || 0, 'Enviar invasão (navio ou marcha)')}</button>`
+      + (w.fa.length ? '' : `<div class="hint">Sem fronteira com ${esc(C[sel].name)}: mande navios, ou tropas por terra se não houver mar.</div>`);
+    if (w.mode === 'ataque') return ship + `<button class="peace" data-act="peace"${day < w.peaceCD ? ' disabled' : ''}>🕊 ${cd(w.peaceCD, 'Propor paz')}</button>`
       + alliesOf(P).filter(a => warMat[a * N + sel] < 0 && !isAllied(a, sel)).map(a => `<button data-act="help" data-a="${a}" data-e="${sel}">📣 Pedir ajuda a ${esc(C[a].name)}</button>`).join('')
       + `<div class="hint">🎯 Toque no território de ${esc(C[sel].name)} para focar o ataque.</div>`;
-    return alliesOf(P).filter(a => warMat[a * N + sel] < 0 && !isAllied(a, sel)).map(a => `<button data-act="help" data-a="${a}" data-e="${sel}">📣 Pedir ajuda a ${esc(C[a].name)}</button>`).join('')
+    return ship + alliesOf(P).filter(a => warMat[a * N + sel] < 0 && !isAllied(a, sel)).map(a => `<button data-act="help" data-a="${a}" data-e="${sel}">📣 Pedir ajuda a ${esc(C[a].name)}</button>`).join('')
       + `<div class="hint">☠ Guerra até a morte — sem paz possível. Só termina quando um país perder todo o território.</div>`;
   }
   let h = '';
@@ -1022,6 +1126,7 @@ $('panel').addEventListener('click', e => {
   else if (act === 'war') declareWar(P, sel, 'ataque');
   else if (act === 'death') declareWar(P, sel, 'morte');
   else if (act === 'peace') actPeace(sel);
+  else if (act === 'ship') actShip(sel);
   else if (act === 'ally') actAlly(sel);
   else if (act === 'aid') actAid(sel);
   else if (act === 'break') { setAlly(P, sel, 0); relAdd(P, sel, -30); }
@@ -1049,7 +1154,95 @@ document.querySelectorAll('[data-spd]').forEach(b => b.addEventListener('click',
   document.querySelectorAll('[data-spd]').forEach(x => x.classList.toggle('on', x === b));
 }));
 $('vs').addEventListener('click', () => { $('vs').hidden = true; });
+$('cfg').addEventListener('click', () => {
+  showModal('Configurações', '', [['Fechar', () => {}]]);
+  $('mtext').innerHTML = `<div class="opt"><b>Animação de guerra</b>
+    <label><input type="radio" name="fx" value="soldados"${opts.fx === 'soldados' ? ' checked' : ''}> Soldados e bandeiras nas frentes</label>
+    <label><input type="radio" name="fx" value="cinza"${opts.fx === 'cinza' ? ' checked' : ''}> Frente cinza (só o território avançando e recuando)</label></div>
+    <div class="opt"><b>Território</b>
+    <label><input type="checkbox" id="o-stripes"${opts.stripes ? ' checked' : ''}> Território ocupado listrado (vira seu ao fazer a paz)</label>
+    <label><input type="checkbox" id="o-smooth"${opts.smooth ? ' checked' : ''}> Bordas internas sombreadas</label></div>`;
+});
+$('mtext').addEventListener('change', e => {
+  if (e.target.name === 'fx') opts.fx = e.target.value;
+  else if (e.target.id === 'o-stripes') opts.stripes = e.target.checked;
+  else if (e.target.id === 'o-smooth') opts.smooth = e.target.checked;
+  saveOpts(); dirty = true;
+});
 $('newgame').addEventListener('click', () => showModal('Novo jogo?', 'O progresso atual será perdido.', [['Novo mapa', () => newWorld()], ['Cancelar', () => {}]]));
+
+// ---------- navios e marchas (guerras sem fronteira) ----------
+const qBuf = { q: null, prev: null };
+function findPath(src, dst, mode, enemy) {
+  if (!qBuf.q || qBuf.q.length !== NC) { qBuf.q = new Int32Array(NC); qBuf.prev = new Int32Array(NC); }
+  const q = qBuf.q, prev = qBuf.prev; prev.fill(-1);
+  let h = 0, t = 0, goal = -1; q[t++] = src; prev[src] = src;
+  while (h < t && goal < 0) {
+    const c = q[h++], x = c % GW, y = (c / GW) | 0;
+    for (let dy = -1; dy <= 1 && goal < 0; dy++) for (let dx = -1; dx <= 1; dx++) {
+      if (!dx && !dy) continue;
+      const nx = x + dx, ny = y + dy; if (nx < 0 || ny < 0 || nx >= GW || ny >= GH) continue;
+      const n = ny * GW + nx; if (prev[n] >= 0) continue;
+      if (mode === 'sea') { if (n !== dst && land[n]) continue; }
+      else if (!land[n]) continue;
+      prev[n] = c; q[t++] = n;
+      if (n === dst || (mode === 'land' && owner[n] === enemy)) { goal = n; break; }
+    }
+  }
+  if (goal < 0) return null;
+  const path = []; for (let c = goal; c !== src; c = prev[c]) path.push(c); path.push(src);
+  return path.reverse();
+}
+function sendExpedition(w, side, aim = -1) {
+  const e = enemyIn(w, side), A = C[side], E = C[e];
+  if (A.troops < 800) return false;
+  const amount = Math.max(600, A.troops * .15);
+  const ref = aim >= 0 ? aim : A.ly * GW + A.lx, rx = ref % GW, ry = (ref / GW) | 0;
+  let tgt = -1, td = 1e18, src = -1, sd = 1e18;
+  for (const c of coastList) if (owner[c] === e) { const d = (c % GW - rx) ** 2 + (((c / GW) | 0) - ry) ** 2; if (d < td) { td = d; tgt = c; } }
+  if (tgt >= 0) for (const c of coastList) if (owner[c] === side) { const d = (c % GW - tgt % GW) ** 2 + (((c / GW) | 0) - ((tgt / GW) | 0)) ** 2; if (d < sd) { sd = d; src = c; } }
+  let path = null, kind = 'boat';
+  if (src >= 0 && tgt >= 0) path = findPath(src, tgt, 'sea');
+  if (!path) { kind = 'army'; path = findPath(A.cap, -1, 'land', e); }
+  if (!path || path.length < 2) { amphibious(w); return false; }
+  A.troops -= amount;
+  units.push({ war: w.id, from: side, to: e, kind, path, prog: 0, troops: amount, speed: kind === 'boat' ? 1.7 : .8, ph: R() * 6 });
+  if (side === P) toast(kind === 'boat' ? `🚢 Frota com ${fmt(amount)} soldados a caminho de ${E.name}` : `🪖 ${fmt(amount)} soldados marchando por terra até ${E.name}`, 'good');
+  else if (e === P) toast(kind === 'boat' ? `🚢 ${A.name} enviou uma frota contra você!` : `🪖 Tropas de ${A.name} marcham em sua direção!`, 'bad');
+  return true;
+}
+function landUnit(u, w) {
+  const e = u.to, A = C[u.from], E = C[e], end = u.path[u.path.length - 1];
+  let tgt = owner[end] === e ? end : -1;
+  if (tgt < 0) {
+    const ex = end % GW, ey = (end / GW) | 0; let bd = 1e18;
+    for (let y = Math.max(0, ey - 6); y <= Math.min(GH - 1, ey + 6); y++) for (let x = Math.max(0, ex - 6); x <= Math.min(GW - 1, ex + 6); x++) {
+      const c = y * GW + x; if (owner[c] !== e) continue; const d = (x - ex) ** 2 + (y - ey) ** 2; if (d < bd) { bd = d; tgt = c; }
+    }
+  }
+  if (tgt < 0) { A.troops += u.troops; return; }
+  const dens = E.troops / Math.max(E.cells, 1);
+  const def = dens * 22 * (.7 + R() * .6) * (rad[tgt] && day - rad[tgt] < CFG.RAD_DAYS ? .45 : 1);
+  const att = u.troops * (.7 + R() * .6) * (u.kind === 'boat' ? .85 : 1);
+  const win = att > def;
+  const la = u.troops * (win ? .25 : .6), ld = Math.min(E.troops, def * (win ? .6 : .25));
+  A.troops += u.troops - la; A.casualties += la; E.troops -= ld; E.casualties += ld;
+  if (w.a === u.from) { w.casA += la; w.casB += ld; } else { w.casB += la; w.casA += ld; }
+  if (win) {
+    const tx = tgt % GW, ty = (tgt / GW) | 0;
+    for (let y = ty - 2; y <= ty + 2; y++) for (let x = tx - 2; x <= tx + 2; x++) {
+      if (x < 0 || y < 0 || x >= GW || y >= GH || (x - tx) ** 2 + (y - ty) ** 2 > 5) continue;
+      const c = y * GW + x; if (owner[c] === e) capture(c, u.from, e);
+    }
+  }
+  const what = u.kind === 'boat' ? 'Desembarque' : 'Ataque das tropas';
+  if (u.from === P) toast(win ? `🚢 ${what} em ${E.name} deu certo! Cabeça de ponte criada.` : `🚢 ${what} em ${E.name} foi repelido.`, win ? 'good' : 'bad');
+  else if (e === P) toast(win ? `🚢 ${A.name} desembarcou no seu território!` : `🚢 Você repeliu a invasão de ${A.name}.`, win ? 'bad' : 'good');
+}
+function actShip(e) {
+  const w = warOf(P, e); if (!w || day < (w.shipCD || 0)) return;
+  if (sendExpedition(w, P, focus && focus.enemy === e ? focus.c : -1)) w.shipCD = day + 15;
+}
 
 // ---------- bomba nuclear ----------
 function launchNuke(from, cell) {
