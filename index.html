@@ -51,7 +51,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#08131c;color:var(--tx
 .hint{font-size:12px;color:var(--mut);margin-top:4px}
 #log{margin-top:8px;font-size:12px;color:var(--mut);max-height:120px;overflow:hidden}
 #log div{padding:1px 0}
-#reqs{position:fixed;left:12px;bottom:12px;width:320px;display:flex;flex-direction:column;gap:6px;z-index:7}
+#reqs{position:fixed;left:12px;bottom:96px;width:320px;display:flex;flex-direction:column;gap:6px;z-index:7}
 .req{background:rgba(18,26,36,.97);border:1px solid #4c79a8;border-radius:10px;padding:10px 12px;font-size:14px;animation:pop .2s}
 .req .b{display:flex;gap:6px;margin-top:8px}
 .req button{flex:1;text-align:center;padding:7px}
@@ -80,6 +80,13 @@ html,body{margin:0;height:100%;overflow:hidden;background:#08131c;color:var(--tx
 .cch .tr2{height:6px;background:#4a1c22;border-radius:3px;overflow:hidden}
 .cch .tr2 i{display:block;height:100%;background:var(--green)}
 .cch b{color:var(--txt);font-variant-numeric:tabular-nums}
+#nuke{position:fixed;left:calc(16px + env(safe-area-inset-left,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px));width:66px;height:66px;border-radius:50%;background:radial-gradient(#5a4600,#1c1500);border:2px solid var(--gold);color:var(--gold);font-size:26px;line-height:1;z-index:7;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer;box-shadow:0 4px 18px #000a;font-family:inherit}
+#nuke small{font-size:9.5px;font-weight:800;letter-spacing:.5px}
+#nuke.cd{border-color:#4a5563;color:#8b9aab;background:#161d26}
+#nuke.armed{background:radial-gradient(#b01818,#3a0505);border-color:#ff5050;color:#fff;animation:arm .7s infinite alternate}
+@keyframes arm{to{box-shadow:0 0 28px #ff3030}}
+#pact input{font:inherit;background:#1b2734;color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:8px;width:100%}
+.tag.nuc{background:#5a4600;color:var(--gold)}
 @keyframes pop{from{transform:scale(.9);opacity:0}to{transform:none;opacity:1}}
 .modal{position:fixed;inset:0;background:#000a;display:none;align-items:center;justify-content:center;z-index:20}
 .modal .box{background:#111a24;border:1px solid var(--line);border-radius:14px;padding:22px;max-width:360px;width:90%;text-align:center}
@@ -100,6 +107,8 @@ html,body{margin:0;height:100%;overflow:hidden;background:#08131c;color:var(--tx
   .req{font-size:13px;padding:8px 10px}
   #toasts{top:auto;bottom:calc(43vh + 8px)}
   .toast{font-size:12.5px;padding:5px 10px}
+  #nuke{bottom:calc(43vh + 12px);left:10px;width:58px;height:58px;font-size:22px}
+  #panel.min~#nuke{bottom:74px}
 }
 </style>
 </head>
@@ -120,8 +129,11 @@ html,body{margin:0;height:100%;overflow:hidden;background:#08131c;color:var(--tx
 <div id="vs" hidden></div>
 <div id="panel"><button id="ptog" aria-label="Minimizar painel"></button><div id="pinfo"></div><div id="pact"></div><div id="log"></div></div>
 <div id="reqs"></div>
+<button id="nuke" hidden aria-label="Bomba nuclear"></button>
+<datalist id="clist"></datalist>
 <div class="modal" id="modal"><div class="box"><h2 id="mtitle"></h2><div id="mtext" class="mut"></div><div class="b" id="mbtns"></div></div></div>
 
+<script src="world-data.js"></script>
 <script>
 'use strict';
 // ---------- constantes de jogo ----------
@@ -139,8 +151,11 @@ const CFG = {
   FOCUS_RADIUS: 10,
   GRACE_DAYS: 90,            // dias iniciais sem IA atacar o jogador
   RECRUIT_CD: 150, PEACE_CD: 25, ALLY_CD: 30, AID_CD: 10,
+  NUKE_CD_MS: 30000,         // recarga da bomba nuclear do jogador (tempo real)
+  AI_NUKE_CD_MS: 90000,      // recarga das potências nucleares da IA
+  NUKE_R: 5, NUKE_FLY_MS: 1500, NUKE_FX_MS: 2600, RAD_DAYS: 80,
 };
-const GW = CFG.GW, GH = CFG.GH, S = CFG.S, NC = GW * GH;
+let GW = CFG.GW, GH = CFG.GH, S = CFG.S, NC = GW * GH;
 const $ = id => document.getElementById(id);
 const R = Math.random;
 const ri = (a, b) => a + Math.floor(R() * (b - a + 1));
@@ -163,14 +178,22 @@ function makeNoise() {
 }
 
 // ---------- estado ----------
-const owner = new Int16Array(NC), land = new Uint8Array(NC), shade = new Float32Array(NC);
-const ocean = new Uint32Array(NC), coastal = new Uint8Array(NC), flash = new Float32Array(NC);
+let owner, land, shade, ocean, coastal, flash, rad;
+function alloc(gw, gh, s) {
+  GW = gw; GH = gh; NC = gw * gh; S = s;
+  owner = new Int16Array(NC); land = new Uint8Array(NC); shade = new Float32Array(NC);
+  ocean = new Uint32Array(NC); coastal = new Uint8Array(NC); flash = new Float32Array(NC); rad = new Float32Array(NC);
+  off.width = GW * S; off.height = GH * S;
+  img = octx.createImageData(GW * S, GH * S); u32 = new Uint32Array(img.data.buffer);
+  fitted = false; resize();
+}
 let seaA = new Int32Array(0), seaB = new Int32Array(0), coastList = [];
 let C = [], N = 0, rel, allied, warMat, adj;
 let wars = [], warSeq = 1;
 let day = 0, P = -1, phase = 'select', sel = -1, speed = 1, focus = null;
 let reqs = [], logs = [], anims = [];
-let dirty = true, ended = false, nCount = 20;
+let dirty = true, ended = false, nCount = 20, worldMode = 'real';
+let nukes = [], nukeArmed = false, nukeReady = 0;
 
 // ---------- geração do mundo ----------
 const SYL_A = ['Val','Kor','Ost','Bel','Mar','Tor','Zan','Lis','Dra','Ves','Ard','Nor','Sar','Kel','Rho','Gal','Eri','Mon','Tal','Vor','Lum','Bra','Cas','Fen','Hal','Ith','Jor','Kar','Pel','Ruv','Sol','Ul','Tes','Gor','Aur','Zer','Mir','Ost','Del','Qar'];
@@ -188,6 +211,7 @@ function genFlag() {
   return { type: ['h3','v3','h2','cross','disk','tri','h3'][ri(0, 6)], cols };
 }
 function drawFlag(ctx, f, x, y, w, h) {
+  if (f.img) { if (f.img.complete && f.img.naturalWidth) ctx.drawImage(f.img, x, y, w, h); return; }
   const c = i => `rgb(${f.cols[i].join(',')})`;
   ctx.save();
   switch (f.type) {
@@ -227,19 +251,9 @@ function cleanComponents(type, minSize) {
   }
 }
 
-function genWorld(n) {
-  const nz = makeNoise(), nz2 = makeNoise(), nz3 = makeNoise();
-  const val = new Float32Array(NC);
-  for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) {
-    const dx = (x / GW - .5) * 2, dy = (y / GH - .5) * 2, d = Math.sqrt(dx * dx * .85 + dy * dy);
-    val[y * GW + x] = nz(x / 34, y / 34, 5) - d * d * .45;
-  }
-  const thr = Float32Array.from(val).sort()[Math.floor(NC * (1 - CFG.LAND))];
-  for (let i = 0; i < NC; i++) land[i] = val[i] > thr ? 1 : 0;
-  cleanComponents(1, 25); cleanComponents(0, 20);
-
-  // relevo e oceano
-  let mx = 1e-6; for (let i = 0; i < NC; i++) if (land[i]) mx = Math.max(mx, val[i] - thr);
+// terreno comum: oceano, costa, travessias marítimas
+function finishTerrain(elev) {
+  const nz3 = makeNoise();
   const dist = new Int16Array(NC).fill(99), q = [];
   for (let i = 0; i < NC; i++) if (land[i]) { dist[i] = 0; q.push(i); }
   for (let h = 0; h < q.length; h++) {
@@ -252,7 +266,7 @@ function genWorld(n) {
   for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) {
     const i = y * GW + x, tex = (nz3(x / 4, y / 4, 2) - .5);
     if (land[i]) {
-      shade[i] = .8 + .28 * Math.pow(Math.max(0, val[i] - thr) / mx, .7) + tex * .12;
+      shade[i] = .8 + .28 * elev(i) + tex * .12;
       coastal[i] = ((x > 0 && !land[i - 1]) || (x < GW - 1 && !land[i + 1]) || (y > 0 && !land[i - GW]) || (y < GH - 1 && !land[i + GW])) ? 1 : 0;
       if (coastal[i]) coastList.push(i);
     } else {
@@ -261,7 +275,6 @@ function genWorld(n) {
       ocean[i] = pack(9 + t * 30, 30 + t * 62, 48 + t * 66);
     }
   }
-  // travessias marítimas curtas (até 3 células)
   const sa = [], sb = [];
   for (const c of coastList) {
     const x = c % GW, y = (c / GW) | 0;
@@ -277,8 +290,22 @@ function genWorld(n) {
     }
   }
   seaA = Int32Array.from(sa); seaB = Int32Array.from(sb);
+}
 
-  // sementes dos países
+function genWorld(n) {
+  alloc(CFG.GW, CFG.GH, 4);
+  const nz = makeNoise(), nz2 = makeNoise();
+  const val = new Float32Array(NC);
+  for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) {
+    const dx = (x / GW - .5) * 2, dy = (y / GH - .5) * 2, d = Math.sqrt(dx * dx * .85 + dy * dy);
+    val[y * GW + x] = nz(x / 34, y / 34, 5) - d * d * .45;
+  }
+  const thr = Float32Array.from(val).sort()[Math.floor(NC * (1 - CFG.LAND))];
+  for (let i = 0; i < NC; i++) land[i] = val[i] > thr ? 1 : 0;
+  cleanComponents(1, 25); cleanComponents(0, 20);
+  let mx = 1e-6; for (let i = 0; i < NC; i++) if (land[i]) mx = Math.max(mx, val[i] - thr);
+  finishTerrain(i => Math.pow(Math.max(0, val[i] - thr) / mx, .7));
+
   const landCells = []; for (let i = 0; i < NC; i++) if (land[i]) landCells.push(i);
   let seeds = [], minD = Math.sqrt(landCells.length / n) * .8, tries = 0;
   while (seeds.length < n && tries < 30000) {
@@ -309,32 +336,59 @@ function genWorld(n) {
   const keep = seeds.map((_, i) => cnt[i] >= 25);
   seeds = seeds.filter((_, i) => keep[i]); weights = weights.filter((_, i) => keep[i]);
   cnt = assign();
+  const names = genNames(seeds.length);
+  makeCountries(seeds.map((cap, i) => ({ name: names[i], flag: genFlag(), cap, mult: 1, nuclear: false })));
+}
 
-  N = seeds.length;
-  const names = genNames(N), hue0 = R() * 360;
-  C = seeds.map((s, i) => ({
-    id: i, name: names[i], col: hslRgb((hue0 + i * 137.508) % 360, 38 + R() * 26, 44 + R() * 16),
-    flag: genFlag(), alive: true, cells: cnt[i], troops: cnt[i] * CFG.TROOPS_PER_CELL * (.8 + R() * .5),
-    casualties: 0, cap: s, aggr: .25 + R() * .6, lx: s % GW, ly: (s / GW) | 0,
+// força militar relativa (1 = padrão por província) e potências nucleares de hoje
+const POWER = { US: 2.6, CN: 2.3, RU: 1.5, IN: 2, GB: 2.2, FR: 2.2, DE: 2, JP: 2, KR: 2.3, KP: 2, IL: 2.6, TR: 1.9, IR: 1.6, PK: 1.9, EG: 1.4,
+  UA: 1.6, PL: 1.7, IT: 1.8, BR: 1.3, SA: 1.1, ES: 1.6, TW: 2.2, VN: 1.7, ID: 1.2, NG: 1.1, MX: 1.1, AU: .7, CA: .45, GL: .12, MN: .4,
+  KZ: .6, DZ: .8, LY: .5, NE: .5, ML: .5, TD: .5, MR: .4, SD: .7, AR: .8, CD: .7, AQ: .1 };
+const NUKES = new Set(['US', 'RU', 'CN', 'GB', 'FR', 'IN', 'PK', 'IL', 'KP']);
+function genReal() {
+  alloc(WORLD.gw, WORLD.gh, 3);
+  let k = 0;
+  for (let r = 0; r < WORLD.runs.length; r += 2) for (let j = 0; j < WORLD.runs[r + 1]; j++) { owner[k] = WORLD.runs[r] - 1; land[k] = owner[k] >= 0 ? 1 : 0; k++; }
+  finishTerrain(() => .45);
+  const cnt = new Array(WORLD.countries.length).fill(0); for (let i = 0; i < NC; i++) if (owner[i] >= 0) cnt[owner[i]]++;
+  makeCountries(WORLD.countries.map((w, i) => {
+    let flag = genFlag();
+    if (w.f) { const im = new Image(); im.onload = () => { dirty = true; }; im.src = w.f; flag = { img: im, url: w.f }; }
+    return { name: w.n, flag, cap: -1, mult: (POWER[w.a] || 1) * clamp((60 / Math.max(cnt[i], 1)) ** .35, 1, 2.6), nuclear: NUKES.has(w.a) };
+  }));
+}
+function newWorld() { worldMode === 'real' ? genReal() : genWorld(nCount); fillSearch(); }
+function fillSearch() { $('clist').innerHTML = C.map(c => `<option value="${esc(c.name)}"></option>`).join(''); }
+
+function makeCountries(list) {
+  N = list.length;
+  const hue0 = R() * 360;
+  const cnt = new Array(N).fill(0); for (let i = 0; i < NC; i++) if (owner[i] >= 0) cnt[owner[i]]++;
+  C = list.map((d, i) => ({
+    id: i, name: d.name, col: hslRgb((hue0 + i * 137.508) % 360, 38 + R() * 26, 44 + R() * 16),
+    flag: d.flag, alive: cnt[i] > 0, cells: cnt[i], mult: d.mult, nuclear: d.nuclear, nukeReady: 0,
+    troops: cnt[i] * CFG.TROOPS_PER_CELL * d.mult * (.8 + R() * .5),
+    casualties: 0, cap: d.cap, aggr: .25 + R() * .6, lx: 0, ly: 0,
     recruitCD: 0, allyCD: 0, aidCD: 0,
   }));
+  computeLabels();
   for (const c of C) {
-    if (owner[c.cap] !== c.id) relocateCapital(c.id, c.cap);
-    const fc = document.createElement('canvas'); fc.width = 36; fc.height = 24;
-    drawFlag(fc.getContext('2d'), c.flag, 0, 0, 36, 24); c.flagURL = fc.toDataURL();
+    if (c.cap < 0 || owner[c.cap] !== c.id) { c.cap = c.ly * GW + c.lx; if (owner[c.cap] !== c.id) relocateCapital(c.id, c.cap); }
+    if (c.flag.url) c.flagURL = c.flag.url;
+    else { const fc = document.createElement('canvas'); fc.width = 36; fc.height = 24; drawFlag(fc.getContext('2d'), c.flag, 0, 0, 36, 24); c.flagURL = fc.toDataURL(); }
   }
   rel = new Float32Array(N * N); allied = new Uint8Array(N * N); adj = new Uint16Array(N * N);
   for (let a = 0; a < N; a++) for (let b = a + 1; b < N; b++) { const v = -15 + R() * 50; rel[a * N + b] = rel[b * N + a] = v; }
   wars = []; rebuildWarMat();
   scanBorders();
   for (let a = 0; a < N; a++) for (let b = 0; b < N; b++) if (adj[a * N + b]) rel[a * N + b] -= 8;
-  flash.fill(0); anims = []; $('vs').hidden = true; reqs = []; logs = []; focus = null;
+  anims = []; nukes = []; nukeArmed = false; nukeReady = 0; $('vs').hidden = true; reqs = []; logs = []; focus = null;
   day = 0; P = -1; sel = -1; phase = 'select'; ended = false;
-  computeLabels(); dirty = true; reqsChanged = true;
+  dirty = true; reqsChanged = true;
 }
 
 // ---------- utilidades de diplomacia ----------
-const maxT = c => c.cells * CFG.MAX_PER_CELL + 2000;
+const maxT = c => c.cells * CFG.MAX_PER_CELL * c.mult + 2000;
 const isAllied = (a, b) => !!allied[a * N + b];
 const warOf = (a, b) => { const i = warMat[a * N + b]; return i >= 0 ? wars[i] : null; };
 function rebuildWarMat() {
@@ -392,7 +446,7 @@ function declareWar(a, b, mode, parent = 0, helpFor = -1) {
   if (a === P) toast(parent ? `⚔ Você entrou na guerra contra ${C[b].name}${tagM}` : `⚔ Você declarou guerra a ${C[b].name}${tagM}`, 'bad');
   else if (b === P) toast(parent ? `⚔ ${C[a].name} entrou na guerra contra você!` : `⚔ ${C[a].name} declarou guerra a você!${tagM}`, 'bad');
   else if (parent && w.helpFor === P) toast(`📣 ${C[a].name} entrou na guerra ao seu lado contra ${C[b].name}!`, 'good');
-  else if (!parent) toast(`${C[a].name} declarou guerra a ${C[b].name}${mode === 'morte' ? ' (até a morte)' : ''}`, 'g');
+  else if (!parent && (P < 0 || adj[a * N + P] || adj[b * N + P] || C[a].cells > 120 || C[b].cells > 120)) toast(`${C[a].name} declarou guerra a ${C[b].name}${mode === 'morte' ? ' (até a morte)' : ''}`, 'g');
   for (const x of [a, b]) for (const o of alliesOf(x)) relAdd(o, x === a ? b : a, -20);
   if (!parent) {
     // aliados do defensor podem entrar na guerra
@@ -427,7 +481,7 @@ function kill(id) {
   for (let o = 0; o < N; o++) allied[id * N + o] = allied[o * N + id] = 0;
   toast(id === P ? `☠ ${c.name} caiu.` : `☠ ${c.name} foi eliminado!`, id === P ? 'bad' : '');
   if (sel === id && phase === 'game') sel = P;
-  if (id === P && !ended) { ended = true; showModal('Derrota', `${c.name} perdeu todo o território no dia ${day}.`, [['Escolher outro país', () => { phase = 'select'; sel = -1; P = -1; ended = false; focus = null; reqs = []; reqsChanged = true; }], ['Novo mapa', () => genWorld(nCount)]]); }
+  if (id === P && !ended) { ended = true; showModal('Derrota', `${c.name} perdeu todo o território no dia ${day}.`, [['Escolher outro país', () => { phase = 'select'; sel = -1; P = -1; ended = false; focus = null; reqs = []; reqsChanged = true; }], ['Novo mapa', () => newWorld()]]); }
   dirty = true;
 }
 function relocateCapital(id, from) {
@@ -471,6 +525,8 @@ function battle(w, ca, cb, sea) {
     const fx = focus.c % GW, fy = (focus.c / GW) | 0, tc = w.a === P ? cb : ca;
     if ((tc % GW - fx) ** 2 + (((tc / GW) | 0) - fy) ** 2 < CFG.FOCUS_RADIUS ** 2) { if (w.a === P) ba = CFG.FOCUS_BONUS; else bb = CFG.FOCUS_BONUS; }
   }
+  if (rad[ca] && day - rad[ca] < CFG.RAD_DAYS) ba *= .45;
+  if (rad[cb] && day - rad[cb] < CFG.RAD_DAYS) bb *= .45;
   const sa = (da + 4) * (.55 + R() * .9) * ba, sb = (db + 4) * (.55 + R() * .9) * bb;
   const base = (da + db) * .09 * (.5 + R()) + 4;
   const aWins = sa > sb;
@@ -496,7 +552,7 @@ function amphibious(w) {
 }
 function tick() {
   day++;
-  for (const c of C) if (c.alive) c.troops = Math.max(0, c.troops + c.cells * CFG.REGEN * (1 - c.troops / maxT(c)));
+  for (const c of C) if (c.alive) c.troops = Math.max(0, c.troops + c.cells * CFG.REGEN * c.mult * (1 - c.troops / maxT(c)));
   scanBorders();
   for (const w of wars.slice()) {
     if (!wars.includes(w) || !C[w.a].alive || !C[w.b].alive) continue;
@@ -542,7 +598,7 @@ function tick() {
   if (day % 8 === 0) computeLabels();
   if (P >= 0 && C[P].alive && !ended && C.every(c => !c.alive || c.id === P || isAllied(c.id, P))) {
     ended = true;
-    showModal('Vitória!', `${C[P].name} dominou o continente no dia ${day}. Todos os países restantes são seus aliados.`, [['Continuar jogando', () => {}], ['Novo mapa', () => genWorld(nCount)]]);
+    showModal('Vitória!', `${C[P].name} dominou o mundo no dia ${day}. Todos os países restantes são seus aliados.`, [['Continuar jogando', () => {}], ['Novo mapa', () => newWorld()]]);
   }
 }
 function aiThink(c) {
@@ -557,7 +613,13 @@ function aiThink(c) {
     } else if (!w.parent && ((dur > 140 && R() < .25) || (lost > .25 && R() < .4))) endWar(w, 'peace');
   }
   const active = wars.filter(w => !w.parent).length;
-  if (my.length === 0 && active < Math.max(2, N / 4) && c.troops > maxT(c) * .55 && R() < c.aggr * .5) {
+  if (c.nuclear && performance.now() > c.nukeReady) {
+    for (const w of my) {
+      const e = enemyIn(w, id), lost = 1 - c.cells / Math.max(w.a === id ? w.a0 : w.b0, 1);
+      if ((w.mode === 'morte' || lost > .2) && R() < .25 && C[e].alive) { launchNuke(id, C[e].cap); break; }
+    }
+  }
+  if (my.length === 0 && active < Math.max(2, Math.min(N / 4, 10)) && c.troops > maxT(c) * .55 && R() < c.aggr * .5) {
     let best = -1, bs = -1e9;
     for (let o = 0; o < N; o++) {
       if (o === id || !C[o].alive || !adj[id * N + o] || isAllied(id, o)) continue;
@@ -579,12 +641,27 @@ function aiThink(c) {
   }
 }
 function computeLabels() {
-  const sx = new Float64Array(N), sy = new Float64Array(N), n = new Int32Array(N);
-  for (let i = 0; i < NC; i++) { const o = owner[i]; if (o >= 0) { sx[o] += i % GW; sy[o] += (i / GW) | 0; n[o]++; } }
+  const comp = new Int32Array(NC).fill(-1), stack = [];
+  const best = new Int32Array(N).fill(0), bestId = new Int32Array(N).fill(-1), mx = new Float64Array(N), my = new Float64Array(N), n = new Int32Array(N);
+  let id = 0;
+  for (let i = 0; i < NC; i++) {
+    const o = owner[i]; if (o < 0 || comp[i] >= 0) continue;
+    let k = 0, sx = 0, sy = 0; stack.push(i); comp[i] = id;
+    while (stack.length) {
+      const c = stack.pop(), x = c % GW, y = (c / GW) | 0; k++; sx += x; sy += y;
+      if (x > 0 && comp[c - 1] < 0 && owner[c - 1] === o) { comp[c - 1] = id; stack.push(c - 1); }
+      if (x < GW - 1 && comp[c + 1] < 0 && owner[c + 1] === o) { comp[c + 1] = id; stack.push(c + 1); }
+      if (y > 0 && comp[c - GW] < 0 && owner[c - GW] === o) { comp[c - GW] = id; stack.push(c - GW); }
+      if (y < GH - 1 && comp[c + GW] < 0 && owner[c + GW] === o) { comp[c + GW] = id; stack.push(c + GW); }
+    }
+    n[o] += k;
+    if (k > best[o]) { best[o] = k; bestId[o] = id; mx[o] = sx / k; my[o] = sy / k; }
+    id++;
+  }
   const bd = new Float64Array(N).fill(1e18), bc = new Int32Array(N).fill(-1);
   for (let i = 0; i < NC; i++) {
-    const o = owner[i]; if (o < 0) continue;
-    const d = (i % GW - sx[o] / n[o]) ** 2 + (((i / GW) | 0) - sy[o] / n[o]) ** 2;
+    const o = owner[i]; if (o < 0 || comp[i] !== bestId[o]) continue;
+    const d = (i % GW - mx[o]) ** 2 + (((i / GW) | 0) - my[o]) ** 2;
     if (d < bd[o]) { bd[o] = d; bc[o] = i; }
   }
   for (const c of C) { c.cells = n[c.id]; if (bc[c.id] >= 0) { c.lx = bc[c.id] % GW; c.ly = (bc[c.id] / GW) | 0; } }
@@ -655,7 +732,7 @@ function showModal(title, text, btns) {
 // ---------- renderização ----------
 const cv = $('map'), ctx = cv.getContext('2d');
 const off = document.createElement('canvas'); off.width = GW * S; off.height = GH * S;
-const octx = off.getContext('2d'), img = octx.createImageData(GW * S, GH * S), u32 = new Uint32Array(img.data.buffer);
+const octx = off.getContext('2d'); let img, u32;
 const cam = { x: 0, y: 0, z: 4, fit: 4 };
 let dpr = 1, VW = 0, VH = 0, fitted = false;
 const COL_EDGE = pack(12, 12, 16), COL_WAR = pack(225, 45, 45), COL_COAST = pack(18, 30, 40), COL_ME = pack(5, 5, 8);
@@ -670,6 +747,7 @@ function renderOff() {
       const k = C[o].col, s = shade[c];
       let r = k[0] * s, g = k[1] * s, b = k[2] * s;
       if (o === sel) { r += 32; g += 32; b += 32; }
+      if (rad[c] && day - rad[c] < CFG.RAD_DAYS) { const t = (1 - (day - rad[c]) / CFG.RAD_DAYS) * .6; r += (64 - r) * t; g += (78 - g) * t; b += (34 - b) * t; }
       const f = day - flash[c];
       if (flash[c] > 0 && f < 10) { const t = (1 - f / 10) * .22; r += (255 - r) * t; g += (255 - g) * t; b += (255 - b) * t; }
       col = pack(r, g, b);
@@ -715,6 +793,7 @@ function resize() {
 function draw() {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.fillStyle = '#07111a'; ctx.fillRect(0, 0, VW, VH);
+  if (shakeAmt > 0) ctx.translate((R() - .5) * shakeAmt * 2, (R() - .5) * shakeAmt * 2);
   ctx.imageSmoothingEnabled = false;
   ctx.drawImage(off, cam.x, cam.y, GW * cam.z, GH * cam.z);
   const z = cam.z, sx = x => cam.x + (x + .5) * z, sy = y => cam.y + (y + .5) * z;
@@ -783,7 +862,7 @@ function draw() {
   }
   // capitais
   for (const c of C) {
-    if (!c.alive) continue;
+    if (!c.alive || (c.cells < 6 && z < 7 && c.id !== P && c.id !== sel)) continue;
     const x = sx(c.cap % GW), y = sy((c.cap / GW) | 0), r = Math.max(2.5, Math.min(6, z * .9));
     ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fillStyle = c.id === P ? '#f2c443' : '#e8eef5'; ctx.fill();
     ctx.lineWidth = 1.5; ctx.strokeStyle = '#111'; ctx.stroke();
@@ -811,6 +890,7 @@ function draw() {
       ctx.fillStyle = inWar ? '#ff8a8a' : c.id === P ? '#bfe0ff' : '#d8e2ec'; ctx.fillText(t, x, y + f * .95);
     }
   }
+  shakeAmt = drawNukes(now, z);
   // foco de ataque
   if (focus && phase === 'game') {
     const x = sx(focus.c % GW), y = sy((focus.c / GW) | 0), r = CFG.FOCUS_RADIUS * z * .5, pulse = 1 + Math.sin(now / 200) * .08;
@@ -829,7 +909,7 @@ function relBar(v) {
 function infoHTML() {
   if (sel < 0) {
     return `<h2>⚔ Guerra Global</h2>
-    <p class="mut small" style="margin:4px 0 8px">Escolha um país tocando no mapa. Declare guerras, forme alianças e conquiste o continente.</p>
+    <p class="mut small" style="margin:4px 0 8px">Escolha um país tocando no mapa. Declare guerras, forme alianças e conquiste o mundo.</p>
     <div class="small" style="line-height:1.55">
       <b>⚔ Ataque</b> — guerra normal; dá pra propor paz a qualquer momento.<br>
       <b>☠ Até a morte</b> — sem paz: só acaba quando um dos países perde todo o território.<br>
@@ -843,6 +923,7 @@ function infoHTML() {
   else if (me) tag = '<span class="tag you">VOCÊ</span>';
   else if (phase === 'game' && P >= 0 && warMat[P * N + sel] >= 0) tag = `<span class="tag war">${warOf(P, sel).mode === 'morte' ? '☠ ATÉ A MORTE' : 'EM GUERRA'}</span>`;
   else if (phase === 'game' && P >= 0 && isAllied(P, sel)) tag = '<span class="tag ally">ALIADO</span>';
+  if (c.nuclear) tag += ' <span class="tag nuc" title="Potência nuclear">☢</span>';
   let h = `<h2><img src="${c.flagURL}" alt="">${esc(c.name)} ${tag}</h2>
   <div class="stats">
     <span class="mut">Território</span><b>${fmt(c.cells)} prov.</b>
@@ -860,7 +941,9 @@ function actionsHTML() {
   if (phase === 'select') {
     let h = '';
     if (sel >= 0 && C[sel].alive) h += `<button class="big" data-act="play">▶ Jogar com ${esc(C[sel].name)}</button>`;
-    h += `<div class="row"><select id="ncount">${[8, 12, 16, 20, 26, 32, 40].map(v => `<option value="${v}"${v === nCount ? ' selected' : ''}>${v} países</option>`).join('')}</select><button data-act="newmap">🎲 Novo mapa</button></div>`;
+    h += `<div class="row"><input id="search" list="clist" placeholder="🔎 Buscar país…" autocomplete="off"></div>`;
+    h += `<div class="row"><select id="wmode"><option value="real"${worldMode === 'real' ? ' selected' : ''}>🌍 Mundo real (hoje)</option><option value="rand"${worldMode === 'rand' ? ' selected' : ''}>🎲 Continente aleatório</option></select></div>`;
+    if (worldMode === 'rand') h += `<div class="row"><select id="ncount">${[8, 12, 16, 20, 26, 32, 40].map(v => `<option value="${v}"${v === nCount ? ' selected' : ''}>${v} países</option>`).join('')}</select><button data-act="newmap">🎲 Novo mapa</button></div>`;
     return h;
   }
   if (sel < 0 || !C[sel].alive || P < 0 || !C[P].alive) return '';
@@ -934,8 +1017,8 @@ $('panel').addEventListener('click', e => {
   if (e.target.id === 'ptog') { $('panel').classList.toggle('min'); return; }
   const b = e.target.closest('button[data-act]'); if (!b || b.disabled) return;
   const act = b.dataset.act;
-  if (act === 'play') { P = sel; phase = 'game'; if (VW < 760) { cam.z = cam.fit * 2.2; cam.x = VW / 2 - (C[P].lx + .5) * cam.z; cam.y = VH * .3 - (C[P].ly + .5) * cam.z; } toast(`Você governa ${C[P].name}. Boa sorte!`, 'good'); }
-  else if (act === 'newmap') genWorld(nCount);
+  if (act === 'play') { P = sel; phase = 'game'; if (VW < 760 || worldMode === 'real') { cam.z = worldMode === 'real' ? Math.max(cam.fit * 2.6, 6) : cam.fit * 2.2; cam.x = VW / 2 - (C[P].lx + .5) * cam.z; cam.y = VH * .3 - (C[P].ly + .5) * cam.z; } toast(`Você governa ${C[P].name}. Boa sorte!`, 'good'); }
+  else if (act === 'newmap') newWorld();
   else if (act === 'war') declareWar(P, sel, 'ataque');
   else if (act === 'death') declareWar(P, sel, 'morte');
   else if (act === 'peace') actPeace(sel);
@@ -946,7 +1029,14 @@ $('panel').addEventListener('click', e => {
   else if (act === 'recruit') actRecruit();
   dirty = true; updateUI();
 });
-$('panel').addEventListener('change', e => { if (e.target.id === 'ncount') { nCount = +e.target.value; genWorld(nCount); updateUI(); } });
+$('panel').addEventListener('change', e => {
+  if (e.target.id === 'ncount') { nCount = +e.target.value; newWorld(); updateUI(); }
+  else if (e.target.id === 'wmode') { worldMode = e.target.value; newWorld(); updateUI(); }
+  else if (e.target.id === 'search') {
+    const c = C.find(c => c.name.toLowerCase() === e.target.value.trim().toLowerCase());
+    if (c && c.alive) { sel = c.id; cam.z = Math.max(cam.z, cam.fit * 2.5); cam.x = VW / 2 - (c.lx + .5) * cam.z; cam.y = VH * (VW < 760 ? .3 : .5) - (c.ly + .5) * cam.z; dirty = true; updateUI(); }
+  }
+});
 $('reqs').addEventListener('click', e => {
   const b = e.target.closest('button[data-req]'); if (!b) return;
   const r = reqs[+b.dataset.req]; if (!r) return;
@@ -959,12 +1049,102 @@ document.querySelectorAll('[data-spd]').forEach(b => b.addEventListener('click',
   document.querySelectorAll('[data-spd]').forEach(x => x.classList.toggle('on', x === b));
 }));
 $('vs').addEventListener('click', () => { $('vs').hidden = true; });
-$('newgame').addEventListener('click', () => showModal('Novo jogo?', 'O progresso atual será perdido.', [['Novo mapa', () => genWorld(nCount)], ['Cancelar', () => {}]]));
+$('newgame').addEventListener('click', () => showModal('Novo jogo?', 'O progresso atual será perdido.', [['Novo mapa', () => newWorld()], ['Cancelar', () => {}]]));
+
+// ---------- bomba nuclear ----------
+function launchNuke(from, cell) {
+  const now = performance.now(), e = owner[cell];
+  if (from === P) nukeReady = now + CFG.NUKE_CD_MS; else C[from].nukeReady = now + CFG.AI_NUKE_CD_MS;
+  nukes.push({ from, src: C[from].cap, dst: cell, t: now, hit: false });
+  for (const c of C) if (c.alive && c.id !== from && warMat[from * N + c.id] < 0) relAdd(from, c.id, isAllied(from, c.id) ? -4 : -10);
+  if (from === P) toast(`☢ Míssil nuclear lançado contra ${C[e].name}!`, 'bad');
+  else if (e === P) toast(`☢ ${C[from].name} lançou uma bomba nuclear em você!`, 'bad');
+  else toast(`☢ ${C[from].name} lançou uma bomba nuclear em ${C[e].name}`, 'g');
+}
+function detonate(n) {
+  const r = CFG.NUKE_R, tx = n.dst % GW, ty = (n.dst / GW) | 0, hits = new Map(), target = owner[n.dst];
+  for (let y = ty - r; y <= ty + r; y++) for (let x = tx - r; x <= tx + r; x++) {
+    if (x < 0 || y < 0 || x >= GW || y >= GH || (x - tx) ** 2 + (y - ty) ** 2 > r * r) continue;
+    const c = y * GW + x, o = owner[c]; if (o < 0) continue;
+    rad[c] = Math.max(day, 1); hits.set(o, (hits.get(o) || 0) + 1);
+  }
+  let total = 0;
+  for (const [o, h] of hits) {
+    const k = C[o]; if (!k.alive) continue;
+    const frac = clamp((o === target ? .15 : 0) + h / Math.max(k.cells, 1) * 2.5, 0, o === target ? .7 : .5);
+    const loss = k.troops * frac; k.troops -= loss; k.casualties += loss;
+    const w = warOf(n.from, o); if (w) { if (w.a === o) w.casA += loss; else w.casB += loss; }
+    if (o === target) total = loss;
+    if ((k.cap % GW - tx) ** 2 + (((k.cap / GW) | 0) - ty) ** 2 <= r * r) { k.troops *= .8; relocateCapital(o, k.cap); if (o === P) toast('🏛 Sua capital foi destruída! Governo transferido.', 'bad'); }
+  }
+  if (n.from === P || target === P) toast(`☢ Explosão nuclear em ${C[target].name}: −${fmt(total)} tropas`, n.from === P ? 'good' : 'bad');
+  dirty = true;
+}
+function updateNukes(now) {
+  for (const n of nukes) if (!n.hit && now - n.t >= CFG.NUKE_FLY_MS) { n.hit = true; if (owner[n.dst] >= 0) detonate(n); }
+  nukes = nukes.filter(n => now - n.t < CFG.NUKE_FLY_MS + CFG.NUKE_FX_MS);
+}
+function drawNukes(now, z) {
+  let shake = 0;
+  for (const n of nukes) {
+    const sx0 = cam.x + (n.src % GW + .5) * z, sy0 = cam.y + (((n.src / GW) | 0) + .5) * z;
+    const sx1 = cam.x + (n.dst % GW + .5) * z, sy1 = cam.y + (((n.dst / GW) | 0) + .5) * z;
+    const k = (now - n.t) / CFG.NUKE_FLY_MS, R0 = CFG.NUKE_R * z;
+    if (k < 1) {
+      const cx = (sx0 + sx1) / 2, cy = (sy0 + sy1) / 2 - Math.hypot(sx1 - sx0, sy1 - sy0) * .35 - 20;
+      const bz = t => [(1 - t) ** 2 * sx0 + 2 * (1 - t) * t * cx + t * t * sx1, (1 - t) ** 2 * sy0 + 2 * (1 - t) * t * cy + t * t * sy1];
+      ctx.lineCap = 'round';
+      for (let i = 0; i < 14; i++) {
+        const t0 = Math.max(0, k - .3 + i * .3 / 14), t1 = Math.max(0, k - .3 + (i + 1) * .3 / 14);
+        const [a, b] = bz(t0), [c2, d] = bz(t1);
+        ctx.strokeStyle = `rgba(255,${200 - i * 6},120,${i / 14 * .8})`; ctx.lineWidth = 1 + i / 4;
+        ctx.beginPath(); ctx.moveTo(a, b); ctx.lineTo(c2, d); ctx.stroke();
+      }
+      const [hx, hy] = bz(k);
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(hx, hy, 3.5, 0, 7); ctx.fill();
+      const pul = .5 + .5 * Math.sin(now / 90);
+      ctx.strokeStyle = `rgba(255,60,60,${.5 + pul * .4})`; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(sx1, sy1, R0 * (1 + pul * .1), 0, 7); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(sx1 - R0 * .4, sy1); ctx.lineTo(sx1 + R0 * .4, sy1); ctx.moveTo(sx1, sy1 - R0 * .4); ctx.lineTo(sx1, sy1 + R0 * .4); ctx.stroke();
+      continue;
+    }
+    const e = (now - n.t - CFG.NUKE_FLY_MS) / CFG.NUKE_FX_MS;
+    if (e < .3) shake = Math.max(shake, (1 - e / .3) * 7);
+    const fr = R0 * (.4 + Math.min(1, e * 3) * .9), a = 1 - e;
+    const g = ctx.createRadialGradient(sx1, sy1, 0, sx1, sy1, fr);
+    g.addColorStop(0, `rgba(255,255,230,${a})`); g.addColorStop(.35, `rgba(255,200,70,${a * .95})`);
+    g.addColorStop(.7, `rgba(230,80,20,${a * .7})`); g.addColorStop(1, 'rgba(120,20,10,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(sx1, sy1, fr, 0, 7); ctx.fill();
+    ctx.strokeStyle = `rgba(255,240,210,${(1 - e) * .85})`; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(sx1, sy1, R0 * (.5 + e * 2.6), 0, 7); ctx.stroke();
+    const cy = sy1 - e * fr * 1.3, cr = fr * (.45 + e * .4);
+    ctx.fillStyle = `rgba(90,70,60,${(1 - e) * .55})`; ctx.fillRect(sx1 - cr * .18, cy, cr * .36, sy1 - cy);
+    const g2 = ctx.createRadialGradient(sx1, cy, 0, sx1, cy, cr);
+    g2.addColorStop(0, `rgba(255,160,60,${(1 - e) * .8})`); g2.addColorStop(1, `rgba(80,60,55,0)`);
+    ctx.fillStyle = g2; ctx.beginPath(); ctx.arc(sx1, cy, cr, 0, 7); ctx.fill();
+    if (e < .12) { ctx.fillStyle = `rgba(255,255,255,${(1 - e / .12) * .55})`; ctx.fillRect(0, 0, VW, VH); }
+  }
+  return shake;
+}
+function nukeButton() {
+  const b = $('nuke'), show = phase === 'game' && P >= 0 && C[P].alive && warsOf(P).length > 0;
+  b.hidden = !show; if (!show) { nukeArmed = false; return; }
+  const left = Math.ceil((nukeReady - performance.now()) / 1000);
+  const html = nukeArmed ? '☢<small>ALVO?</small>' : left > 0 ? `☢<small>${left}s</small>` : '☢<small>PRONTA</small>';
+  b.className = nukeArmed ? 'armed' : left > 0 ? 'cd' : '';
+  if (b.innerHTML !== html) b.innerHTML = html;
+}
+$('nuke').addEventListener('click', () => {
+  if (performance.now() < nukeReady) { toast(`☢ Recarregando: ${Math.ceil((nukeReady - performance.now()) / 1000)}s`); return; }
+  nukeArmed = !nukeArmed;
+  if (nukeArmed) toast('☢ Toque no território de um país em guerra com você.', 'bad');
+  nukeButton();
+});
 
 // ---------- entrada: arrastar, zoom, toque ----------
 const ptrs = new Map(); let moved = 0, pinch0 = null;
 function zoomAt(mx, my, f) {
-  const nz = clamp(cam.z * f, cam.fit * .7, cam.fit * 9);
+  const nz = clamp(cam.z * f, cam.fit * .7, cam.fit * (worldMode === 'real' ? 16 : 9));
   cam.x = mx - (mx - cam.x) * nz / cam.z; cam.y = my - (my - cam.y) * nz / cam.z; cam.z = nz;
 }
 cv.addEventListener('pointerdown', e => { cv.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY }); moved = ptrs.size > 1 ? 99 : 0; pinch0 = null; });
@@ -998,6 +1178,11 @@ function tap(px, py) {
   const x = Math.floor((px - cam.x) / cam.z), y = Math.floor((py - cam.y) / cam.z);
   if (x < 0 || y < 0 || x >= GW || y >= GH) return;
   const c = y * GW + x, o = owner[c];
+  if (nukeArmed) {
+    if (o >= 0 && P >= 0 && warMat[P * N + o] >= 0) { nukeArmed = false; launchNuke(P, c); nukeButton(); }
+    else toast('☢ Escolha um país que está em guerra com você.', 'bad');
+    return;
+  }
   if (o < 0) { sel = phase === 'game' ? P : -1; }
   else {
     sel = o;
@@ -1012,7 +1197,8 @@ addEventListener('keydown', e => {
 });
 
 // ---------- loop ----------
-let acc = 0, lastT = performance.now(), uiT = 0;
+let shakeAmt = 0;
+let acc = 0, lastT = performance.now(), uiT = 0, lastRO = 0;
 function frame(t) {
   const dt = Math.min(250, t - lastT); lastT = t;
   if (phase === 'game' && speed > 0 && !ended) {
@@ -1023,13 +1209,14 @@ function frame(t) {
   } else if (phase === 'game' && ended && speed > 0 && P >= 0 && C[P].alive) {
     acc += dt * CFG.TPS * speed / 1000; while (acc >= 1) { tick(); acc -= 1; }
   }
-  if (dirty) { renderOff(); dirty = false; }
+  if (dirty && t - lastRO > 60) { renderOff(); dirty = false; lastRO = t; }
+  updateNukes(t);
   draw();
-  uiT += dt; if (uiT > 250) { uiT = 0; updateUI(); }
+  uiT += dt; if (uiT > 250) { uiT = 0; updateUI(); nukeButton(); }
   requestAnimationFrame(frame);
 }
 resize();
-genWorld(nCount);
+newWorld();
 updateUI();
 requestAnimationFrame(frame);
 </script>
