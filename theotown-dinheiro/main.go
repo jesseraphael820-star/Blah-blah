@@ -1,9 +1,9 @@
-//go:build windows
-
 // Editor de dinheiro para TheoTown (modo single-player).
 // Funciona como um "Cheat Engine" simplificado: procura na memória do jogo
 // o valor atual do seu dinheiro, filtra os resultados conforme o valor muda
 // e depois escreve o valor que você quiser.
+//
+// Windows: mem_windows.go  |  Android/Linux (precisa de root): mem_linux.go
 package main
 
 import (
@@ -13,67 +13,25 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
-	"unsafe"
 )
-
-var (
-	kernel32               = syscall.NewLazyDLL("kernel32.dll")
-	procCreateSnapshot     = kernel32.NewProc("CreateToolhelp32Snapshot")
-	procProcess32FirstW    = kernel32.NewProc("Process32FirstW")
-	procProcess32NextW     = kernel32.NewProc("Process32NextW")
-	procOpenProcess        = kernel32.NewProc("OpenProcess")
-	procVirtualQueryEx     = kernel32.NewProc("VirtualQueryEx")
-	procReadProcessMemory  = kernel32.NewProc("ReadProcessMemory")
-	procWriteProcessMemory = kernel32.NewProc("WriteProcessMemory")
-	procCloseHandle        = kernel32.NewProc("CloseHandle")
-)
-
-const (
-	th32csSnapProcess = 0x00000002
-	processVMRead     = 0x0010
-	processVMWrite    = 0x0020
-	processVMOp       = 0x0008
-	processQueryInfo  = 0x0400
-
-	memCommit = 0x1000
-	memMapped = 0x40000
-	pageGuard = 0x100
-
-	pageReadWrite        = 0x04
-	pageWriteCopy        = 0x08
-	pageExecuteReadWrite = 0x40
-	pageExecuteWriteCopy = 0x80
-)
-
-type processEntry32 struct {
-	Size            uint32
-	Usage           uint32
-	ProcessID       uint32
-	DefaultHeapID   uintptr
-	ModuleID        uint32
-	Threads         uint32
-	ParentProcessID uint32
-	PriClassBase    int32
-	Flags           uint32
-	ExeFile         [260]uint16
-}
-
-type memoryBasicInfo struct {
-	BaseAddress       uintptr
-	AllocationBase    uintptr
-	AllocationProtect uint32
-	PartitionID       uint16
-	RegionSize        uintptr
-	State             uint32
-	Protect           uint32
-	Type              uint32
-}
 
 type proc struct {
 	pid  uint32
 	name string
+}
+
+type region struct {
+	base uintptr
+	size uintptr
+}
+
+// Acesso à memória do jogo; implementado por sistema operacional.
+type memory interface {
+	regions() []region
+	read(addr uintptr, buf []byte) bool
+	write(addr uintptr, buf []byte) bool
+	close()
 }
 
 // candidato = endereço + tamanho (4 = int32, 8 = int64)
@@ -86,7 +44,10 @@ var in = bufio.NewReader(os.Stdin)
 
 func ask(msg string) string {
 	fmt.Print(msg)
-	s, _ := in.ReadString('\n')
+	s, err := in.ReadString('\n')
+	if err != nil && s == "" {
+		os.Exit(0)
+	}
 	return strings.TrimSpace(s)
 }
 
@@ -102,29 +63,17 @@ func askNumber(msg string) int64 {
 	}
 }
 
-func listProcesses() []proc {
-	snap, _, _ := procCreateSnapshot.Call(th32csSnapProcess, 0)
-	if snap == uintptr(syscall.InvalidHandle) {
-		return nil
-	}
-	defer procCloseHandle.Call(snap)
-	var e processEntry32
-	e.Size = uint32(unsafe.Sizeof(e))
-	var out []proc
-	r, _, _ := procProcess32FirstW.Call(snap, uintptr(unsafe.Pointer(&e)))
-	for r != 0 {
-		out = append(out, proc{e.ProcessID, syscall.UTF16ToString(e.ExeFile[:])})
-		r, _, _ = procProcess32NextW.Call(snap, uintptr(unsafe.Pointer(&e)))
-	}
-	return out
+func fail(msg string) {
+	fmt.Println(msg)
+	ask("Aperte ENTER para sair...")
+	os.Exit(1)
 }
 
 func chooseProcess() proc {
 	for {
 		var matches []proc
 		for _, p := range listProcesses() {
-			n := strings.ToLower(p.name)
-			if strings.Contains(n, "theotown") || strings.HasPrefix(n, "java") {
+			if isGame(strings.ToLower(p.name)) {
 				matches = append(matches, p)
 			}
 		}
@@ -148,89 +97,42 @@ func chooseProcess() proc {
 	}
 }
 
-func openProcess(pid uint32) uintptr {
-	h, _, err := procOpenProcess.Call(processVMRead|processVMWrite|processVMOp|processQueryInfo, 0, uintptr(pid))
-	if h == 0 {
-		fmt.Println("Não consegui abrir o processo do jogo:", err)
-		fmt.Println("Tente executar este programa como Administrador (botão direito > Executar como administrador).")
-		ask("Aperte ENTER para sair...")
-		os.Exit(1)
-	}
-	return h
-}
-
-func readMem(h, addr uintptr, buf []byte) bool {
-	var n uintptr
-	r, _, _ := procReadProcessMemory.Call(h, addr, uintptr(unsafe.Pointer(&buf[0])), uintptr(len(buf)), uintptr(unsafe.Pointer(&n)))
-	return r != 0 && int(n) == len(buf)
-}
-
-func writeMem(h, addr uintptr, buf []byte) bool {
-	var n uintptr
-	r, _, _ := procWriteProcessMemory.Call(h, addr, uintptr(unsafe.Pointer(&buf[0])), uintptr(len(buf)), uintptr(unsafe.Pointer(&n)))
-	return r != 0 && int(n) == len(buf)
-}
-
-func writable(p uint32) bool {
-	if p&pageGuard != 0 {
-		return false
-	}
-	switch p & 0xff {
-	case pageReadWrite, pageWriteCopy, pageExecuteReadWrite, pageExecuteWriteCopy:
-		return true
-	}
-	return false
-}
-
-// Primeira busca: varre toda a memória gravável procurando o valor como int32 e int64.
-func firstScan(h uintptr, value int64) []candidate {
+// Primeira busca: varre a memória gravável procurando o valor.
+func firstScan(m memory, value int64) []candidate {
 	var out []candidate
-	var mbi memoryBasicInfo
-	var addr uintptr
 	const chunk = 4 << 20
 	buf := make([]byte, chunk)
 	fits32 := value >= -1<<31 && value < 1<<31
-	for {
-		r, _, _ := procVirtualQueryEx.Call(h, addr, uintptr(unsafe.Pointer(&mbi)), unsafe.Sizeof(mbi))
-		if r == 0 {
-			break
-		}
-		next := mbi.BaseAddress + mbi.RegionSize
-		if next <= addr {
-			break
-		}
-		if mbi.State == memCommit && writable(mbi.Protect) && mbi.Type != memMapped {
-			for off := uintptr(0); off < mbi.RegionSize; off += chunk {
-				size := mbi.RegionSize - off
-				if size > chunk {
-					size = chunk
-				}
-				b := buf[:size]
-				base := mbi.BaseAddress + off
-				if !readMem(h, base, b) {
-					continue
-				}
-				for i := 0; i+4 <= len(b); i += 4 {
-					// Se cabe em int32, guarda como int32 (escrever 4 bytes nunca
-					// estraga o campo vizinho). Senão procura int64 alinhado em 8.
-					if fits32 {
-						if int64(int32(binary.LittleEndian.Uint32(b[i:]))) == value {
-							out = append(out, candidate{base + uintptr(i), 4})
-						}
-					} else if i%8 == 0 && i+8 <= len(b) && int64(binary.LittleEndian.Uint64(b[i:])) == value {
-						out = append(out, candidate{base + uintptr(i), 8})
+	for _, r := range m.regions() {
+		for off := uintptr(0); off < r.size; off += chunk {
+			size := r.size - off
+			if size > chunk {
+				size = chunk
+			}
+			b := buf[:size]
+			base := r.base + off
+			if !m.read(base, b) {
+				continue
+			}
+			for i := 0; i+4 <= len(b); i += 4 {
+				// Se cabe em int32, guarda como int32 (escrever 4 bytes nunca
+				// estraga o campo vizinho). Senão procura int64 alinhado em 8.
+				if fits32 {
+					if int64(int32(binary.LittleEndian.Uint32(b[i:]))) == value {
+						out = append(out, candidate{base + uintptr(i), 4})
 					}
+				} else if i%8 == 0 && i+8 <= len(b) && int64(binary.LittleEndian.Uint64(b[i:])) == value {
+					out = append(out, candidate{base + uintptr(i), 8})
 				}
 			}
 		}
-		addr = next
 	}
 	return out
 }
 
-func readValue(h uintptr, c candidate) (int64, bool) {
+func readValue(m memory, c candidate) (int64, bool) {
 	b := make([]byte, c.size)
-	if !readMem(h, c.addr, b) {
+	if !m.read(c.addr, b) {
 		return 0, false
 	}
 	if c.size == 8 {
@@ -239,17 +141,17 @@ func readValue(h uintptr, c candidate) (int64, bool) {
 	return int64(int32(binary.LittleEndian.Uint32(b))), true
 }
 
-func filter(h uintptr, cs []candidate, value int64) []candidate {
+func filter(m memory, cs []candidate, value int64) []candidate {
 	var out []candidate
 	for _, c := range cs {
-		if v, ok := readValue(h, c); ok && v == value {
+		if v, ok := readValue(m, c); ok && v == value {
 			out = append(out, c)
 		}
 	}
 	return out
 }
 
-func writeValue(h uintptr, cs []candidate, value int64) int {
+func writeValue(m memory, cs []candidate, value int64) int {
 	ok := 0
 	for _, c := range cs {
 		b := make([]byte, c.size)
@@ -262,7 +164,7 @@ func writeValue(h uintptr, cs []candidate, value int64) int {
 			}
 			binary.LittleEndian.PutUint32(b, uint32(int32(v)))
 		}
-		if writeMem(h, c.addr, b) {
+		if m.write(c.addr, b) {
 			ok++
 		}
 	}
@@ -277,21 +179,21 @@ func main() {
 	fmt.Println()
 
 	p := chooseProcess()
-	h := openProcess(p.pid)
-	defer procCloseHandle.Call(h)
+	m := openProcess(p.pid)
+	defer m.close()
 
 	for {
 		fmt.Println("PASSO 1: Olhe quanto dinheiro sua cidade tem agora.")
 		value := askNumber("Digite o valor EXATO do seu dinheiro atual: ")
 		fmt.Println("Procurando na memória do jogo... (pode levar alguns segundos)")
-		cs := firstScan(h, value)
+		cs := firstScan(m, value)
 		fmt.Printf("  %d resultados encontrados.\n\n", len(cs))
 
 		for len(cs) > 5 {
 			fmt.Println("PASSO 2: Volte ao jogo e faça o dinheiro mudar")
 			fmt.Println("  (construa uma estrada, demolir algo, esperar o dia virar, etc.)")
 			value = askNumber("Digite o NOVO valor do dinheiro: ")
-			cs = filter(h, cs, value)
+			cs = filter(m, cs, value)
 			fmt.Printf("  %d resultados restantes.\n\n", len(cs))
 		}
 
@@ -304,7 +206,7 @@ func main() {
 		fmt.Println("Pronto! Dinheiro localizado.")
 		for {
 			want := askNumber("PASSO 3: Digite quanto dinheiro você quer ter (máx. 2147483647): ")
-			n := writeValue(h, cs, want)
+			n := writeValue(m, cs, want)
 			fmt.Printf("  Valor escrito em %d endereço(s). Volte ao jogo e confira!\n\n", n)
 
 			fmt.Println("O que fazer agora?")
@@ -323,7 +225,7 @@ func main() {
 						case <-stop:
 							return
 						default:
-							writeValue(h, cs, want)
+							writeValue(m, cs, want)
 							time.Sleep(300 * time.Millisecond)
 						}
 					}
