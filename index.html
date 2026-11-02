@@ -115,6 +115,20 @@ html,body{margin:0;height:100%;overflow:hidden;background:#08131c;color:var(--tx
 .econ{display:flex;justify-content:space-between;gap:8px;font-size:12px;color:var(--mut)}
 .econ b{color:var(--txt);font-variant-numeric:tabular-nums}
 @media (max-width:440px){#money{font-size:12px;padding:3px 6px}#money small{display:none}#day{font-size:11px;min-width:0}}
+.tabs{display:flex;gap:4px;background:#0f1720;border:1px solid var(--line);border-radius:10px;padding:3px}
+#pact .tabs button{flex:1;text-align:center;padding:7px 2px;font-size:12.5px;border:0;background:transparent;color:var(--mut);font-weight:700}
+#pact .tabs button.on{background:#243446;color:var(--txt)}
+#pact button.tech{display:grid;grid-template-columns:28px 1fr auto;gap:8px;align-items:center;padding:8px 10px}
+.tech .ti{font-size:20px;text-align:center}
+.tech .tb{display:flex;flex-direction:column;gap:2px;min-width:0}
+.tech .tb small{font-size:11px;color:var(--mut);line-height:1.3}
+.tech .lv{font-size:11px;color:var(--gold);font-weight:700}
+.tech .tc{font-weight:800;color:var(--gold);font-size:13px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.pips{display:flex;gap:2px;margin-top:2px}.pips i{width:10px;height:4px;border-radius:2px;background:#2a3644}.pips i.on{background:var(--gold)}
+.clk{background:#141f2a;border:1px solid var(--line);border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:6px}
+.clk-v{font-size:28px;font-weight:800;color:var(--gold);text-align:center;font-variant-numeric:tabular-nums}
+.clk-v small{display:block;font-size:11px;color:var(--mut);font-weight:600}
+.stats b.tl{font-size:12px;letter-spacing:.5px}
 @keyframes pop{from{transform:scale(.9);opacity:0}to{transform:none;opacity:1}}
 .modal{position:fixed;inset:0;background:#000a;display:none;align-items:center;justify-content:center;z-index:20}
 .modal .box{background:#111a24;border:1px solid var(--line);border-radius:14px;padding:22px;max-width:460px;width:90%;text-align:center}
@@ -231,6 +245,20 @@ let dirty = true, ended = false, nCount = 20, worldMode = 'real';
 let nukes = [], nukeArmed = false, nukeReady = 0, units = [];
 // opções visuais (salvas só neste navegador)
 const opts = { fx: 'soldados', stripes: true, smooth: true };
+// tecnologias: custo = base × 1,7^nível, até o nível 10
+const TECH = [
+  { k: 'atk', i: '⚔', n: 'Armamento', d: '+7% de força em combate e mais chance de tomar províncias', base: 8000 },
+  { k: 'def', i: '🛡', n: 'Defesa', d: '−10% de baixas e fronteiras mais difíceis de tomar', base: 8000 },
+  { k: 'eco', i: '🏭', n: 'Indústria', d: '+12% de renda por dia', base: 6000 },
+  { k: 'log', i: '🚚', n: 'Logística', d: '−6% de manutenção e +15% de recrutamento natural', base: 6000 },
+  { k: 'nav', i: '⚓', n: 'Marinha', d: '+15% de velocidade dos navios e +12% de força no desembarque', base: 5000 },
+];
+const TECH_MAX = 10;
+const techCost = (c, k) => Math.round(TECH.find(t => t.k === k).base * 1.7 ** c.tech[k] / 100) * 100;
+// clique: valor e custo crescem a cada nível
+const clickVal = c => Math.round(10 * 1.55 ** c.clickLv);
+const clickCost = c => Math.round(200 * 1.75 ** c.clickLv / 10) * 10;
+let ptab = 'army', floaters = [];
 try { Object.assign(opts, JSON.parse(localStorage.getItem('gg-opts') || '{}')); } catch (e) {}
 const saveOpts = () => { try { localStorage.setItem('gg-opts', JSON.stringify(opts)); } catch (e) {} };
 
@@ -456,6 +484,7 @@ function makeCountries(list) {
     casualties: 0, cap: d.cap, aggr: .25 + R() * .6, lx: 0, ly: 0,
     recruitCD: 0, allyCD: 0, aidCD: 0,
     econ: d.econ || 1, money: cnt[i] * 60 * (d.econ || 1) + 3000, net: 0,
+    tech: { atk: 0, def: 0, eco: 0, log: 0, nav: 0 }, clickLv: 0, clickTotal: 0,
   }));
   computeLabels();
   for (const c of C) {
@@ -498,7 +527,7 @@ const enemyIn = (w, a) => w.a === a ? w.b : w.a;
 const modeName = m => m === 'morte' ? 'Até a morte' : 'Ataque';
 
 function sideStrength(w, side) {
-  let s = C[side].troops + C[side].cells * 40;
+  let s = (C[side].troops + C[side].cells * 40) * (1 + .07 * C[side].tech.atk) * (1 + .05 * C[side].tech.def);
   for (const x of wars) if (x.parent === w.id && x.helpFor === side && C[x.a].alive) s += (C[x.a].troops + C[x.a].cells * 40) * .5;
   return s;
 }
@@ -633,14 +662,15 @@ function battle(w, ca, cb, sea) {
   }
   if (rad[ca] && day - rad[ca] < CFG.RAD_DAYS) ba *= .45;
   if (rad[cb] && day - rad[cb] < CFG.RAD_DAYS) bb *= .45;
-  const sa = (da + 4) * (.55 + R() * .9) * ba, sb = (db + 4) * (.55 + R() * .9) * bb;
+  const sa = (da + 4) * (.55 + R() * .9) * ba * (1 + .07 * A.tech.atk), sb = (db + 4) * (.55 + R() * .9) * bb * (1 + .07 * B.tech.atk);
   const base = (da + db) * .09 * (.5 + R()) + 4;
   const aWins = sa > sb;
-  let la = base * (aWins ? .6 : 1.3), lb = base * (aWins ? 1.3 : .6);
+  let la = base * (aWins ? .6 : 1.3) / (1 + .1 * A.tech.def), lb = base * (aWins ? 1.3 : .6) / (1 + .1 * B.tech.def);
   la = Math.min(la, A.troops); lb = Math.min(lb, B.troops);
   A.troops -= la; A.casualties += la; w.casA += la;
   B.troops -= lb; B.casualties += lb; w.casB += lb;
-  if (R() < (sea ? CFG.CAPTURE_SEA : CFG.CAPTURE)) aWins ? capture(cb, w.a, w.b) : capture(ca, w.b, w.a);
+  const W = aWins ? A : B, Lz = aWins ? B : A;
+  if (R() < (sea ? CFG.CAPTURE_SEA : CFG.CAPTURE) * (1 + .1 * W.tech.atk) / (1 + .12 * Lz.tech.def)) aWins ? capture(cb, w.a, w.b) : capture(ca, w.b, w.a);
 }
 function amphibious(w) {
   const A = C[w.a], B = C[w.b];
@@ -658,7 +688,7 @@ function amphibious(w) {
 }
 function tick() {
   day++;
-  for (const c of C) if (c.alive) c.troops = Math.max(0, c.troops + c.cells * CFG.REGEN * c.mult * (1 - c.troops / maxT(c)));
+  for (const c of C) if (c.alive) c.troops = Math.max(0, c.troops + c.cells * CFG.REGEN * c.mult * (1 + .15 * c.tech.log) * (1 - c.troops / maxT(c)));
   scanBorders();
   for (const w of wars.slice()) {
     if (!wars.includes(w) || !C[w.a].alive || !C[w.b].alive) continue;
@@ -708,7 +738,11 @@ function tick() {
   const atWar = new Uint8Array(N); for (const w of wars) { atWar[w.a] = 1; atWar[w.b] = 1; }
   for (const c of C) {
     if (!c.alive) continue;
-    c.inc = income(c); c.up = c.troops * CFG.UPKEEP; c.net = c.inc - c.up;
+    c.inc = income(c); c.up = c.troops * CFG.UPKEEP * Math.max(.4, 1 - .06 * c.tech.log); c.net = c.inc - c.up;
+    if (c.id !== P && day % 30 === c.id % 30) {
+      const k = atWar[c.id] ? (R() < .5 ? 'atk' : 'def') : TECH[ri(0, TECH.length - 1)].k;
+      if (c.tech[k] < TECH_MAX && c.money > techCost(c, k) * 1.5) { c.money -= techCost(c, k); c.tech[k]++; }
+    }
     c.money += c.net;
     if (c.money < 0) { c.money = 0; c.troops *= .996; if (c.id === P && day % 20 === 0) toast('💸 Sem dinheiro! Soldados estão desertando. Reduza o exército ou conquiste mais terras.', 'bad'); }
     // IA compra tropas a cada 5 dias
@@ -819,7 +853,18 @@ function computeLabels() {
 }
 
 // ---------- ações do jogador ----------
-function income(c) { return (c.cells * 2.2 + 40) * c.econ * (warsOf(c.id).length ? .9 : 1); }
+function income(c) { return (c.cells * 2.2 + 40) * c.econ * (1 + .12 * c.tech.eco) * (warsOf(c.id).length ? .9 : 1); }
+function actTech(k) {
+  const c = C[P]; if (c.tech[k] >= TECH_MAX) return;
+  const cost = techCost(c, k); if (c.money < cost) { toast('💸 Dinheiro insuficiente.', 'bad'); return; }
+  c.money -= cost; c.tech[k]++;
+  const t = TECH.find(t => t.k === k); toast(`🔬 ${t.i} ${t.n} nível ${c.tech[k]} pesquisado!`, 'good');
+}
+function actClickUp() {
+  const c = C[P], cost = clickCost(c); if (c.money < cost) { toast('💸 Dinheiro insuficiente.', 'bad'); return; }
+  c.money -= cost; c.clickLv++;
+  toast(`👆 Clique nível ${c.clickLv}: agora cada toque vale ${fmtM(clickVal(c))}.`, 'good');
+}
 const fmtM = n => { const a = Math.abs(n), sg = n < 0 ? '−' : ''; return sg + '$' + (a >= 1e6 ? (a / 1e6).toFixed(1).replace('.', ',') + ' mi' : a >= 1e4 ? Math.round(a / 1e3) + ' mil' : a >= 1e3 ? (a / 1e3).toFixed(1).replace('.', ',') + ' mil' : Math.round(a)); };
 const buyCap = c => maxT(c) * 2;
 function actBuy(n) {
@@ -1162,6 +1207,14 @@ function draw() {
     }
   }
   shakeAmt = drawNukes(now, z);
+  floaters = floaters.filter(f => now - f.t < 900);
+  for (const f of floaters) {
+    const k = (now - f.t) / 900;
+    ctx.save(); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.globalAlpha = 1 - k;
+    ctx.font = `800 ${16 + (1 - k) * 4}px system-ui,sans-serif`; ctx.textAlign = 'center'; ctx.lineWidth = 4; ctx.strokeStyle = '#000';
+    ctx.strokeText(f.text, f.x, f.y - 14 - k * 40); ctx.fillStyle = '#ffd54a'; ctx.fillText(f.text, f.x, f.y - 14 - k * 40);
+    ctx.restore();
+  }
   // foco de ataque
   if (focus && phase === 'game') {
     const x = sx(focus.c % GW), y = sy((focus.c / GW) | 0), r = CFG.FOCUS_RADIUS * z * .5, pulse = 1 + Math.sin(now / 200) * .08;
@@ -1202,6 +1255,7 @@ function infoHTML() {
     <span class="mut">Baixas</span><b>${fmt(c.casualties)}</b>
     <span class="mut">Dinheiro</span><b>${fmtM(c.money)}</b>
     <span class="mut">Saldo por dia</span><b style="color:${c.net >= 0 ? '#5fd39a' : '#ff7a7a'}">${c.net >= 0 ? '+' : ''}${fmtM(c.net)}</b>
+    <span class="mut">Tecnologia</span><b class="tl">${TECH.map(t => `${t.i}${c.tech[t.k]}`).join(' ')}</b>
     <span class="mut">Agressividade</span><b>${c.aggr > .65 ? 'Alta' : c.aggr > .4 ? 'Média' : 'Baixa'}</b>
   </div>`;
   if (phase === 'game' && P >= 0 && !me && c.alive) h += `<div class="small mut">Relação com você: <b style="color:var(--txt)">${Math.round(rel[P * N + sel])}</b>${relBar(rel[P * N + sel])}</div>`;
@@ -1228,7 +1282,25 @@ function actionsHTML() {
   const cd = (t, label) => day < t ? `${label} (${t - day}d)` : label;
   if (sel === P) {
     const me = C[P], full = me.troops >= buyCap(me);
-    let h = `<div class="shop"><div class="shop-h">🪖 Comprar soldados <span class="mut">($${CFG.TROOP_PRICE} cada · manutenção $${Math.round(CFG.UPKEEP * 1000)}/mil/dia)</span></div>
+    const tabs = `<div class="tabs">${[['army', '🪖 Exército'], ['tech', '🔬 Tecnologia'], ['click', '👆 Clique']].map(([t, l]) => `<button data-act="tab" data-t="${t}" class="${ptab === t ? 'on' : ''}">${l}</button>`).join('')}</div>`;
+    if (ptab === 'tech') {
+      return tabs + TECH.map(t => {
+        const lv = me.tech[t.k], maxed = lv >= TECH_MAX, cost = techCost(me, t.k);
+        return `<button class="tech" data-act="tech" data-k="${t.k}"${maxed || me.money < cost ? ' disabled' : ''}>
+          <span class="ti">${t.i}</span><span class="tb"><b>${t.n}</b> <span class="lv">Nv ${lv}/${TECH_MAX}</span><small>${t.d}</small>
+          <span class="pips">${'<i class="on"></i>'.repeat(lv)}${'<i></i>'.repeat(TECH_MAX - lv)}</span></span>
+          <span class="tc">${maxed ? 'MÁX' : fmtM(cost)}</span></button>`;
+      }).join('') + `<div class="hint">Os outros países também pesquisam. Em guerra, eles priorizam Armamento e Defesa.</div>`;
+    }
+    if (ptab === 'click') {
+      const v = clickVal(me), cost = clickCost(me), next = Math.round(10 * 1.55 ** (me.clickLv + 1));
+      return tabs + `<div class="clk"><div class="clk-v">${fmtM(v)}<small>por toque</small></div>
+        <div class="hint">Toque no mapa, em cima do território de ${esc(me.name)}, para ganhar dinheiro.</div>
+        <div class="econ"><span>Nível <b>${me.clickLv}</b></span><span>Ganho com cliques <b>${fmtM(me.clickTotal)}</b></span></div></div>
+        <button class="tech" data-act="clickup"${me.money < cost ? ' disabled' : ''}><span class="ti">👆</span><span class="tb"><b>Melhorar clique</b> <span class="lv">Nv ${me.clickLv} → ${me.clickLv + 1}</span><small>Cada toque passa a valer ${fmtM(next)} (+${fmtM(next - v)})</small></span><span class="tc">${fmtM(cost)}</span></button>
+        <div class="hint">Quanto mais você investe, mais cada toque rende — e mais caro fica o próximo nível.</div>`;
+    }
+    let h = tabs + `<div class="shop"><div class="shop-h">🪖 Comprar soldados <span class="mut">($${CFG.TROOP_PRICE} cada · manutenção $${Math.round(CFG.UPKEEP * 1000)}/mil/dia)</span></div>
       <div class="row"><button data-act="buy" data-n="1000"${full || me.money < 1000 * CFG.TROOP_PRICE ? ' disabled' : ''}>+1 mil<small>${fmtM(1000 * CFG.TROOP_PRICE)}</small></button>
       <button data-act="buy" data-n="10000"${full || me.money < 10000 * CFG.TROOP_PRICE ? ' disabled' : ''}>+10 mil<small>${fmtM(10000 * CFG.TROOP_PRICE)}</small></button>
       <button data-act="buy" data-n="max"${full || me.money < 100 ? ' disabled' : ''}>Máximo<small>${full ? 'limite' : 'todo o dinheiro'}</small></button></div></div>`;
@@ -1338,6 +1410,9 @@ $('panel').addEventListener('click', e => {
   else if (act === 'break') { setAlly(P, sel, 0); relAdd(P, sel, -30); }
   else if (act === 'help') actHelp(+b.dataset.a, +b.dataset.e);
   else if (act === 'recruit') actRecruit();
+  else if (act === 'tab') ptab = b.dataset.t;
+  else if (act === 'tech') actTech(b.dataset.k);
+  else if (act === 'clickup') actClickUp();
   dirty = true; updateUI();
 });
 $('panel').addEventListener('change', e => {
@@ -1368,8 +1443,8 @@ $('rank').addEventListener('click', () => {
   if (P >= 0 && C[P].alive && !rows.includes(C[P])) rows.push(C[P]);
   const atWar = wars.filter(w => !w.parent).length;
   $('mtext').innerHTML = `<div class="rk-sum"><span><b>${alive.length}</b> países vivos</span><span><b>${fmtM(alive.reduce((s, c) => s + (c.inc || 0), 0))}</b>/dia de PIB mundial</span><span><b>${atWar}</b> guerras</span><span><b>${fmt(C.reduce((s, c) => s + c.casualties, 0))}</b> baixas no mundo</span></div>
-  <div class="rk-wrap"><table class="rk"><thead><tr><th>#</th><th>País</th><th>Prov.</th><th>Tropas</th><th>Dinheiro</th><th>Baixas</th></tr></thead><tbody>
-  ${rows.map(c => `<tr class="${c.id === P ? 'me' : ''}"><td>${alive.indexOf(c) + 1}</td><td><img src="${c.flagURL}" alt=""> ${esc(c.name)}${c.nuclear ? ' ☢' : ''}</td><td>${fmt(c.cells)}</td><td>${fmt(c.troops)}</td><td>${fmtM(c.money)}</td><td>${fmt(c.casualties)}</td></tr>`).join('')}
+  <div class="rk-wrap"><table class="rk"><thead><tr><th>#</th><th>País</th><th>Prov.</th><th>Tropas</th><th>Dinheiro</th><th>Tec.</th><th>Baixas</th></tr></thead><tbody>
+  ${rows.map(c => `<tr class="${c.id === P ? 'me' : ''}"><td>${alive.indexOf(c) + 1}</td><td><img src="${c.flagURL}" alt=""> ${esc(c.name)}${c.nuclear ? ' ☢' : ''}</td><td>${fmt(c.cells)}</td><td>${fmt(c.troops)}</td><td>${fmtM(c.money)}</td><td>${Object.values(c.tech).reduce((a, b) => a + b, 0)}</td><td>${fmt(c.casualties)}</td></tr>`).join('')}
   </tbody></table></div>`;
 });
 $('cfg').addEventListener('click', () => {
@@ -1425,7 +1500,7 @@ function sendExpedition(w, side, aim = -1) {
   if (!path) { kind = 'army'; path = findPath(A.cap, -1, 'land', e); }
   if (!path || path.length < 2) { amphibious(w); return false; }
   A.troops -= amount;
-  units.push({ war: w.id, from: side, to: e, kind, path, prog: 0, troops: amount, speed: kind === 'boat' ? 1.7 : .8, ph: R() * 6 });
+  units.push({ war: w.id, from: side, to: e, kind, path, prog: 0, troops: amount, speed: (kind === 'boat' ? 1.7 : .8) * (1 + .15 * A.tech.nav), ph: R() * 6 });
   if (side === P) toast(kind === 'boat' ? `🚢 Frota com ${fmt(amount)} soldados a caminho de ${E.name}` : `🪖 ${fmt(amount)} soldados marchando por terra até ${E.name}`, 'good');
   else if (e === P) toast(kind === 'boat' ? `🚢 ${A.name} enviou uma frota contra você!` : `🪖 Tropas de ${A.name} marcham em sua direção!`, 'bad');
   return true;
@@ -1442,7 +1517,7 @@ function landUnit(u, w) {
   if (tgt < 0) { A.troops += u.troops; return; }
   const dens = E.troops / Math.max(E.cells, 1);
   const def = dens * 22 * (.7 + R() * .6) * (rad[tgt] && day - rad[tgt] < CFG.RAD_DAYS ? .45 : 1);
-  const att = u.troops * (.7 + R() * .6) * (u.kind === 'boat' ? .85 : 1);
+  const att = u.troops * (.7 + R() * .6) * (u.kind === 'boat' ? .85 : 1) * (1 + .12 * A.tech.nav) * (1 + .07 * A.tech.atk);
   const win = att > def;
   const la = u.troops * (win ? .25 : .6), ld = Math.min(E.troops, def * (win ? .6 : .25));
   A.troops += u.troops - la; A.casualties += la; E.troops -= ld; E.casualties += ld;
@@ -1594,6 +1669,10 @@ function tap(px, py) {
     if (o >= 0 && P >= 0 && warMat[P * N + o] >= 0) { nukeArmed = false; launchNuke(P, c); nukeButton(); }
     else toast('☢ Escolha um país que está em guerra com você.', 'bad');
     return;
+  }
+  if (phase === 'game' && P >= 0 && o === P && C[P].alive) {
+    const v = clickVal(C[P]); C[P].money += v; C[P].clickTotal += v;
+    if (floaters.length < 40) floaters.push({ x: px, y: py, t: performance.now(), text: '+' + fmtM(v) });
   }
   if (o < 0) { sel = phase === 'game' ? P : -1; }
   else {

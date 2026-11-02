@@ -14,5 +14,7 @@ Jogo de estratégia de guerra no mapa-múndi atual (193 países com bandeiras re
 - **🚢 Navios e marchas**: sem fronteira com o inimigo, frotas cruzam o mar e desembarcam; se não houver caminho por mar, as tropas vão andando por terra.
 - **🗺 Estados**: no mundo real, escolha um país e divida-o em estados para jogar com um estado (guerra de estados).
 - **💰 Economia**: renda por província (PIB real por país), manutenção do exército, compra de soldados, presentes em dinheiro e paz com indenização.
+- **🔬 Tecnologia**: Armamento, Defesa, Indústria, Logística e Marinha (até o nível 10).
+- **👆 Clique**: toque no seu território para ganhar dinheiro; melhore o clique para ganhar mais por toque.
 - **🏆 Ranking**, data no calendário, indicador de avanço/recuo e gráfico de território em cada guerra.
 - **⚙ Configurações**: animação de guerra com soldados e bandeiras, frente cinza ou listras que avançam e recuam; território ocupado listrado; bordas sombreadas.
