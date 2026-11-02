@@ -191,10 +191,10 @@ export class World {
     const r = mulberry32(5);
     for (let i = 0; i < 26; i++) {
       const a = Math.PI * (1.05 + r() * 0.9);
-      const d = 650 + r() * 350;
-      const h = new THREE.Mesh(new THREE.ConeGeometry(120 + r() * 160, 60 + r() * 140, 7), hillMat);
+      const d = 750 + r() * 350;
+      const h = new THREE.Mesh(new THREE.SphereGeometry(1, 18, 8, 0, Math.PI * 2, 0, Math.PI / 2), hillMat);
       h.position.set(Math.cos(a) * d, 0, Math.sin(a) * d * 0.9);
-      h.rotation.y = r() * 3;
+      h.rotation.y = r() * 3; h.scale.set(140 + r() * 160, 25 + r() * 70, 140 + r() * 160);
       this.scene.add(h);
     }
   }
