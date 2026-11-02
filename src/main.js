@@ -38,7 +38,7 @@ class Input {
     el.addEventListener('mousedown', (e) => { if (e.button === 0) { this.mouse.left = true; this.mouse.leftPressed = true; } if (e.button === 2) this.mouse.right = true; });
     addEventListener('mouseup', (e) => { if (e.button === 0) this.mouse.left = false; if (e.button === 2) this.mouse.right = false; });
     addEventListener('mousemove', (e) => {
-      if (document.pointerLockElement) { this.mouse.dx += e.movementX; this.mouse.dy += e.movementY; this.mouse.moved = performance.now(); }
+      if (document.pointerLockElement || window.__noPointerLock) { this.mouse.dx += e.movementX || 0; this.mouse.dy += e.movementY || 0; this.mouse.moved = performance.now(); }
     });
     el.addEventListener('contextmenu', (e) => e.preventDefault());
   }
@@ -689,7 +689,12 @@ export class Game {
 const menu = document.getElementById('menu');
 const pauseEl = document.getElementById('pause');
 let game = null;
-function lock() { const c = document.getElementById('game'); if (c.requestPointerLock) c.requestPointerLock(); }
+function lock() {
+  const c = document.getElementById('game');
+  if (window.__noPointerLock || !c.requestPointerLock) { window.__noPointerLock = true; return; }
+  try { const r = c.requestPointerLock(); if (r && r.catch) r.catch(() => { window.__noPointerLock = true; }); } catch { window.__noPointerLock = true; }
+}
+document.addEventListener('pointerlockerror', () => { window.__noPointerLock = true; });
 document.getElementById('play').addEventListener('click', () => {
   const q = document.getElementById('quality').value;
   document.getElementById('loading').style.display = 'block';
