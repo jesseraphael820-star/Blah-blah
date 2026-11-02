@@ -12,7 +12,8 @@ html,body{margin:0;height:100%;overflow:hidden;background:#08131c;color:var(--tx
 #top{position:fixed;top:0;left:0;right:0;height:50px;display:flex;align-items:center;gap:8px;padding:0 12px;background:linear-gradient(#08131cf0,#08131c00);z-index:5;pointer-events:none}
 #top>*{pointer-events:auto}
 #top h1{font-family:Georgia,"Times New Roman",serif;font-size:18px;margin:0 6px 0 0;letter-spacing:.5px;white-space:nowrap}
-#day{font-variant-numeric:tabular-nums;color:var(--mut);font-size:13px;min-width:70px}
+#day{font-variant-numeric:tabular-nums;color:var(--mut);font-size:13px;min-width:70px;white-space:nowrap}
+@media (max-width:440px){#top h1{display:none}}
 .sp{background:#1a2532;border:1px solid var(--line);color:var(--txt);border-radius:7px;padding:5px 9px;font-size:13px;cursor:pointer}
 .sp.on{background:#2f4a66;border-color:#4c79a8}
 #top .grow{flex:1}
@@ -90,6 +91,20 @@ html,body{margin:0;height:100%;overflow:hidden;background:#08131c;color:var(--tx
 #mtext .opt{display:flex;flex-direction:column;gap:9px;margin:10px 0 4px;text-align:left;color:var(--txt);font-size:14px}
 #mtext .opt label{display:flex;gap:9px;align-items:center;cursor:pointer}
 #mtext .opt input{accent-color:var(--gold);width:17px;height:17px;flex:none}
+.ctr{display:flex;justify-content:space-between;gap:8px;font-size:11px;margin-top:3px;font-variant-numeric:tabular-nums}
+.tr-up{color:#5fd39a;font-weight:700}.tr-dn{color:#ff7a7a;font-weight:700}.tr-eq{color:var(--gold);font-weight:700}
+.spk{display:block;width:100%;height:24px;margin-top:4px;background:#0d141c;border-radius:4px}
+.spk polyline{fill:none;stroke-width:1.6;vector-effect:non-scaling-stroke}
+.rk-sum{display:flex;flex-wrap:wrap;gap:6px 14px;justify-content:center;font-size:12px;margin:4px 0 10px;color:var(--mut)}
+.rk-sum b{color:var(--txt)}
+.rk-wrap{max-height:52vh;overflow:auto}
+.rk{width:100%;border-collapse:collapse;font-size:12.5px;color:var(--txt);text-align:left;font-variant-numeric:tabular-nums}
+.rk th{font-size:10px;letter-spacing:1px;color:var(--mut);font-weight:700;padding:4px;border-bottom:1px solid var(--line);position:sticky;top:0;background:#111a24}
+.rk td{padding:5px 4px;border-bottom:1px solid #1c2631;white-space:nowrap}
+.rk td:nth-child(n+3),.rk th:nth-child(n+3){text-align:right}
+.rk img{width:20px;height:13px;vertical-align:-2px;border:1px solid #0008}
+.rk tr.me td{background:#3a3210;color:#ffe28a}
+.modal .box{max-height:90vh;overflow:auto;max-width:440px}
 @keyframes pop{from{transform:scale(.9);opacity:0}to{transform:none;opacity:1}}
 .modal{position:fixed;inset:0;background:#000a;display:none;align-items:center;justify-content:center;z-index:20}
 .modal .box{background:#111a24;border:1px solid var(--line);border-radius:14px;padding:22px;max-width:360px;width:90%;text-align:center}
@@ -125,6 +140,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#08131c;color:var(--tx
   <button class="sp on" data-spd="1">1x</button>
   <button class="sp" data-spd="2">2x</button>
   <button class="sp" data-spd="4">4x</button>
+  <button class="sp" id="rank" title="Ranking mundial">🏆</button>
   <button class="sp" id="cfg" title="Configurações">⚙</button>
   <button class="sp" id="newgame" title="Novo jogo">↺</button>
 </div>
@@ -579,7 +595,8 @@ function capture(cell, to, from) {
 }
 function captureCell(cell, to, from) {
   owner[cell] = to; C[to].cells++; C[from].cells--; flash[cell] = day; dirty = true;
-  if (anims.length < 500) anims.push({ c: cell, from, to, t: performance.now() });
+  if (anims.length < 500 && opts.fx !== 'listras') anims.push({ c: cell, from, to, t: performance.now() });
+  const wi = warMat[to * N + from]; if (wi >= 0) { const w = wars[wi]; w.mom = (w.mom || 0) + (w.a === to ? 1 : -1); }
   if (C[from].cap === cell) {
     C[from].troops *= .88;
     relocateCapital(from, cell);
@@ -677,6 +694,11 @@ function tick() {
   }
   const before = reqs.length;
   reqs = reqs.filter(r => r.until > day); if (reqs.length !== before) reqsChanged = true;
+  for (const w of wars) {
+    w.mom = (w.mom || 0) * .92;
+    if (!w.hist) w.hist = [];
+    if (day % 4 === 0) { w.hist.push([C[w.a].cells, C[w.b].cells]); if (w.hist.length > 60) w.hist.shift(); }
+  }
   if (day % 8 === 0) computeLabels();
   if (P >= 0 && C[P].alive && !ended && C.every(c => !c.alive || c.id === P || isAllied(c.id, P))) {
     ended = true;
@@ -866,7 +888,7 @@ function renderOff() {
   }
   const edge = (o, o2) => {
     if (o < 0 || o2 < 0) return [COL_COAST, (o === P || o2 === P) && P >= 0];
-    if (warMat[o * N + o2] >= 0) return [opts.fx === 'cinza' ? COL_WAR_G : COL_WAR, true];
+    if (warMat[o * N + o2] >= 0) return [opts.fx === 'cinza' ? COL_WAR_G : opts.fx === 'listras' ? COL_EDGE : COL_WAR, true];
     const me = P >= 0 && (o === P || o2 === P);
     return [me ? COL_ME : COL_EDGE, me];
   };
@@ -953,27 +975,54 @@ function draw() {
       soldier(C[w.b], bx + dx * z * .3 - tx * off, by + dy * z * .3 - ty * off, dirB, now / 110 + m.ph + 1);
     }
   }
-  // listras animadas: frente e território ocupado listrados com a cor do outro lado
+  // listras: a faixa da frente é listrada com as duas cores; as listras andam para o lado de quem está ganhando
   if (opts.fx === 'listras') {
-    const sp = Math.max(6, z * 1.7), shift = (now / 30) % sp;
+    const dtf = Math.min(50, now - (draw.lastNow || now)); draw.lastNow = now;
+    const sp = Math.max(7, z * 2.2);
     for (const w of wars) {
-      for (const [front, occ, other] of [[w.fa, w.occA || [], w.b], [w.fb, w.occB || [], w.a]]) {
-        const path = new Path2D(); let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
-        const add = c => {
-          const x = cam.x + (c % GW) * z, y = cam.y + ((c / GW) | 0) * z;
-          if (x < -z || y < -z || x > VW || y > VH) return;
-          path.rect(x, y, z, z); if (x < x0) x0 = x; if (y < y0) y0 = y; if (x + z > x1) x1 = x + z; if (y + z > y1) y1 = y + z;
-        };
-        for (let j = 0; j < front.length; j++) if (!w.fs[j]) add(front[j]);
-        for (const c of occ) add(c);
-        if (x1 < x0) continue;
-        const k = C[other].col, h = y1 - y0;
-        ctx.save(); ctx.clip(path);
-        ctx.strokeStyle = `rgba(${k[0] | 0},${k[1] | 0},${k[2] | 0},.75)`; ctx.lineWidth = sp * .4;
-        ctx.beginPath();
-        for (let x = x0 - h - sp + shift; x < x1 + sp; x += sp) { ctx.moveTo(x, y1); ctx.lineTo(x + h, y0); }
-        ctx.stroke(); ctx.restore();
+      if (!w.fa.length && !(w.occA && w.occA.length) && !(w.occB && w.occB.length)) continue;
+      const path = new Path2D(); let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9, dx = 0, dy = 0;
+      const add = c => {
+        const x = cam.x + (c % GW) * z, y = cam.y + ((c / GW) | 0) * z;
+        if (x < -z || y < -z || x > VW || y > VH) return;
+        path.rect(x, y, z, z); if (x < x0) x0 = x; if (y < y0) y0 = y; if (x + z > x1) x1 = x + z; if (y + z > y1) y1 = y + z;
+      };
+      for (let j = 0; j < w.fa.length; j++) {
+        if (w.fs[j]) continue;
+        const a = w.fa[j], b = w.fb[j];
+        dx += b % GW - a % GW; dy += ((b / GW) | 0) - ((a / GW) | 0);
+        add(a); add(b);
+        // um passo a mais para dentro de cada lado: faixa de 4 células
+        const ax = a % GW, bx = b % GW, ay = (a / GW) | 0, by = (b / GW) | 0;
+        const a2 = (2 * ay - by) * GW + (2 * ax - bx), b2 = (2 * by - ay) * GW + (2 * bx - ax);
+        if (a2 >= 0 && a2 < NC && owner[a2] === w.a) add(a2);
+        if (b2 >= 0 && b2 < NC && owner[b2] === w.b) add(b2);
       }
+      for (const c of w.occA || []) add(c);
+      for (const c of w.occB || []) add(c);
+      if (x1 < x0) continue;
+      let d = Math.hypot(dx, dy); if (d < 1e-6) { dx = 1; dy = 0; d = 1; } dx /= d; dy /= d;
+      const A = C[w.a], B = C[w.b];
+      const da = A.troops / Math.max(A.cells, 1), db = B.troops / Math.max(B.cells, 1);
+      const share = clamp(da / (da + db + 1e-6), .15, .85);
+      const vel = clamp(w.mom || 0, -6, 6) / 6;   // −1 recua, +1 avança (de A para B)
+      w.ph = (w.ph || 0) + (vel * 1.8 + Math.sin(now / 520 + w.id) * (1 - Math.abs(vel)) * .9) * dtf * .03 * z;
+      const T = sp * 2, wA = T * share, cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, L = Math.hypot(x1 - x0, y1 - y0) / 2 + T;
+      const px = -dy, py = dx, ph = ((w.ph % T) + T) % T;
+      ctx.save(); ctx.clip(path);
+      const stripe = (col, t, width) => {
+        ctx.strokeStyle = col; ctx.lineWidth = width;
+        ctx.beginPath();
+        for (let k = -L - T + ph; k < L + T; k += T) {
+          const mx = cx + dx * (k + t), my = cy + dy * (k + t);
+          ctx.moveTo(mx - px * L, my - py * L); ctx.lineTo(mx + px * L, my + py * L);
+        }
+        ctx.stroke();
+      };
+      stripe(`rgba(${A.col[0] | 0},${A.col[1] | 0},${A.col[2] | 0},.92)`, wA / 2, wA);
+      stripe(`rgba(${B.col[0] | 0},${B.col[1] | 0},${B.col[2] | 0},.92)`, wA + (T - wA) / 2, T - wA);
+      stripe('rgba(0,0,0,.35)', 0, Math.max(1, z * .12));
+      ctx.restore();
     }
   }
   // navios e tropas em marcha
@@ -1162,6 +1211,18 @@ function actionsHTML() {
   h += `<button data-act="aid"${day < C[sel].aidCD ? ' disabled' : ''}>🎁 ${cd(C[sel].aidCD, 'Enviar ajuda (melhora relação)')}</button>`;
   return h;
 }
+const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+function fmtDate(d) { const t = new Date(2026, 0, 1 + d); return `${t.getDate()} ${MESES[t.getMonth()]} ${t.getFullYear()}`; }
+function spark(w) {
+  const h = w.hist || []; if (h.length < 2) return '';
+  const meA = w.a === P, mx = Math.max(1, ...h.map(v => Math.max(v[0], v[1])));
+  const pts = i => h.map((v, k) => `${(k / (h.length - 1) * 118 + 1).toFixed(1)},${(23 - v[i] / mx * 21).toFixed(1)}`).join(' ');
+  return `<svg class="spk" viewBox="0 0 120 24" preserveAspectRatio="none"><polyline points="${pts(meA ? 1 : 0)}" stroke="#ff7a7a"/><polyline points="${pts(meA ? 0 : 1)}" stroke="#5fd39a"/></svg>`;
+}
+function trend(w) {
+  const m = (w.a === P ? 1 : -1) * (w.mom || 0);
+  return m > .8 ? '<span class="tr-up">▲ Avançando</span>' : m < -.8 ? '<span class="tr-dn">▼ Recuando</span>' : '<span class="tr-eq">◆ Frente estável</span>';
+}
 function casHTML() {
   if (phase !== 'game' || P < 0 || !C[P].alive) return '';
   const ws = warsOf(P);
@@ -1172,7 +1233,8 @@ function casHTML() {
     h += `<div class="cwar"><div class="cmode">${w.mode === 'morte' ? '☠ ATÉ A MORTE' : '⚔ ATAQUE'}</div>
       <div class="crow"><img src="${C[P].flagURL}" alt=""><span style="color:#ff5d6c">${fmt(mine)}</span></div>
       <div class="crow"><img src="${C[e].flagURL}" alt=""><span style="color:#5aa9ff">${fmt(theirs)}</span></div>
-      <div class="cch"><span>Vitória</span><div class="tr2"><i style="width:${winChance(w)}%"></i></div><b>${winChance(w)}%</b></div></div>`;
+      <div class="cch"><span>Vitória</span><div class="tr2"><i style="width:${winChance(w)}%"></i></div><b>${winChance(w)}%</b></div>
+      <div class="ctr">${trend(w)}<span class="mut">${fmt(C[P].cells)} × ${fmt(C[e].cells)} prov.</span></div>${spark(w)}</div>`;
   }
   if (ws.length > 3) h += `<div class="cmode">+${ws.length - 3} guerras</div>`;
   return h;
@@ -1180,7 +1242,7 @@ function casHTML() {
 const last = { info: '', act: '', cas: '', log: '' };
 function setIf(id, key, html) { if (last[key] !== html) { last[key] = html; $(id).innerHTML = html; } }
 function updateUI() {
-  $('day').textContent = phase === 'game' ? `Dia ${day}` : 'Escolha um país';
+  $('day').textContent = phase === 'game' ? fmtDate(day) : 'Escolha um país';
   setIf('pinfo', 'info', infoHTML());
   setIf('pact', 'act', actionsHTML());
   const cas = casHTML(); setIf('cas', 'cas', cas); $('cas').style.display = cas ? 'block' : 'none';
@@ -1229,12 +1291,23 @@ document.querySelectorAll('[data-spd]').forEach(b => b.addEventListener('click',
   document.querySelectorAll('[data-spd]').forEach(x => x.classList.toggle('on', x === b));
 }));
 $('vs').addEventListener('click', () => { $('vs').hidden = true; });
+$('rank').addEventListener('click', () => {
+  showModal('Ranking mundial', '', [['Fechar', () => {}]]);
+  const alive = C.filter(c => c.alive).sort((a, b) => b.cells - a.cells);
+  const rows = alive.slice(0, 12);
+  if (P >= 0 && C[P].alive && !rows.includes(C[P])) rows.push(C[P]);
+  const atWar = wars.filter(w => !w.parent).length;
+  $('mtext').innerHTML = `<div class="rk-sum"><span><b>${alive.length}</b> países vivos</span><span><b>${atWar}</b> guerras</span><span><b>${fmt(C.reduce((s, c) => s + c.casualties, 0))}</b> baixas no mundo</span></div>
+  <div class="rk-wrap"><table class="rk"><thead><tr><th>#</th><th>País</th><th>Prov.</th><th>Tropas</th><th>Baixas</th></tr></thead><tbody>
+  ${rows.map(c => `<tr class="${c.id === P ? 'me' : ''}"><td>${alive.indexOf(c) + 1}</td><td><img src="${c.flagURL}" alt=""> ${esc(c.name)}${c.nuclear ? ' ☢' : ''}</td><td>${fmt(c.cells)}</td><td>${fmt(c.troops)}</td><td>${fmt(c.casualties)}</td></tr>`).join('')}
+  </tbody></table></div>`;
+});
 $('cfg').addEventListener('click', () => {
   showModal('Configurações', '', [['Fechar', () => {}]]);
   $('mtext').innerHTML = `<div class="opt"><b>Animação de guerra</b>
     <label><input type="radio" name="fx" value="soldados"${opts.fx === 'soldados' ? ' checked' : ''}> Soldados e bandeiras nas frentes</label>
     <label><input type="radio" name="fx" value="cinza"${opts.fx === 'cinza' ? ' checked' : ''}> Frente cinza (só o território avançando e recuando)</label>
-    <label><input type="radio" name="fx" value="listras"${opts.fx === 'listras' ? ' checked' : ''}> Listras animadas (frente e território ocupado)</label></div>
+    <label><input type="radio" name="fx" value="listras"${opts.fx === 'listras' ? ' checked' : ''}> Listras (só listras avançando e recuando na frente)</label></div>
     <div class="opt"><b>Território</b>
     <label><input type="checkbox" id="o-stripes"${opts.stripes ? ' checked' : ''}> Território ocupado listrado (vira seu ao fazer a paz)</label>
     <label><input type="checkbox" id="o-smooth"${opts.smooth ? ' checked' : ''}> Bordas internas sombreadas</label></div>`;
