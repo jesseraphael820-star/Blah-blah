@@ -23,7 +23,13 @@ Requisitos: navegador com WebGL2 (Chrome, Edge ou Firefox atuais), teclado e mou
 |---|---|
 | W A S D | andar / dirigir |
 | Shift | correr |
-| Alt ou C | andar devagar |
+| Alt | andar devagar |
+| C | agachar (a polícia te vê de mais perto) |
+| T / G | conversar / provocar quem está perto |
+| E | entrar em lojas e locais |
+| M | mapa completo da cidade |
+| 1, 2… | escolher opções em diálogos e lojas |
+| F2 | painel de depuração |
 | Espaço | pular / freio de mão (drift) |
 | F | entrar no carro, roubar (tira o motorista) ou sair |
 | Mouse | câmera |
@@ -47,6 +53,13 @@ Requisitos: navegador com WebGL2 (Chrome, Edge ou Firefox atuais), teclado e mou
 - **Trânsito com IA**: os carros seguem faixas, fazem curvas nos cruzamentos, freiam para pedestres e outros carros e buzinam quando ficam presos.
 - **Pedestres** que caminham pelas calçadas, atravessam ruas, fogem de tiros, se rendem e revidam.
 - **Polícia e nível de procurado (1 a 5 estrelas)**: viaturas perseguem e batem no seu carro, policiais descem e atiram a partir de 2 estrelas. Para fugir, saia da linha de visão deles. Você pode ser **preso** ou **morrer**, e reaparece na delegacia ou no hospital.
+- **Expressões faciais**: sobrancelhas, pálpebras, cantos da boca e olhar com movimentos rápidos. Os personagens mostram alegria, raiva, tristeza, surpresa, preocupação e confiança, gesticulam e mexem a cabeça enquanto falam.
+- **Conversas na rua**: pedestres param para conversar entre si com vozes diferentes. Você pode cumprimentar (T) ou provocar (G), e a resposta depende da sua reputação e do nível de procurado.
+- **Escolhas na história**: na missão 3 você decide o destino do líder dos Corvos, e isso muda o final.
+- **Clima dinâmico**: sol, nublado, chuva (com som e asfalto molhado que reflete) e neblina.
+- **Natação e agachar**: dá para entrar no mar e nadar, e agachado você chama menos atenção da polícia.
+- **Lojas e atividades**: roupas (Moda Sol), lanchonete (Maré), academia (força e fôlego), apartamento à venda (Edifício Maré, vira ponto de salvamento e lugar para dormir) e pintura e reparo de carros.
+- **Reputação e estatísticas** (no menu de pausa) e **salvamento manual**.
 - **Combate**: socos, pistola com tiro na cabeça, rastro de bala, clarão do disparo e partículas.
 - **4 missões de história** com cenas faladas:
   1. *Rodas Novas*: roubar um carro e levá-lo à oficina da Duda.
@@ -57,6 +70,8 @@ Requisitos: navegador com WebGL2 (Chrome, Edge ou Firefox atuais), teclado e mou
 - **Itens**: vida no hospital e no esconderijo, colete na delegacia e dinheiro deixado por inimigos.
 - **Áudio sintetizado**: motor com marchas, cantada de pneu, sirene, tiros, batidas, explosões, buzina e rádio.
 - **Progresso salvo** automaticamente no navegador (missão atual, dinheiro e armas).
+
+Para entender o código e acrescentar missões e locais, veja **[docs/DESENVOLVIMENTO.md](docs/DESENVOLVIMENTO.md)**.
 
 ## Estrutura
 
@@ -71,7 +86,8 @@ src/vehicle.js    modelos de carro, física, IA de trânsito e de perseguição
 src/npc.js        pedestres, policiais, gangue e personagens da história
 src/player.js     protagonista: movimento, combate, roubo de carro, direção
 src/missions.js   missões e roteiro
-src/hud.js        HUD e minimapa
+src/hud.js        HUD, minimapa, mapa completo, escolhas, estatísticas, depuração
+src/places.js     lojas, lanchonete, academia, apartamento, pintura
 src/fx.js         partículas, explosões e marcadores
 src/audio.js      áudio sintetizado
 vendor/three/     Three.js r160 (licença MIT)

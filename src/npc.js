@@ -21,6 +21,10 @@ export const LOOKS = {
 export class NPC {
   constructor(game, kind, look = {}, pos) {
     this.game = game; this.kind = kind;
+    if (kind === 'ped') {
+      this.gender = look.gender || (look.longHair ? 'f' : look.skin !== undefined ? 'm' : Math.random() < 0.5 ? 'f' : 'm');
+      if (this.gender === 'f' && look.skin === undefined) look = { ...look, longHair: true, bulk: 0.8 + Math.random() * 0.12, scale: 0.9 + Math.random() * 0.08 };
+    }
     this.human = new Human(look);
     game.scene.add(this.human.root);
     this.pos = pos.clone(); this.pos.y = game.world.groundHeight(pos.x, pos.z);
@@ -35,7 +39,10 @@ export class NPC {
     this.deadT = 0; this.downT = 0; this.cower = false;
     this.threat = null;
     this.name = '';
-    this.voice = { pitch: 1, rate: 1, gender: 'm' };
+    const fem = this.gender === 'f';
+    this.voice = { pitch: fem ? 1.15 + Math.random() * 0.35 : 0.72 + Math.random() * 0.35, rate: 0.95 + Math.random() * 0.2, gender: fem ? 'f' : 'm' };
+    this.name = kind === 'cop' ? 'Policial' : kind === 'thug' ? 'Corvo' : fem ? 'Moradora' : 'Morador';
+    this.partner = null;
     if (kind !== 'story') this.pickCorner();
   }
   get alive() { return this.state !== 'dead'; }
@@ -89,8 +96,29 @@ export class NPC {
     if (cause === 'car') { this.downT = 2.2; }
   }
 
+  // react to the player talking to this NPC. returns {text, emo}
+  react(kind) {
+    const g = this.game, rep = g.player.stats.respect;
+    const pickL = (a) => a[Math.floor(Math.random() * a.length)];
+    if (this.partner) { this.partner.state = 'walk'; this.partner.partner = null; this.partner = null; }
+    if (this.kind === 'cop') {
+      this.state = g.wanted > 0 ? 'chase' : 'listen'; this.timer = 4;
+      return kind === 'taunt' ? (g.crime(0.6), { text: 'Mais uma gracinha e você vai dormir na delegacia.', emo: 'angry' })
+        : { text: g.wanted > 0 ? 'Parado! Mãos onde eu possa ver!' : 'Circulando, cidadão. Tudo tranquilo por aqui.', emo: g.wanted > 0 ? 'angry' : 'neutral' };
+    }
+    if (g.wanted > 0) { this.scare(g.player, 8); return { text: pickL(['Não quero problema com a polícia!', 'Sai de perto de mim!']), emo: 'worried' }; }
+    if (kind === 'taunt') {
+      if (Math.random() < 0.4 && this.kind === 'ped') { this.state = 'fight'; this.threat = g.player; return { text: pickL(['Tá falando comigo? Então vem!', 'Repete isso na minha cara!']), emo: 'angry' }; }
+      this.scare(g.player, 6); return { text: pickL(['Que grosseria! Me deixa em paz.', 'Credo, que mal-educado!']), emo: 'sad' };
+    }
+    this.state = 'listen'; this.timer = 5;
+    if (rep >= 40) return { text: pickL(['Léo! Todo mundo no bairro fala de você.', 'E aí, Léo! Obrigado por cuidar da quebrada.', 'Olha só, o herói de Porto Sol!']), emo: 'happy' };
+    return { text: pickL(['Bom dia! Dia bonito pra praia, hein?', 'Oi. Precisa de alguma coisa?', 'Fala aí, tudo certo?', 'Cuidado no pátio velho, ouvi que os Corvos andam por lá.']), emo: pickL(['happy', 'neutral', 'confident']) };
+  }
+
   scare(from, t = 8) {
     if (this.kind !== 'ped' || !this.alive || this.state === 'fight') return;
+    if (this.partner) { this.partner.partner = null; this.partner = null; }
     this.state = 'flee'; this.threat = from; this.timer = t + Math.random() * 4;
     if (Math.random() < 0.15) this.cower = true;
   }
@@ -131,6 +159,31 @@ export class NPC {
         if (d.length() < 0.8) this.nextCorner();
         else { d.normalize(); moveX = d.x; moveZ = d.z; spd = this.walkSpeed; }
         if (this.kind === 'cop' && g.wanted > 0) this.state = 'chase';
+        // sometimes stop to chat with another pedestrian
+        if (this.kind === 'ped' && Math.random() < dt * 0.05) {
+          for (const o of g.npcs) {
+            if (o === this || o.kind !== 'ped' || o.state !== 'walk' || o.removed) continue;
+            if (Math.abs(o.pos.x - this.pos.x) < 3 && Math.abs(o.pos.z - this.pos.z) < 3) {
+              const t = 8 + Math.random() * 6;
+              this.state = o.state = 'chat'; this.partner = o; o.partner = this; this.timer = o.timer = t;
+              break;
+            }
+          }
+        }
+        break;
+      }
+      case 'chat': {
+        this.timer -= dt;
+        const o = this.partner;
+        if (!o || !o.alive || o.state !== 'chat' || this.timer <= 0) { this.state = 'walk'; this.partner = null; this.human.setEmotion('neutral'); this.pickCorner(); break; }
+        face = Math.atan2(o.pos.x - this.pos.x, o.pos.z - this.pos.z);
+        this.lookAtPartner = true;
+        break;
+      }
+      case 'listen': {
+        this.timer -= dt;
+        face = Math.atan2(toP.x, toP.z);
+        if (this.timer <= 0) { this.state = 'walk'; this.human.setEmotion('neutral'); this.pickCorner(); }
         break;
       }
       case 'flee': {
@@ -185,6 +238,8 @@ export class NPC {
         break;
       }
     }
+    const stateEmo = { flee: this.cower ? 'surprised' : 'worried', fight: 'angry', chase: 'angry' }[this.state];
+    if (stateEmo) this.human.setEmotion(stateEmo);
     // integrate
     const tvx = moveX * spd, tvz = moveZ * spd;
     this.vel.x = damp(this.vel.x, tvx, 8, dt); this.vel.z = damp(this.vel.z, tvz, 8, dt);
@@ -197,6 +252,7 @@ export class NPC {
     this.pos.y = damp(this.pos.y, w.groundHeight(this.pos.x, this.pos.z), 20, dt);
     let lookYaw = 0;
     if (dP < 10 && this.state !== 'flee') lookYaw = angleDiff(this.heading, Math.atan2(toP.x, toP.z));
+    if (this.state === 'chat' && this.partner) lookYaw = 0;
     if (this.lookAt) lookYaw = angleDiff(this.heading, Math.atan2(this.lookAt.x - this.pos.x, this.lookAt.z - this.pos.z));
     this.human.update(dt, { speed: this.speed, grounded: true, aim: this.human.gun.visible && (this.state === 'chase' || this.state === 'fight'), cower: this.cower, lookYaw });
     this.sync();

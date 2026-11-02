@@ -30,6 +30,11 @@ export class Audio {
     const af = C.createBiquadFilter(); af.type = 'lowpass'; af.frequency.value = 380;
     this.ambG = C.createGain(); this.ambG.gain.value = 0.05;
     this.amb.connect(af); af.connect(this.ambG); this.ambG.connect(this.comp); this.amb.start();
+    // rain
+    this.rainSrc = C.createBufferSource(); this.rainSrc.buffer = buf; this.rainSrc.loop = true;
+    const rf = C.createBiquadFilter(); rf.type = 'highpass'; rf.frequency.value = 1200;
+    this.rainG = C.createGain(); this.rainG.gain.value = 0;
+    this.rainSrc.connect(rf); rf.connect(this.rainG); this.rainG.connect(this.comp); this.rainSrc.start();
     // radio bus
     this.radioG = C.createGain(); this.radioG.gain.value = 0; this.radioG.connect(this.comp);
     this.radioOn = false; this.nextBeat = 0; this.step = 0;
@@ -66,7 +71,8 @@ export class Audio {
   mission() { [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => this.tone({ f0: f, f1: f, dur: 0.35, type: 'triangle', gain: 0.22 }), i * 130)); }
   fail() { [392, 330, 262].forEach((f, i) => setTimeout(() => this.tone({ f0: f, f1: f * 0.95, dur: 0.4, type: 'sawtooth', gain: 0.12 }), i * 180)); }
   checkpoint() { this.tone({ f0: 880, f1: 1760, dur: 0.15, type: 'sine', gain: 0.3 }); }
-  step() { this.burst({ dur: 0.05, freq: 500, gain: 0.05 }); }
+  step(v = 1) { this.burst({ dur: 0.05, freq: 500, gain: 0.05 * v }); }
+  thunder() { this.burst({ dur: 3, freq: 300, gain: 0.9, pitchEnv: 40, attack: 0.05 }); }
 
   update(dt, s) {
     if (!this.ctx) return;
@@ -88,6 +94,7 @@ export class Audio {
       this.sirG.gain.setTargetAtTime(0.06 / (1 + s.sirenDist * 0.05), t, 0.1);
     } else this.sirG.gain.setTargetAtTime(0, t, 0.2);
     this.ambG.gain.setTargetAtTime(s.inCar ? 0.02 : 0.05, t, 0.5);
+    this.rainG.gain.setTargetAtTime((s.rain || 0) * (s.inCar ? 0.09 : 0.14), t, 0.5);
     // procedural radio (in car)
     this.radioG.gain.setTargetAtTime(s.inCar && s.radio ? 0.22 : 0, t, 0.3);
     if (s.inCar && s.radio) this.radioTick();

@@ -80,6 +80,30 @@
   #pause { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; flex-direction: column; background: rgba(0,0,0,.7); z-index: 15; backdrop-filter: blur(4px); }
   #pause h1 { font-family: Anton, Impact, sans-serif; font-size: 70px; margin: 0 0 16px; color: var(--gold); }
   #pause .panel { background: rgba(0,0,0,.5); border-radius: 10px; padding: 16px 24px; max-width: 640px; width: calc(100% - 32px); box-sizing: border-box; }
+  #clock::before { content: attr(data-w); font-family: sans-serif; font-size: 22px; margin-right: 8px; vertical-align: 3px; }
+  #subtitle.ambient { font-size: 19px; bottom: 7vh; color: #e8e8e8; }
+  [hidden] { display: none !important; }
+  #shop { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,.45); z-index: 12; }
+  .shopBox { background: rgba(12,12,16,.94); border: 2px solid var(--gold); border-radius: 10px; padding: 18px 22px; width: min(520px, calc(100% - 32px)); box-sizing: border-box; }
+  .shopBox h3 { font-family: Anton, Impact, sans-serif; font-size: 34px; margin: 0; color: var(--gold); letter-spacing: 1px; }
+  .shopMoney { color: #34c759; font-size: 18px; margin-bottom: 10px; }
+  .shopBox ol { list-style: none; padding: 0; margin: 0 0 12px; display: grid; gap: 6px; }
+  .shopBox li button, #choice button { width: 100%; display: flex; gap: 10px; align-items: center; text-align: left; font: inherit; font-size: 17px; color: #fff; background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.15); border-radius: 6px; padding: 8px 10px; cursor: pointer; }
+  .shopBox li button:hover, .shopBox li button:focus-visible, #choice button:hover, #choice button:focus-visible { background: rgba(255,210,58,.18); outline: 2px solid var(--gold); }
+  .shopBox li button span { flex: 1; }
+  .shopBox li button em { font-style: normal; color: var(--gold); }
+  .shopBox li button.poor em { color: #ff6a6a; }
+  kbd { font-family: Anton, Impact, sans-serif; background: var(--gold); color: #111; border-radius: 4px; padding: 0 7px; font-size: 15px; }
+  #choice { position: fixed; left: 50%; bottom: 14vh; transform: translateX(-50%); width: min(640px, calc(100% - 32px)); display: grid; gap: 8px; z-index: 9; }
+  #choice .cTitle { font-family: Anton, Impact, sans-serif; color: var(--gold); font-size: 22px; text-align: center; text-shadow: 0 2px 4px #000; }
+  #bigmap { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(0,0,0,.82); z-index: 11; gap: 8px; }
+  #bigmapCanvas { width: min(86vh, calc(100vw - 32px)); height: auto; aspect-ratio: 1; border: 3px solid #000; box-shadow: 0 0 0 2px var(--gold); max-width: 100%; }
+  #bigmap p { margin: 0; color: #ddd; }
+  #debug { position: fixed; left: 8px; top: 110px; z-index: 13; background: rgba(0,0,0,.75); color: #7dff9a; font: 12px/1.5 ui-monospace, Menlo, Consolas, monospace; padding: 8px 10px; border-radius: 6px; white-space: pre; pointer-events: none; }
+  #stats { margin-top: 18px; background: rgba(0,0,0,.5); border-radius: 10px; padding: 12px 22px; width: min(640px, calc(100% - 32px)); box-sizing: border-box; display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 2px 24px; }
+  #stats h3 { grid-column: 1 / -1; margin: 0 0 6px; font-family: Anton, Impact, sans-serif; color: var(--gold); font-weight: 400; font-size: 24px; }
+  #stats div { display: flex; justify-content: space-between; gap: 10px; border-bottom: 1px solid rgba(255,255,255,.08); padding: 3px 0; font-variant-numeric: tabular-nums; }
+  #stats span { color: #bbb; }
   @media (max-width: 700px) {
     #minimap { width: 140px; height: 140px; } #objective { max-width: 90%; bottom: 180px; font-size: 16px; } #speed { left: 170px; }
   }
@@ -117,9 +141,14 @@
       <div><b>Clique</b> soco / atirar</div>
       <div><b>Botão dir.</b> mirar</div>
       <div><b>Q</b> trocar arma</div>
+      <div><b>C</b> agachar (furtivo)</div>
+      <div><b>T</b> conversar · <b>G</b> provocar</div>
+      <div><b>E</b> lojas / sirene</div>
+      <div><b>M</b> mapa da cidade</div>
       <div><b>H</b> buzina · <b>R</b> rádio</div>
-      <div><b>E</b> sirene (viatura)</div>
+      <div><b>1 2</b> escolhas no diálogo</div>
       <div><b>Espaço</b> pular fala (cena)</div>
+      <div><b>F2</b> painel de depuração</div>
       <div><b>Esc</b> pausar</div>
     </div>
   </div>
@@ -147,6 +176,10 @@
 <div id="damage"></div>
 <div id="letterbox"></div>
 <div id="fade"></div>
+<div id="shop" hidden></div>
+<div id="choice" hidden></div>
+<div id="bigmap" hidden><canvas id="bigmapCanvas" width="900" height="900"></canvas><p>Aperte <b>M</b> para fechar o mapa</p></div>
+<div id="debug" hidden></div>
 
 <div id="pause">
   <h1>PAUSADO</h1>
@@ -154,9 +187,11 @@
   <div class="panel controls" style="margin-top:22px">
     <div><b>W A S D</b> andar / dirigir</div><div><b>Shift</b> correr</div><div><b>Espaço</b> pular / freio de mão</div>
     <div><b>F</b> entrar / roubar carro</div><div><b>Clique</b> soco / atirar</div><div><b>Q</b> trocar arma</div>
-    <div><b>H</b> buzina · <b>R</b> rádio</div><div><b>E</b> sirene</div>
+    <div><b>H</b> buzina · <b>R</b> rádio</div><div><b>E</b> lojas / sirene</div>
+    <div><b>C</b> agachar</div><div><b>T</b> conversar · <b>G</b> provocar</div><div><b>M</b> mapa · <b>F2</b> depuração</div>
   </div>
-  <p><button class="small" id="resetSave">Apagar progresso e recomeçar</button></p>
+  <div id="stats"></div>
+  <p style="display:flex;gap:10px"><button class="small" id="saveNow">Salvar agora</button><button class="small" id="resetSave">Apagar progresso e recomeçar</button></p>
 </div>
 
 <script type="module" src="./src/main.js"></script>

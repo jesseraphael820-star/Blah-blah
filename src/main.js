@@ -15,6 +15,7 @@ import { HUD } from './hud.js';
 import { Voice } from './voice.js';
 import { Audio } from './audio.js';
 import { FX } from './fx.js';
+import { Places } from './places.js';
 import { clamp, damp, dampAngle, angleDiff, lerp, pick } from './util.js';
 
 const QUALITY = {
@@ -124,6 +125,7 @@ export class Game {
     this.player.pos.set(L.bento.x + 3, 0.15, L.bento.z + 9);
     this.player.heading = Math.PI;
     this.missions = new Missions(this, this.saveData.mission || 0);
+    this.places = new Places(this);
     this.initPopulation();
     this.pickups.push(new Pickup(this, 'health', L.hospital.clone(), 0, 45));
     this.pickups.push(new Pickup(this, 'armor', L.police.clone().add(new THREE.Vector3(6, 0, 0)), 0, 90));
@@ -158,12 +160,17 @@ export class Game {
   // ------------------------------------------------------------ save
   load() {
     try { this.saveData = JSON.parse(localStorage.getItem(SAVE_KEY)) || {}; } catch { this.saveData = {}; }
-    const s = this.saveData;
-    this.player.money = s.money || 0; this.player.hasPistol = !!s.pistol; this.player.ammo = s.ammo || 0;
+    const s = this.saveData, P = this.player;
+    P.money = s.money || 0; P.hasPistol = !!s.pistol; P.ammo = s.ammo || 0;
+    this.flags = s.flags || {};
+    if (s.stats) Object.assign(P.stats, s.stats);
+    if (s.wardrobe) P.wardrobe = s.wardrobe;
+    if (s.look) P.setLook(s.look);
   }
-  save() {
+  save(manual = false) {
     const P = this.player;
-    try { localStorage.setItem(SAVE_KEY, JSON.stringify({ mission: this.missions.index, money: P.money, pistol: P.hasPistol, ammo: P.ammo })); } catch { /* storage unavailable */ }
+    const data = { mission: this.missions.index, money: P.money, pistol: P.hasPistol, ammo: P.ammo, flags: this.flags, stats: P.stats, wardrobe: P.wardrobe, look: P.look, savedAt: Date.now(), manual };
+    try { localStorage.setItem(SAVE_KEY, JSON.stringify(data)); } catch { if (manual) this.hud.help('Não foi possível salvar neste navegador.', 3); }
   }
 
   // ------------------------------------------------------------ spawning
@@ -263,6 +270,8 @@ export class Game {
   }
   onAssault(n) { if (n.kind === 'cop') this.crime(2); else if (n.kind === 'ped') this.crime(this.copNear(n.pos) ? 1.5 : 0.35); }
   onKill(n) {
+    const S = this.player.stats; S.kills++; if (n.kind === 'cop') S.copsKilled++;
+    S.respect += n.kind === 'thug' ? 2 : n.kind === 'ped' ? -3 : -2;
     if (n.kind === 'cop') this.crime(4); else if (n.kind === 'thug') this.crime(0.25); else this.crime(this.copNear(n.pos) ? 2 : 1.2);
     if (n.kind !== 'cop' && Math.random() < 0.7) this.pickups.push(new Pickup(this, 'money', n.pos.clone(), 10 + Math.floor(Math.random() * 60), 0));
     for (const o of this.npcs) if (o !== n && o.pos.distanceTo(n.pos) < 25) o.scare(this.player, 10);
@@ -341,8 +350,8 @@ export class Game {
       let seen = false;
       const check = (pos) => {
         const d = pos.distanceTo(pp);
-        if (d < 12) return true;
-        if (d > 65) return false;
+        if (d < (P.crouch ? 6 : 12)) return true;
+        if (d > (P.crouch && !P.vehicle ? 32 : 65)) return false;
         return !this.world.lineBlocked(pos.clone().add(new THREE.Vector3(0, 1.5, 0)), eye, 2);
       };
       for (const c of this.cars) if (c.typeKey === 'police' && (c.driverKind === 'police') && check(c.pos)) { seen = true; break; }
@@ -439,7 +448,73 @@ export class Game {
       setTimeout(() => this.hud.fade(false), 300);
     }, 700);
   }
-  addMoney(n) { this.player.money += n; this.save(); }
+  addMoney(n) { this.player.money += n; if (n > 0) this.player.stats.earned += n; this.save(); }
+  spend(n) {
+    if (this.player.money < n) { this.hud.help(`Dinheiro insuficiente: faltam <b>$${n - this.player.money}</b>.`, 2); this.audio.fail(); return false; }
+    this.player.money -= n; this.save(); return true;
+  }
+  relock() { if (window.__relock) window.__relock(); }
+  sleep(hours) {
+    this.hud.fade(true);
+    setTimeout(() => {
+      this.world.hour = (this.world.hour + hours) % 24; this.player.health = 100; this.save(true);
+      this.hud.fade(false); this.hud.help(`Você dormiu ${hours} horas. Jogo salvo.`, 3);
+    }, 900);
+  }
+
+  // ------------------------------------------------------------ conversations
+  voiceIdle() { return !this.voice.active || this.voice.active.done; }
+  async talkToNearest(kind) {
+    const P = this.player;
+    if (this.convoBusy || this.cutsceneActive || P.vehicle) return;
+    let best = null, bd = 3.2;
+    for (const n of this.npcs) {
+      if (!n.alive || n.removed || n.downT > 0) continue;
+      const d = n.pos.distanceTo(P.pos); if (d < bd) { bd = d; best = n; }
+    }
+    if (!best) { this.hud.help('Chegue perto de alguém para conversar.', 1.5); return; }
+    this.convoBusy = true;
+    const n = best;
+    P.heading = Math.atan2(n.pos.x - P.pos.x, n.pos.z - P.pos.z);
+    const pick = (a) => a[Math.floor(Math.random() * a.length)];
+    const mine = kind === 'greet' ? pick(['E aí, tudo certo?', 'Bom dia! Como vão as coisas?', 'Fala, beleza?']) : pick(['Qual é a sua, hein?', 'Tá olhando o quê?', 'Sai da frente!']);
+    let reply;
+    if (n.kind === 'story') reply = { text: n === this.story.bento ? 'Juízo na rua, sobrinho. Qualquer coisa, estou aqui.' : 'Se o carro der problema, é só trazer pra oficina.', emo: 'happy' };
+    else reply = n.react(kind);
+    await this.say(P, mine, kind === 'greet' ? 'happy' : 'angry');
+    if (n.alive) { n.lookAt = P.pos; await this.say(n, reply.text, reply.emo); n.lookAt = null; }
+    this.convoBusy = false;
+  }
+  async say(who, text, emo = 'neutral') {
+    who.human.setEmotion(emo);
+    this.hud.subtitle(who.name, text, true);
+    await this.voice.say(text, who.human, who.voice);
+    if (!this.cutsceneActive) this.hud.subtitle(null);
+    who.human.setEmotion('neutral');
+  }
+  async ambientChat() {
+    if (this.convoBusy || this.cutsceneActive || !this.voiceIdle()) return;
+    const P = this.player, pp = P.vehicle ? P.vehicle.pos : P.pos;
+    const a = this.npcs.find((n) => n.state === 'chat' && n.partner && !n.chatted && n.pos.distanceTo(pp) < 14);
+    if (!a) return;
+    const b = a.partner; a.chatted = b.chatted = true;
+    const TOPICS = [
+      [['Você viu o preço da gasolina esta semana?', 'worried'], ['Nem me fala. Vou acabar indo de bicicleta.', 'sad']],
+      [['Vai ter show na praia no sábado!', 'happy'], ['Sério? Então eu vou, com certeza!', 'happy']],
+      [['Dizem que os Corvos voltaram pro pátio velho.', 'worried'], ['Melhor ficar longe de lá depois que escurece.', 'worried']],
+      [['Esse calor hoje está demais.', 'sad'], ['Dia perfeito pra um açaí na Maré.', 'happy']],
+      [['Meu carro quebrou de novo.', 'angry'], ['Leva na oficina da Duda. Ela resolve tudo.', 'confident']],
+      [['Você viu aquela perseguição ontem?', 'surprised'], ['Vi! A polícia passou voando aqui na frente.', 'surprised']],
+      [['A academia Ferro abriu horário novo.', 'neutral'], ['Preciso voltar a treinar, tô sem fôlego nenhum.', 'sad']],
+    ];
+    const [la, lb] = TOPICS[Math.floor(Math.random() * TOPICS.length)];
+    this.convoBusy = true;
+    a.lookAt = b.pos; b.lookAt = a.pos;
+    await this.say(a, la[0], la[1]);
+    if (b.alive && b.state === 'chat' && !this.cutsceneActive) await this.say(b, lb[0], lb[1]);
+    a.lookAt = b.lookAt = null;
+    this.convoBusy = false;
+  }
 
   // ------------------------------------------------------------ cutscenes
   async playCutscene(lines) {
@@ -449,11 +524,21 @@ export class Game {
     this.hud.setObjective('');
     P.vel.set(0, 0, 0);
     if (P.vehicle) P.exitVehicle(true);
-    const resolve = (who) => (who === 'player' ? P : this.story[who]);
-    const other = resolve(lines.find((l) => l.who !== 'player')?.who) || this.story.bento;
-    for (const line of lines) {
+    const resolve = (who) => (who === 'player' ? P : typeof who === 'object' ? who : this.story[who]);
+    const other = resolve(lines.find((l) => l.who && l.who !== 'player')?.who) || this.story.bento;
+    lines = [...lines];
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
       if (!this.cutsceneActive) break;
+      if (line.choice) {
+        const idx = await this.hud.choice(line.choice);
+        if (line.onPick) line.onPick(idx);
+        lines.splice(i + 1, 0, ...line.branches[idx]);
+        continue;
+      }
       const spk = resolve(line.who), lst = spk === P ? other : P;
+      spk.human.setEmotion(line.emo || 'neutral');
+      lst.human.setEmotion(line.listenEmo || (line.emo === 'angry' ? 'worried' : line.emo === 'happy' ? 'happy' : 'neutral'));
       // face each other
       const dx = lst.pos.x - spk.pos.x, dz = lst.pos.z - spk.pos.z;
       spk.heading = Math.atan2(dx, dz); lst.heading = Math.atan2(-dx, -dz);
@@ -472,7 +557,8 @@ export class Game {
       await this.voice.say(line.text, spk.human, spk.voice);
       await new Promise((r) => setTimeout(r, 250));
     }
-    this.story.bento.lookAt = null; this.story.duda.lookAt = null;
+    this.story.bento.lookAt = null; this.story.duda.lookAt = null; other.lookAt = null;
+    for (const h of [P.human, this.story.bento.human, this.story.duda.human, other.human]) h.setEmotion('neutral');
     this.hud.subtitle(null);
     this.hud.letterbox(false);
     this.cine = null;
@@ -653,7 +739,8 @@ export class Game {
       if (inp.pressed('Space') || inp.pressed('Enter')) this.voice.stop();
       P.human.update(dt, { speed: 0, grounded: true, sit: !!P.vehicle });
       P.human.root.position.copy(P.pos); P.human.root.rotation.y = P.heading;
-    } else if (this.state === 'play') P.update(dt, inp, this.cam);
+    } else if (this.state === 'play' && !this.menuOpen) P.update(dt, inp, this.cam);
+    else if (this.menuOpen) { P.vel.set(0, 0, 0); P.human.update(dt, { speed: 0, grounded: true, sit: !!P.vehicle }); }
     else P.update(dt, { down: () => false, pressed: () => false, mouse: {} }, this.cam);
     this.updateCars(dt);
     for (const n of this.npcs) {
@@ -665,6 +752,20 @@ export class Game {
     this.popT -= dt; if (this.popT <= 0) { this.popT = 0.5; this.managePopulation(); }
     for (let i = this.pickups.length - 1; i >= 0; i--) { const p = this.pickups[i]; p.update(dt); if (p.dead) { p.dispose(); this.pickups.splice(i, 1); } }
     if (!this.cutsceneActive) this.missions.update(dt); else { this.missions.marker && this.missions.marker.update(dt); }
+    this.places.update(dt, inp);
+    this.chatT = (this.chatT || 0) - dt; if (this.chatT <= 0) { this.chatT = 1; this.ambientChat(); }
+    P.stats.playTime += dt;
+    if (inp.pressed('KeyM')) this.hud.toggleMap();
+    if (inp.pressed('F2')) this.hud.toggleDebug();
+    if (this.hud.debugOn) {
+      if (inp.pressed('PageUp')) this.world.hour = (this.world.hour + 1) % 24;
+      if (inp.pressed('PageDown')) this.world.hour = (this.world.hour + 23) % 24;
+      if (inp.pressed('Home')) { this.world.nextWeather(); this.hud.help('Clima: <b>' + this.world.weather + '</b>', 1.5); }
+      if (inp.pressed('End')) this.addMoney(1000);
+      if (inp.pressed('Insert')) { this.godMode = !this.godMode; this.hud.help('Invencível: ' + (this.godMode ? 'sim' : 'não'), 1.5); }
+      if (inp.pressed('Delete')) this.setWanted(Math.min(5, this.wanted + 1));
+    }
+    if (this.godMode) P.health = 100;
     // F hint
     if (!P.vehicle && !this.cutsceneActive && this.state === 'play' && !P.entering) {
       const c = P.nearestCar(3); if (c && !this.hud.helpTimer) this.hud.help(`Aperte <b>F</b> para ${c.driver ? 'roubar' : 'entrar no'} ${c.type.name}`, 0.4);
@@ -674,12 +775,12 @@ export class Game {
     this.updateCamera(dt);
     this.updateHeadlight();
     const focus = P.vehicle ? P.vehicle.pos : P.pos;
-    this.world.update(dt, focus);
+    this.world.update(dt, focus, 1, this.camera.position);
     if (this.grade) this.grade.uniforms.uNight.value = this.world.night;
     this.hud.update(dt);
     let sirenDist = 999;
     for (const c of this.cars) if (c.siren) sirenDist = Math.min(sirenDist, c.pos.distanceTo(this.camera.position));
-    this.audio.update(dt, { inCar: !!P.vehicle, speed: P.vehicle ? P.vehicle.speed : 0, throttle: P.vehicle ? Math.abs(P.vehicle.input.throttle) : 0, skid: P.vehicle ? P.vehicle.skid : 0, sirenDist, radio: this.radioStation });
+    this.audio.update(dt, { inCar: !!P.vehicle, speed: P.vehicle ? P.vehicle.speed : 0, throttle: P.vehicle ? Math.abs(P.vehicle.input.throttle) : 0, skid: P.vehicle ? P.vehicle.skid : 0, sirenDist, radio: this.radioStation, rain: this.world.wx.rain });
     this.composer.render();
     inp.endFrame();
   }
@@ -710,10 +811,12 @@ document.getElementById('play').addEventListener('click', () => {
   }, 30);
 });
 document.getElementById('resume').addEventListener('click', () => { pauseEl.style.display = 'none'; if (game) { game.paused = false; game.clock.getDelta(); } lock(); });
+window.__relock = lock;
+document.getElementById('saveNow').addEventListener('click', () => { if (game) { game.save(true); document.getElementById('saveNow').textContent = 'Salvo!'; setTimeout(() => (document.getElementById('saveNow').textContent = 'Salvar agora'), 1500); } });
 document.getElementById('resetSave').addEventListener('click', () => { try { localStorage.removeItem(SAVE_KEY); } catch { /* ignore */ } location.reload(); });
 document.addEventListener('pointerlockchange', () => {
   if (!game) return;
-  if (!document.pointerLockElement && !game.cutsceneActive) { game.paused = true; pauseEl.style.display = 'flex'; if (game.audio.ctx) game.audio.ctx.suspend(); if (game.voice.synth) game.voice.synth.pause(); }
+  if (!document.pointerLockElement && !game.cutsceneActive && !game.menuOpen && !game.hud.mapOn) { game.paused = true; pauseEl.style.display = 'flex'; game.hud.fillStats(); if (game.audio.ctx) game.audio.ctx.suspend(); if (game.voice.synth) game.voice.synth.pause(); }
   else if (document.pointerLockElement) { game.paused = false; pauseEl.style.display = 'none'; if (game.audio.ctx) game.audio.ctx.resume(); if (game.voice.synth) game.voice.synth.resume(); }
 });
 document.getElementById('game').addEventListener('click', () => { if (game && !document.pointerLockElement) lock(); });

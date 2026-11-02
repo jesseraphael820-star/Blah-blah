@@ -41,9 +41,67 @@ export class HUD {
     this.mapImg = c;
   }
   setObjective(html) { this.el.obj.innerHTML = html; this.el.obj.style.opacity = html ? 1 : 0; }
-  subtitle(name, text) {
+  subtitle(name, text, ambient = false) {
     if (!text) { this.el.sub.style.opacity = 0; return; }
+    this.el.sub.classList.toggle('ambient', ambient);
     this.el.sub.innerHTML = `<span class="who">${name}:</span> ${text}`; this.el.sub.style.opacity = 1;
+  }
+  // dialogue choice; resolves with the chosen index (keys 1/2 or click)
+  choice(options) {
+    const el = document.getElementById('choice');
+    el.innerHTML = '<div class="cTitle">Escolha:</div>' + options.map((o, i) => `<button data-c="${i}"><kbd>${i + 1}</kbd> ${o}</button>`).join('');
+    el.hidden = false;
+    return new Promise((resolve) => {
+      const done = (i) => { el.hidden = true; removeEventListener('keydown', onKey); el.onclick = null; resolve(i); };
+      const onKey = (e) => { const n = parseInt(e.key, 10); if (n >= 1 && n <= options.length) done(n - 1); };
+      addEventListener('keydown', onKey);
+      el.onclick = (e) => { const b = e.target.closest('[data-c]'); if (b) done(+b.dataset.c); };
+    });
+  }
+  toggleMap() {
+    this.mapOn = !this.mapOn;
+    const el = document.getElementById('bigmap'); el.hidden = !this.mapOn;
+    if (this.mapOn) this.drawBigMap();
+  }
+  drawBigMap() {
+    const cv = document.getElementById('bigmapCanvas'), c = cv.getContext('2d'), S = cv.width, g = this.g, P = g.player;
+    const k = S / 860, m = (v) => (v + 430) * k;
+    c.fillStyle = '#2b6f8f'; c.fillRect(0, 0, S, S);
+    c.drawImage(this.mapImg, 70, 70, 860, 860, 0, 0, S, S);
+    const dot = (x, z, color, r, label) => {
+      c.fillStyle = color; c.strokeStyle = '#000'; c.lineWidth = 2;
+      c.beginPath(); c.arc(m(x), m(z), r, 0, 7); c.fill(); c.stroke();
+      if (label) { c.fillStyle = '#000'; c.font = `bold ${r * 1.1}px sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(label, m(x), m(z) + 1); }
+    };
+    const L = g.world.loc;
+    c.font = 'bold 15px Oswald, sans-serif'; c.textAlign = 'center'; c.fillStyle = 'rgba(255,255,255,0.85)';
+    for (const [x, z, n] of [[L.bento.x, L.bento.z - 30, 'CASA DO BENTO'], [L.garage.x, L.garage.z - 46, 'OFICINA DA DUDA'], [L.gang.x, L.gang.z - 30, 'PÁTIO DOS CORVOS'], [L.hospital.x, L.hospital.z - 42, 'HOSPITAL'], [L.police.x, L.police.z - 40, 'DELEGACIA'], [L.clothes.x + 18, L.clothes.z - 54, 'COMÉRCIO'], [L.property.x, L.property.z - 36, 'EDIFÍCIO MARÉ'], [0, 352, 'PRAIA DE PORTO SOL']]) c.fillText(n, m(x), m(z));
+    for (const b of g.places.blips) dot(b.pos.x, b.pos.z, b.color, 9, b.icon);
+    dot(L.hospital.x, L.hospital.z, '#fff', 9, '+');
+    for (const b of g.missions.blips) dot(b.pos.x, b.pos.z, b.color, 12, b.icon || '');
+    const p = P.vehicle ? P.vehicle.pos : P.pos, h = P.vehicle ? P.vehicle.heading : P.heading;
+    c.save(); c.translate(m(p.x), m(p.z)); c.rotate(-h + Math.PI);
+    c.fillStyle = '#fff'; c.strokeStyle = '#000'; c.lineWidth = 2;
+    c.beginPath(); c.moveTo(0, -12); c.lineTo(8, 9); c.lineTo(0, 4); c.lineTo(-8, 9); c.closePath(); c.fill(); c.stroke(); c.restore();
+  }
+  toggleDebug() { this.debugOn = !this.debugOn; document.getElementById('debug').hidden = !this.debugOn; }
+  updateDebug(dt) {
+    this.fpsAcc = (this.fpsAcc || 0) + dt; this.fpsN = (this.fpsN || 0) + 1;
+    if (this.fpsAcc < 0.5) return;
+    const g = this.g, P = g.player, p = P.vehicle ? P.vehicle.pos : P.pos, info = g.renderer.info.render;
+    document.getElementById('debug').textContent =
+      `FPS ${(this.fpsN / this.fpsAcc).toFixed(0)} · draw calls ${g.lastCalls || info.calls} · triângulos ${((g.lastTris || info.triangles) / 1000).toFixed(0)}k\n` +
+      `pos ${p.x.toFixed(1)}, ${p.y.toFixed(2)}, ${p.z.toFixed(1)} · hora ${g.world.hour.toFixed(2)} · clima ${g.world.weather} (chuva ${g.world.wx.rain.toFixed(2)}, molhado ${g.world.wet.toFixed(2)})\n` +
+      `carros ${g.cars.length} · NPCs ${g.npcs.length} · procurado ${g.wanted} (calor ${g.heat.toFixed(1)}) · missão ${g.missions.index} ${g.missions.state}\n` +
+      `PgUp/PgDn hora · Home clima · End +$1000 · Insert invencível · Delete +1 estrela`;
+    this.fpsAcc = 0; this.fpsN = 0;
+  }
+  fillStats() {
+    const S = this.g.player.stats, el = document.getElementById('stats'); if (!el) return;
+    const min = Math.floor(S.playTime / 60);
+    const rep = S.respect >= 60 ? 'Lenda do bairro' : S.respect >= 30 ? 'Respeitado' : S.respect >= 0 ? 'Desconhecido' : 'Temido';
+    const rows = [['Respeito', `${S.respect} (${rep})`], ['Força', `${S.strength}/100`], ['Fôlego', `${S.stamina}/100`], ['Missões concluídas', S.missions], ['Carros roubados', S.carsStolen], ['Abates', S.kills], ['Policiais abatidos', S.copsKilled], ['Distância a pé', `${(S.walked / 1000).toFixed(1)} km`], ['Distância dirigindo', `${(S.driven / 1000).toFixed(1)} km`], ['Dinheiro ganho', `$${S.earned}`], ['Tempo de jogo', `${min} min`], ['Apartamento', this.g.flags.property ? 'Edifício Maré' : 'nenhum']];
+    el.innerHTML = '<h3>Estatísticas</h3>' + rows.map(([k, v]) => `<div><span>${k}</span><b>${v}</b></div>`).join('');
   }
   big(title, sub = '', color = '#ffd23a', dur = 3) {
     this.el.bigT.textContent = title; this.el.bigT.style.color = color; this.el.bigS.textContent = sub;
@@ -83,6 +141,10 @@ export class HUD {
     if (this.helpTimer > 0) { this.helpTimer -= dt; if (this.helpTimer <= 0) this.el.help.classList.remove('show'); }
     if (this.carTimer > 0) { this.carTimer -= dt; if (this.carTimer <= 0) this.el.car.classList.remove('show'); }
     this.drawMap();
+    if (this.mapOn) this.drawBigMap();
+    if (this.debugOn) this.updateDebug(dt);
+    const W = { clear: '☀', cloudy: '☁', rain: '🌧', fog: '🌫' }[g.world.weather] || '';
+    this.el.clock.dataset.w = W;
   }
 
   drawMap() {
@@ -121,6 +183,7 @@ export class HUD {
     const t = performance.now() / 1000;
     for (const car of g.cars) if (car.typeKey === 'police' && car.driverKind === 'police') blip(car.pos.x, car.pos.z, Math.floor(t * 4) % 2 ? '#ff3030' : '#3060ff', 6);
     for (const n of g.npcs) if (n.kind === 'cop' && n.alive && g.wanted > 0) blip(n.pos.x, n.pos.z, '#5a7aff', 4);
+    for (const b of g.places.blips) blip(b.pos.x, b.pos.z, b.color, 8, b.icon);
     for (const b of g.missions.blips) blip(b.pos.x, b.pos.z, b.color, b.small ? 5 : 11, b.icon || null);
     if (g.world.loc.hospital) blip(g.world.loc.hospital.x, g.world.loc.hospital.z, '#ffffff', 8, '+');
     // player arrow

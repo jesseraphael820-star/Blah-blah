@@ -10,10 +10,10 @@ const DEFS = [
   {
     id: 'rodas', title: 'Rodas Novas', giver: B,
     intro: [
-      [B, 'Léo! Finalmente voltou pra Porto Sol. A cidade mudou muito desde que você foi embora.'],
-      [L, 'Tio Bento... Vim assim que soube. O que está acontecendo por aqui?'],
-      [B, 'Os Corvos estão tomando o bairro. Mas primeiro, você precisa de um carro. Pega um na rua e leva pra oficina da Duda.'],
-      [L, 'Pegar emprestado, né? Deixa comigo.'],
+      [B, 'Léo! Finalmente voltou pra Porto Sol. A cidade mudou muito desde que você foi embora.', 'happy'],
+      [L, 'Tio Bento... Vim assim que soube. O que está acontecendo por aqui?', 'worried'],
+      [B, 'Os Corvos estão tomando o bairro. Mas primeiro, você precisa de um carro. Pega um na rua e leva pra oficina da Duda.', 'worried'],
+      [L, 'Pegar emprestado, né? Deixa comigo.', 'confident'],
     ],
     start(m) { m.stage = 0; },
     update(m, dt) {
@@ -29,18 +29,18 @@ const DEFS = [
       }
     },
     outro: [
-      [D, 'Opa, carro novo? Bom gosto, Léo. O Bento me falou de você.'],
-      [L, 'Ele disse que você conhece a cidade inteira.'],
-      [D, 'Conheço cada atalho. Volta aqui quando quiser trabalho de verdade.'],
+      [D, 'Opa, carro novo? Bom gosto, Léo. O Bento me falou de você.', 'happy'],
+      [L, 'Ele disse que você conhece a cidade inteira.', 'neutral'],
+      [D, 'Conheço cada atalho. Volta aqui quando quiser trabalho de verdade.', 'confident'],
     ],
     reward: 500,
   },
   {
     id: 'entrega', title: 'Entrega Quente', giver: D,
     intro: [
-      [D, 'Tenho uma entrega urgente. Peças, e nada de perguntas.'],
-      [L, 'Quanto tempo eu tenho?'],
-      [D, 'Pouco. Passa por todos os pontos antes do tempo acabar. Pega o Fúria ali, ele voa.'],
+      [D, 'Tenho uma entrega urgente. Peças, e nada de perguntas.', 'confident'],
+      [L, 'Quanto tempo eu tenho?', 'neutral'],
+      [D, 'Pouco. Passa por todos os pontos antes do tempo acabar. Pega o Fúria ali, ele voa.', 'happy'],
     ],
     start(m) {
       const g = m.g, l = g.world.loc.garage;
@@ -67,9 +67,9 @@ const DEFS = [
       }
     },
     outro: [
-      [D, 'Rápido demais! Toma, você mereceu.'],
-      [D, 'E leva isso aqui. Com os Corvos na rua, você vai precisar.'],
-      [L, 'Valeu, Duda. Fico te devendo.'],
+      [D, 'Rápido demais! Toma, você mereceu.', 'surprised'],
+      [D, 'E leva isso aqui. Com os Corvos na rua, você vai precisar.', 'worried'],
+      [L, 'Valeu, Duda. Fico te devendo.', 'happy'],
     ],
     reward: 1500,
     onDone(m) { const P = m.g.player; P.hasPistol = true; P.ammo += 60; m.g.hud.help('Você ganhou uma <b>pistola</b>! Aperte <b>Q</b> para sacar e <b>clique</b> para atirar. Segure o <b>botão direito</b> para mirar.', 7); },
@@ -77,10 +77,10 @@ const DEFS = [
   {
     id: 'corvos', title: 'Asas Cortadas', giver: B,
     intro: [
-      [B, 'Os Corvos picharam o muro do nosso bairro e ameaçaram a família do seu Zé.'],
-      [L, 'Onde eles ficam?'],
-      [B, 'No pátio velho, a leste daqui. Vai lá e mostra que Porto Sol tem dono.'],
-      [L, 'Hoje eles aprendem a voar baixo.'],
+      [B, 'Os Corvos picharam o muro do nosso bairro e ameaçaram a família do seu Zé.', 'angry'],
+      [L, 'Onde eles ficam?', 'angry'],
+      [B, 'No pátio velho, a leste daqui. Vai lá e mostra que Porto Sol tem dono.', 'confident'],
+      [L, 'Hoje eles aprendem a voar baixo.', 'confident'],
     ],
     start(m) { m.stage = 0; m.thugs = []; m.setTarget(m.g.world.loc.gang, 0xb45aff, 6); },
     update(m) {
@@ -103,22 +103,40 @@ const DEFS = [
       const alive = m.thugs.filter((t) => t.alive).length;
       m.objective(`Elimine os Corvos: <b>${m.thugs.length - alive}/${m.thugs.length}</b>`);
       m.blips = m.thugs.filter((t) => t.alive).map((t) => ({ pos: t.pos, color: '#c48aff', small: true }));
-      if (alive === 0) return 'done';
+      if (alive === 0) {
+        const c = m.g.world.loc.gang;
+        m.leader = m.g.spawnNPC('thug', { ...LOOKS.thug(), shirt: 0x111111, hatColor: 0x2a0a3a, bulk: 1.25 }, new THREE.Vector3(c.x, 0, c.z - 4));
+        m.leader.state = 'idle'; m.leader.cower = true; m.leader.persist = true; m.leader.health = 9999;
+        m.leader.name = 'Corvo Rei'; m.leader.voice = { pitch: 0.6, rate: 0.92, gender: 'm' };
+        return 'done';
+      }
     },
     cleanup(m) { (m.thugs || []).forEach((t) => (t.persist = false)); },
-    outro: [
-      [B, 'Ouvi o barulho daqui. Os Corvos vão pensar duas vezes antes de voltar.'],
-      [L, 'Eles não vão voltar, tio.'],
+    outro: (m) => [
+      { who: m.leader, text: 'Chega! Chega! Vocês venceram... O que você quer de mim?', emo: 'worried' },
+      {
+        choice: ['Some de Porto Sol e não volta nunca mais.', 'A partir de hoje, você trabalha pra gente.'],
+        branches: [
+          [{ who: L, text: 'Some de Porto Sol e não volta nunca mais.', emo: 'angry' }, { who: m.leader, text: 'Tá bom... Eu vou embora hoje mesmo. Você não me vê mais.', emo: 'sad' }],
+          [{ who: L, text: 'A partir de hoje, você trabalha pra gente.', emo: 'confident' }, { who: m.leader, text: 'Fechado. Os Corvos agora voam do lado de vocês.', emo: 'happy' }],
+        ],
+        onPick: (i) => { m.g.flags.corvo = i === 0 ? 'exiled' : 'recruited'; m.bonus = i === 0 ? 0 : 1000; m.g.player.stats.respect += i === 0 ? 10 : 5; },
+      },
     ],
-    outroAt: B,
+    outroAt: 'none',
+    onDone(m) {
+      const ld = m.leader; ld.persist = false; ld.cower = false;
+      if (m.g.flags.corvo === 'exiled') { ld.state = 'flee'; ld.threat = m.g.player; ld.timer = 25; } else { ld.state = 'walk'; ld.pickCorner(); }
+      ld.health = 90;
+    },
     reward: 2500,
   },
   {
     id: 'calor', title: 'Calor Total', giver: B,
     intro: [
-      [B, 'Fizemos barulho demais. A polícia inteira está atrás de você agora!'],
-      [L, 'Então é hora de sumir.'],
-      [B, 'Despista os homens e volta pro esconderijo. Eu confio em você, sobrinho.'],
+      [B, 'Fizemos barulho demais. A polícia inteira está atrás de você agora!', 'surprised'],
+      [L, 'Então é hora de sumir.', 'confident'],
+      [B, 'Despista os homens e volta pro esconderijo. Eu confio em você, sobrinho.', 'worried'],
     ],
     start(m) { m.stage = 0; m.g.setWanted(3); m.g.hud.big('CALOR TOTAL', 'Despiste a polícia!', '#ff4040', 2); },
     update(m) {
@@ -133,9 +151,10 @@ const DEFS = [
       if (m.near(g.world.loc.safehouse, 4)) return 'done';
     },
     outro: [
-      [B, 'Você conseguiu, Léo. Os Corvos sumiram e a polícia perdeu o seu rastro.'],
-      [L, 'Porto Sol é a nossa casa. Ninguém vai tirar isso da gente.'],
-      [B, 'Agora a cidade é sua. Aproveita... e não me arruma mais encrenca!'],
+      [B, 'Você conseguiu, Léo. A polícia perdeu o seu rastro.', 'happy'],
+      [B, (g) => (g.flags.corvo === 'recruited' ? 'E com os Corvos do nosso lado, ninguém mais mexe com o bairro.' : 'E com os Corvos longe daqui, o bairro finalmente respira.'), 'confident'],
+      [L, 'Porto Sol é a nossa casa. Ninguém vai tirar isso da gente.', 'confident'],
+      [B, 'Agora a cidade é sua. Aproveita... e não me arruma mais encrenca!', 'happy'],
     ],
     outroAt: B,
     reward: 5000,
@@ -150,6 +169,7 @@ export class Missions {
     this.setupStart();
   }
   get count() { return DEFS.length; }
+  lines(arr) { return arr.map(([who, text, emo]) => ({ who, text: typeof text === 'function' ? text(this.g) : text, emo })); }
   giverNPC(who) { return who === B ? this.g.story.bento : who === D ? this.g.story.duda : null; }
   setupStart() {
     this.clearTarget();
@@ -178,7 +198,7 @@ export class Missions {
     this.state = 'cutscene';
     this.marker.dispose(); this.marker = null; this.blips = [];
     this.g.hud.big(def.title.toUpperCase(), `Missão ${this.index + 1} de ${DEFS.length}`, '#ffd23a', 2.2);
-    await this.g.playCutscene(def.intro.map(([who, text]) => ({ who, text })));
+    await this.g.playCutscene(this.lines(def.intro));
     this.ctx = { g: this.g, objective: (h) => this.objective(h), near: (p, r) => this.near(p, r), setTarget: (a, b, c) => this.setTarget(a, b, c), clearTarget: () => this.clearTarget(), blipOnly: (a, b) => this.blipOnly(a, b) };
     Object.defineProperty(this.ctx, 'blips', { set: (v) => (this.blips = v), get: () => this.blips });
     this.cur = def;
@@ -197,11 +217,13 @@ export class Missions {
       // teleport near the speaker so the scene makes sense
       this.g.player.pos.set(at.pos.x, at.pos.y, at.pos.z + 3);
     }
-    await this.g.playCutscene(def.outro.map(([who, text]) => ({ who, text })));
-    this.g.addMoney(def.reward);
+    await this.g.playCutscene(typeof def.outro === 'function' ? def.outro(this.ctx) : this.lines(def.outro));
+    const reward = def.reward + (this.ctx.bonus || 0);
+    this.g.addMoney(reward);
+    const P = this.g.player; P.stats.missions++; P.stats.respect += 15;
     if (def.onDone) def.onDone(this.ctx);
     this.g.audio.mission();
-    this.g.hud.big(def.final ? 'FIM DA HISTÓRIA' : 'MISSÃO CONCLUÍDA!', def.final ? `+$${def.reward} — Porto Sol é sua. Explore à vontade!` : `+$${def.reward}`, '#ffd23a', 4);
+    this.g.hud.big(def.final ? 'FIM DA HISTÓRIA' : 'MISSÃO CONCLUÍDA!', def.final ? `+$${reward} — Porto Sol é sua. Explore à vontade!` : `+$${reward}  ·  +15 respeito`, '#ffd23a', 4);
     this.index++; this.cur = null; this.state = 'idle';
     this.g.save();
     this.setupStart();

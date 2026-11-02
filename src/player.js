@@ -16,9 +16,27 @@ export class Player {
     this.vehicle = null; this.entering = null;
     this.punchCd = 0; this.shootCd = 0; this.hurtT = 0; this.stepT = 0;
     this.name = 'Léo';
+    this.crouch = false; this.swimming = false;
+    this.look = { skin: 0x6e4428, shirt: 0xf4f4f2, pants: 0x2b3a5c, hair: 0x0e0e0e, shoes: 0xe8e8e8, bulk: 1.04, scale: 1.0, eyes: 0x2a1a0a };
+    this.stats = { strength: 10, stamina: 10, respect: 0, carsStolen: 0, kills: 0, copsKilled: 0, missions: 0, walked: 0, driven: 0, earned: 0, playTime: 0 };
+    this.wardrobe = ['shirt:0xf4f4f2'];
     this.voice = { pitch: 1.0, rate: 1.05, gender: 'm' };
   }
   get alive() { return this.health > 0; }
+
+  // rebuild the character model with a new outfit (clothes shop)
+  setLook(patch) {
+    const g = this.game;
+    this.look = { ...this.look, ...patch };
+    const old = this.human, parent = old.root.parent;
+    const h = new Human(this.look);
+    if (parent) { parent.remove(old.root); parent.add(h.root); }
+    h.root.position.copy(old.root.position); h.root.rotation.copy(old.root.rotation);
+    h.showGun(old.gun.visible);
+    this.human = h;
+    if (this.vehicle) this.vehicle.driver = h;
+    void g;
+  }
 
   damage(d, from) {
     if (!this.alive) return;
@@ -58,7 +76,7 @@ export class Player {
       ped.downT = 1.2;
       g.npcs.push(ped);
       if (ped.kind === 'ped') { if (Math.random() < 0.2) { ped.state = 'fight'; ped.threat = this; } else ped.scare(this, 10); }
-      g.onCarjack(car);
+      g.onCarjack(car); this.stats.carsStolen++;
       car.driver = null;
     }
     if (car.typeKey === 'police' && car.driverKind === 'police') g.onCarjack(car, true);
@@ -66,7 +84,7 @@ export class Player {
     g.scene.remove(this.human.root);
     car.group.add(this.human.root);
     this.human.root.position.copy(car.seat); this.human.root.rotation.set(0, 0, 0);
-    this.vehicle = car; this.entering = null;
+    this.vehicle = car; this.entering = null; this.crouch = false;
     this.human.showGun(false);
     g.hud.carName(car.type.name);
     g.radioStation = true;
@@ -112,7 +130,9 @@ export class Player {
     // weapon switching
     if (input.pressed('KeyQ') && this.hasPistol) { this.weapon = this.weapon === 'pistol' ? 'fist' : 'pistol'; this.human.showGun(this.weapon === 'pistol'); }
     const armed = this.weapon === 'pistol';
-    const aiming = armed && (input.mouse.right || input.mouse.left);
+    const aiming = armed && !this.swimming && (input.mouse.right || input.mouse.left);
+    if (input.pressed('KeyC')) this.crouch = !this.crouch;
+    if (this.swimming) this.crouch = false;
     // movement
     const f = new THREE.Vector3(Math.sin(cam.yaw), 0, Math.cos(cam.yaw));
     const r = new THREE.Vector3(-f.z, 0, f.x);
@@ -125,25 +145,35 @@ export class Player {
     let target = 0;
     if (ml > 0) {
       mx /= ml; mz /= ml;
-      target = input.down('ShiftLeft') || input.down('ShiftRight') ? 7.6 : input.down('AltLeft') || input.down('KeyC') ? 1.7 : 4.3;
+      const sprint = input.down('ShiftLeft') || input.down('ShiftRight');
+      const st = 1 + this.stats.stamina / 400;
+      target = sprint ? 7.6 * st : input.down('AltLeft') ? 1.7 : 4.3;
+      if (this.crouch) { target = sprint ? 3.2 : 1.8; }
+      if (this.swimming) target = (sprint ? 3.6 : 2.3) * st;
       if (aiming) target = Math.min(target, 3);
     }
-    const accel = this.grounded ? 12 : 2;
+    const accel = this.swimming ? 3 : this.grounded ? 12 : 2;
     this.vel.x = damp(this.vel.x, mx * target, accel, dt);
     this.vel.z = damp(this.vel.z, mz * target, accel, dt);
     if (aiming) this.heading = dampAngle(this.heading, cam.yaw, 18, dt);
     else if (ml > 0) this.heading = dampAngle(this.heading, Math.atan2(mx, mz), 10, dt);
     // jump & gravity
-    if (input.pressed('Space') && this.grounded) { this.vy = 5.2; this.grounded = false; }
+    if (input.pressed('Space') && this.grounded && !this.swimming) { this.vy = this.crouch ? 0 : 5.2; this.grounded = this.crouch; this.crouch = false; }
     this.vy -= 15 * dt;
     this.pos.x += this.vel.x * dt; this.pos.z += this.vel.z * dt; this.pos.y += this.vy * dt;
     const gh = g.world.groundHeight(this.pos.x, this.pos.z);
-    if (this.pos.y <= gh) {
+    const wl = g.world.waterLevel;
+    this.swimming = wl - gh > 1.3;
+    if (this.swimming) {
+      const moving = Math.hypot(this.vel.x, this.vel.z) > 0.6;
+      this.pos.y = damp(this.pos.y, wl - (moving ? 0.45 : 1.4), 6, dt); this.vy = 0; this.grounded = true;
+      if (moving && Math.random() < dt * 6) g.fx.dust(new THREE.Vector3(this.pos.x, wl + 0.05, this.pos.z));
+    } else if (this.pos.y <= gh) {
       if (!this.grounded && this.vy < -9) this.damage((-this.vy - 9) * 6);
       this.pos.y = gh; this.vy = 0; this.grounded = true;
     } else if (this.grounded && this.vy <= 0 && this.pos.y - gh < 0.3) { this.pos.y = gh; this.vy = 0; }
     else this.grounded = false;
-    g.world.collideCircle(this.pos, 0.38);
+    g.world.collideCircle(this.pos, 0.38, 470);
     // push out of cars
     for (const c of g.cars) {
       if (Math.abs(c.pos.x - this.pos.x) > 6 || Math.abs(c.pos.z - this.pos.z) > 6) continue;
@@ -153,15 +183,18 @@ export class Player {
       }
     }
     // actions
-    if (input.pressed('KeyF')) this.tryEnter();
-    if (input.mouse.leftPressed || (armed && input.mouse.left)) {
+    if (input.pressed('KeyF') && !this.swimming) this.tryEnter();
+    if (input.pressed('KeyT')) g.talkToNearest('greet');
+    if (input.pressed('KeyG')) g.talkToNearest('taunt');
+    if (!this.swimming && (input.mouse.leftPressed || (armed && input.mouse.left))) {
       if (armed) this.shoot(cam);
       else if (this.punchCd <= 0) this.punch();
     }
     const speed = Math.hypot(this.vel.x, this.vel.z);
+    this.stats.walked += speed * dt;
     this.stepT -= dt * speed;
-    if (this.grounded && speed > 1 && this.stepT <= 0) { this.stepT = 1.6; g.audio.step(); }
-    this.human.update(dt, { speed: this.grounded ? speed : 0, grounded: this.grounded, aim: aiming, lookYaw: aiming ? 0 : clamp(angleDiff(this.heading, cam.yaw), -1, 1) * 0.6 });
+    if (this.grounded && !this.swimming && speed > 1 && this.stepT <= 0) { this.stepT = this.crouch ? 2.4 : 1.6; g.audio.step(this.crouch ? 0.4 : 1); }
+    this.human.update(dt, { speed: this.grounded ? speed : 0, grounded: this.grounded, aim: aiming, crouch: this.crouch, swim: this.swimming, lookYaw: aiming ? 0 : clamp(angleDiff(this.heading, cam.yaw), -1, 1) * 0.6 });
     this.human.root.position.copy(this.pos);
     this.human.root.rotation.y = this.heading;
     this.aiming = aiming;
@@ -176,7 +209,7 @@ export class Player {
         if (!n.alive || n.removed) continue;
         const dx = n.pos.x - this.pos.x, dz = n.pos.z - this.pos.z, d = Math.hypot(dx, dz);
         if (d < 1.6 && (dx * fx + dz * fz) / (d || 1) > 0.45) {
-          n.hurt(14 + Math.random() * 8, this, 'hit');
+          n.hurt((14 + Math.random() * 8) * (1 + this.stats.strength / 100), this, 'hit');
           n.knock.set(fx * 4, 0, fz * 4);
           g.audio.punch();
           if (n.alive && Math.random() < 0.3) n.downT = 1.2;
@@ -215,6 +248,7 @@ export class Player {
     if (input.pressed('KeyR')) { this.game.radioStation = !this.game.radioStation; this.game.hud.help(this.game.radioStation ? 'Rádio: <b>Porto Sol FM</b>' : 'Rádio desligado', 1.5); }
     if (input.pressed('KeyE') && car.sirenR) car.siren = !car.siren;
     this.human.update(dt, { sit: true, lookYaw: -inp.steer * 0.4 });
+    this.stats.driven += Math.abs(car.speed) * dt;
     this.pos.copy(car.pos);
     if (input.pressed('KeyF')) this.exitVehicle();
     if (car.dead) { this.exitVehicle(true); }

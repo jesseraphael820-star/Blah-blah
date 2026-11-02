@@ -43,7 +43,7 @@ class GeoBuilder {
 
 const SPECIAL = {
   '1,1': 'bento', '5,1': 'garage', '6,5': 'gang', '3,6': 'hospital', '2,2': 'police',
-  '3,3': 'park', '6,7': 'park', '0,4': 'park',
+  '3,3': 'park', '6,7': 'park', '0,4': 'park', '4,1': 'shops', '2,7': 'property',
 };
 
 export class World {
@@ -63,7 +63,56 @@ export class World {
     this.buildRoads();
     this.buildBlocks();
     this.buildProps();
+    this.initWeather();
     this.updateSun(true);
+  }
+
+  // ------------------------------------------------------------ weather
+  initWeather() {
+    this.weather = 'clear';
+    this.wx = { cloud: 0, rain: 0, fog: 0 }; this.wxTarget = { cloud: 0, rain: 0, fog: 0 };
+    this.wet = 0; this.weatherHours = 3 + Math.random() * 3;
+    const n = 3500, pos = new Float32Array(n * 6);
+    this.rainSeed = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) { this.rainSeed[i * 3] = Math.random() * 70 - 35; this.rainSeed[i * 3 + 1] = Math.random() * 30; this.rainSeed[i * 3 + 2] = Math.random() * 70 - 35; }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    this.rainMesh = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: 0xb8c8d8, transparent: true, opacity: 0, depthWrite: false }));
+    this.rainMesh.frustumCulled = false; this.rainMesh.visible = false;
+    this.scene.add(this.rainMesh);
+    this.rainFall = 0;
+  }
+  setWeather(name) {
+    const T = { clear: { cloud: 0, rain: 0, fog: 0 }, cloudy: { cloud: 0.65, rain: 0, fog: 0.1 }, rain: { cloud: 1, rain: 1, fog: 0.35 }, fog: { cloud: 0.45, rain: 0, fog: 1 } };
+    this.weather = T[name] ? name : 'clear';
+    Object.assign(this.wxTarget, T[this.weather]);
+  }
+  nextWeather() { const order = ['clear', 'cloudy', 'rain', 'fog']; this.setWeather(order[(order.indexOf(this.weather) + 1) % order.length]); }
+  updateWeather(dt, cam) {
+    const gameHours = dt / 60;
+    this.weatherHours -= gameHours;
+    if (this.weatherHours <= 0) {
+      this.weatherHours = 2 + Math.random() * 4;
+      const r = Math.random();
+      this.setWeather(r < 0.45 ? 'clear' : r < 0.7 ? 'cloudy' : r < 0.9 ? 'rain' : 'fog');
+    }
+    for (const k of ['cloud', 'rain', 'fog']) this.wx[k] = lerp(this.wx[k], this.wxTarget[k], 1 - Math.exp(-dt * 0.25));
+    this.wet = clamp(this.wet + (this.wx.rain > 0.3 ? dt * 0.05 : -dt * 0.008), 0, 1);
+    for (const m of this.wetMats) { m.roughness = lerp(m.userData.dry, 0.22, this.wet); m.color.setScalar(lerp(1, 0.62, this.wet) * (m.userData.tint || 1)); }
+    const rm = this.rainMesh, rain = this.wx.rain;
+    rm.visible = rain > 0.02; rm.material.opacity = rain * 0.45;
+    if (rm.visible) {
+      this.rainFall += dt * 26;
+      const a = rm.geometry.attributes.position.array, S = this.rainSeed, n = S.length / 3;
+      const cx = cam.x, cy = cam.y, cz = cam.z;
+      for (let i = 0; i < n; i++) {
+        const x = cx + ((S[i * 3] - cx * 0) % 70), z = cz + S[i * 3 + 2];
+        let y = (S[i * 3 + 1] - this.rainFall) % 30; if (y < 0) y += 30;
+        y += cy - 12;
+        a[i * 6] = x; a[i * 6 + 1] = y; a[i * 6 + 2] = z;
+        a[i * 6 + 3] = x + 0.08; a[i * 6 + 4] = y + 0.9; a[i * 6 + 5] = z + 0.04;
+      }
+      rm.geometry.attributes.position.needsUpdate = true;
+    }
   }
 
   // ------------------------------------------------------------ lighting
@@ -128,10 +177,16 @@ export class World {
       this.sun.intensity = 0.35;
     }
     if (this.lightDir.y < 0.12) this.lightDir.y = 0.12;
-    this.hemi.intensity = lerp(0.12, 0.75, day);
+    const W = this.wx || { cloud: 0, rain: 0, fog: 0 };
+    this.sun.intensity *= 1 - W.cloud * 0.78;
+    u.turbidity.value = 6 + W.cloud * 12; u.rayleigh.value = 1.6 + W.cloud * 1.5; u.mieCoefficient.value = 0.006 + W.cloud * 0.02;
+    this.hemi.intensity = lerp(0.12, 0.75, day) * (1 - W.cloud * 0.25);
     this.hemi.color.setRGB(lerp(0.25, 0.81, day), lerp(0.3, 0.89, day), lerp(0.5, 1, day));
     const fogDay = new THREE.Color(0xc8d0d6).lerp(new THREE.Color(0xe0b48a), low * day * 0.7);
+    fogDay.lerp(new THREE.Color(0x9aa1a7), Math.max(W.cloud, W.fog) * 0.85);
     this.scene.fog.color.copy(fogDay.lerp(new THREE.Color(0x0b1222), this.night));
+    this.scene.fog.near = lerp(140, 12, W.fog) * (1 - W.rain * 0.4);
+    this.scene.fog.far = lerp(720, 170, W.fog) * (1 - W.rain * 0.45);
     this.stars.material.opacity = this.night;
     this.renderer.toneMappingExposure = lerp(0.62, 1.05, this.night);
     for (const m of this.nightMats) m.material.emissiveIntensity = m.base * this.night;
@@ -145,8 +200,9 @@ export class World {
     }
   }
 
-  update(dt, focus, timeScale = 1) {
+  update(dt, focus, timeScale = 1, cam = focus) {
     this.hour = (this.hour + (dt / 60) * timeScale) % 24;
+    this.updateWeather(dt, cam);
     this.updateSun();
     const ld = this.lightDir;
     this.sun.position.set(focus.x + ld.x * 250, ld.y * 250, focus.z + ld.z * 250);
@@ -161,16 +217,16 @@ export class World {
   buildGround() {
     const grass = T.makeGrass(); grass.repeat.set(400, 400);
     const ground = new THREE.Mesh(new THREE.PlaneGeometry(3200, 3200), new THREE.MeshStandardMaterial({ map: grass, roughness: 1 }));
-    ground.rotation.x = -Math.PI / 2; ground.position.y = -0.03; ground.receiveShadow = true;
+    ground.rotation.x = -Math.PI / 2; ground.position.set(0, -0.03, SAND_Z + 2 - 1600); ground.receiveShadow = true;
     this.scene.add(ground);
 
     // beach with slope into ocean
-    const sand = T.makeSand(); sand.repeat.set(160, 24);
-    const sg = new THREE.PlaneGeometry(3200, 100, 1, 40);
+    const sand = T.makeSand(); sand.repeat.set(160, 48);
+    const sg = new THREE.PlaneGeometry(3200, 200, 1, 60);
     sg.rotateX(-Math.PI / 2);
     const pa = sg.attributes.position;
     for (let i = 0; i < pa.count; i++) {
-      const z = pa.getZ(i) + SAND_Z + 50;
+      const z = pa.getZ(i) + SAND_Z + 100;
       pa.setZ(i, z); pa.setY(i, this.sandHeight(z));
     }
     sg.computeVertexNormals();
@@ -199,6 +255,7 @@ export class World {
     }
   }
 
+  get waterLevel() { return -0.42; }
   sandHeight(z) { return z < SHORE_Z ? 0 : -(z - SHORE_Z) * 0.06; }
 
   // ------------------------------------------------------------ roads
@@ -224,6 +281,8 @@ export class World {
     const roads = new THREE.Mesh(rb.build(), new THREE.MeshStandardMaterial({ map: roadT, roughness: 0.92 }));
     const inters = new THREE.Mesh(ib.build(), new THREE.MeshStandardMaterial({ map: interT, roughness: 0.92 }));
     roads.receiveShadow = inters.receiveShadow = true;
+    this.wetMats = [roads.material, inters.material];
+    for (const m of this.wetMats) m.userData.dry = m.roughness;
     this.scene.add(roads, inters);
   }
 
@@ -275,12 +334,14 @@ export class World {
     const sw = T.makeSidewalk();
     const slabMat = new THREE.MeshStandardMaterial({ map: sw, roughness: 0.9 });
     const slab = new THREE.Mesh(this.slabBuilder.build(), slabMat); slab.receiveShadow = true; this.scene.add(slab);
+    slabMat.userData.dry = slabMat.roughness; this.wetMats.push(slabMat);
     const gt = T.makeGrass();
     const grass = new THREE.Mesh(this.grassBuilder.build(), new THREE.MeshStandardMaterial({ map: gt, roughness: 1 }));
     grass.receiveShadow = true; this.scene.add(grass);
     const lt = T.makeIntersection(); // reuse asphalt-ish
     const lots = new THREE.Mesh(this.lotBuilder.build(), new THREE.MeshStandardMaterial({ map: lt, roughness: 0.9, color: 0xbbbbbb }));
     lots.receiveShadow = true; this.scene.add(lots);
+    lots.material.userData.dry = 0.9; lots.material.userData.tint = 0.73; this.wetMats.push(lots.material);
   }
 
   addBuilding(b, x0, x1, z0, z1, h, style) {
@@ -382,6 +443,8 @@ export class World {
         this.addSign('OFICINA DO DUDA', b.cx, 8, iz0 + 22.05, 0, { bg: '#111', fg: '#ff7a2a', border: '#ff7a2a' });
         this.loc.garage = new THREE.Vector3(b.cx + 4, SH, iz0 + 34);
         this.loc.duda = new THREE.Vector3(b.cx + 12, SH, iz0 + 26);
+        this.loc.paint = new THREE.Vector3(ix0 + 17, SH, iz0 + 28);
+        this.addSign('PINTURA & REPARO', ix0 + 17, 5, iz0 + 22.06, 0, { bg: '#0d2a4a', fg: '#ffd24a' });
         this.parkSpots.push({ x: b.cx + 16, z: iz1 - 6, h: Math.PI / 2 });
         break;
       }
@@ -402,6 +465,28 @@ export class World {
         this.addBuilding(b, ix0 + 4, ix1 - 4, iz0 + 2, iz0 + 30, 24, 5);
         this.addSign('HOSPITAL', b.cx, 20, iz0 + 30.05, 0, { bg: '#fff', fg: '#d01818' });
         this.loc.hospital = new THREE.Vector3(b.cx, SH, iz0 + 38);
+        break;
+      }
+      case 'shops': {
+        this.addBuilding(b, ix0, ix1, iz0, iz0 + 24, 28, 5);
+        const stores = [['clothes', 'MODA SOL', 1, { bg: '#1d1d3a', fg: '#ff8fd0' }], ['food', 'LANCHONETE MARÉ', 7, { bg: '#7a1a10', fg: '#ffe27a' }], ['gym', 'ACADEMIA FERRO', 3, { bg: '#151515', fg: '#7ad0ff' }]];
+        stores.forEach(([key, name, style, colors], k) => {
+          const x0 = ix0 + 1 + k * 18.3, x1 = x0 + 16.5;
+          this.addBuilding(b, x0, x1, iz1 - 16, iz1, 8, style);
+          this.addSign(name, (x0 + x1) / 2, 5.6, iz1 + 0.06, 0, colors);
+          this.detailBuilder.box(x0 + 3, x1 - 3, 3.4, 3.6, iz1, iz1 + 1.6, 4); // awning
+          this.loc[key] = new THREE.Vector3((x0 + x1) / 2, SH, iz1 + 2);
+        });
+        lot(ix0, ix1, iz0 + 24, iz1 - 16);
+        break;
+      }
+      case 'property': {
+        gtop(ix0, ix1, iz0, iz1);
+        this.addBuilding(b, ix0 + 6, ix1 - 6, iz0 + 2, iz0 + 28, 20, 6);
+        this.addSign('EDIFÍCIO MARÉ', b.cx, 16, iz0 + 28.06, 0, { bg: '#0f3b3b', fg: '#e8fff8' });
+        this.loc.property = new THREE.Vector3(b.cx, SH, iz0 + 31);
+        this.addPalm(b, ix0 + 3, iz1 - 3); this.addPalm(b, ix1 - 3, iz1 - 3);
+        this.parkSpots.push({ x: b.cx + 10, z: iz0 + 38, h: 0 });
         break;
       }
       case 'police': {
@@ -526,7 +611,7 @@ export class World {
     return 0;
   }
   // resolve circle against static colliders. Mutates p (has x,z). returns normal or null
-  collideCircle(p, r) {
+  collideCircle(p, r, zMax = BOUND.z1) {
     let hit = null;
     const i0 = Math.max(0, Math.floor((p.x - r - ORIGIN) / CELL)), i1 = Math.min(N - 1, Math.floor((p.x + r - ORIGIN) / CELL));
     const j0 = Math.max(0, Math.floor((p.z - r - ORIGIN) / CELL)), j1 = Math.min(N - 1, Math.floor((p.z + r - ORIGIN) / CELL));
@@ -551,7 +636,7 @@ export class World {
     if (p.x < BOUND.x0 + r) { p.x = BOUND.x0 + r; hit = { x: 1, z: 0 }; }
     if (p.x > BOUND.x1 - r) { p.x = BOUND.x1 - r; hit = { x: -1, z: 0 }; }
     if (p.z < BOUND.z0 + r) { p.z = BOUND.z0 + r; hit = { x: 0, z: 1 }; }
-    if (p.z > BOUND.z1 - r) { p.z = BOUND.z1 - r; hit = { x: 0, z: -1 }; }
+    if (p.z > zMax - r) { p.z = zMax - r; hit = { x: 0, z: -1 }; }
     if (hit) { const l = Math.hypot(hit.x, hit.z) || 1; hit.x /= l; hit.z /= l; }
     return hit;
   }
