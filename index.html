@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Porto Sol</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Oswald:wght@400;600&display=swap" rel="stylesheet" />
+<style>
+  :root { --gold: #ffd23a; --ink: #0b0b0d; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #000; font-family: Oswald, 'Arial Narrow', sans-serif; color: #fff; user-select: none; }
+  canvas#game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+  .outline { text-shadow: -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 2px 2px 0 #000, 0 3px 8px rgba(0,0,0,.6); }
+
+  #menu { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 20;
+    background: radial-gradient(ellipse at 50% 120%, #ff8a3d 0%, #c2410c 22%, #4c1d4f 55%, #0b0b1a 100%); }
+  #menu .sun { position: absolute; bottom: 18%; width: 340px; height: 340px; border-radius: 50%; background: linear-gradient(#ffe27a, #ff6a3d 70%); opacity: .85;
+    -webkit-mask: repeating-linear-gradient(#000 0 22px, transparent 22px 30px); mask: repeating-linear-gradient(#000 0 22px, transparent 22px 30px); }
+  #menu .palms { position: absolute; bottom: 0; left: 0; right: 0; height: 30%; background: linear-gradient(transparent, #050508 70%); }
+  #menu h1 { font-family: Anton, Impact, sans-serif; font-size: clamp(64px, 12vw, 150px); margin: 0; letter-spacing: 4px; line-height: .9; z-index: 1;
+    background: linear-gradient(#fff6c8, #ffd23a 45%, #ff7a2a); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 6px 0 #000) drop-shadow(0 0 30px rgba(255,140,40,.4)); }
+  #menu h2 { margin: 6px 0 28px; font-weight: 400; letter-spacing: 6px; font-size: 18px; color: #ffe8c4; z-index: 1; text-transform: uppercase; }
+  #menu .panel { z-index: 1; background: rgba(0,0,0,.55); border: 1px solid rgba(255,210,58,.35); border-radius: 10px; padding: 20px 26px; max-width: 640px; width: calc(100% - 32px); box-sizing: border-box; backdrop-filter: blur(6px); }
+  #menu .row { display: flex; gap: 16px; align-items: center; justify-content: center; flex-wrap: wrap; margin-bottom: 14px; }
+  #menu select, #menu label { font: inherit; font-size: 15px; }
+  #menu select { background: #111; color: #fff; border: 1px solid #555; border-radius: 6px; padding: 6px 10px; }
+  button.big { font-family: Anton, Impact, sans-serif; font-size: 30px; letter-spacing: 3px; padding: 10px 46px; border: 0; border-radius: 8px; cursor: pointer; color: #111;
+    background: linear-gradient(#ffe27a, #ffb000); box-shadow: 0 5px 0 #8a5a00, 0 10px 30px rgba(255,170,0,.3); }
+  button.big:hover { filter: brightness(1.1); }
+  button.small { font: inherit; background: transparent; color: #bbb; border: 1px solid #555; border-radius: 6px; padding: 5px 12px; cursor: pointer; }
+  .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 4px 18px; font-size: 14px; color: #ddd; margin-top: 16px; }
+  .controls b { color: var(--gold); display: inline-block; min-width: 70px; }
+  #loading { display: none; margin-top: 12px; color: var(--gold); text-align: center; }
+
+  #hud { display: none; position: fixed; inset: 0; pointer-events: none; z-index: 5; }
+  #hud.cine #topright, #hud.cine #minimapWrap, #hud.cine #objective, #hud.cine #help, #hud.cine #speed { opacity: 0; }
+  #topright { position: absolute; top: 18px; right: 22px; text-align: right; transition: opacity .4s; }
+  #clock { font-family: Anton, Impact, sans-serif; font-size: 30px; }
+  #weapon { font-family: Anton, Impact, sans-serif; font-size: 26px; margin-top: 2px; }
+  .wico { font-size: 26px; }
+  .bar { width: 170px; height: 13px; background: rgba(0,0,0,.6); border: 2px solid #000; margin: 6px 0 0 auto; }
+  .bar > div { height: 100%; transition: width .2s; }
+  #hpbar { background: linear-gradient(#ff6a6a, #c01818); }
+  .bar.low > div { animation: pulse .6s infinite; }
+  #arbar { background: linear-gradient(#e8eef8, #9aa8c0); }
+  @keyframes pulse { 50% { opacity: .35; } }
+  #money { font-family: Anton, Impact, sans-serif; font-size: 34px; color: #34c759; margin-top: 6px; letter-spacing: 1px; }
+  #stars { font-size: 30px; margin-top: 2px; letter-spacing: 2px; }
+  #stars span { color: rgba(0,0,0,.45); -webkit-text-stroke: 1px rgba(255,255,255,.3); }
+  #stars span.on { color: #fff; -webkit-text-stroke: 1px #000; text-shadow: 0 0 10px rgba(255,255,255,.6); }
+  #stars span.on.dim { color: #777; }
+  #minimapWrap { position: absolute; left: 22px; bottom: 22px; transition: opacity .4s; }
+  #minimap { width: 210px; height: 210px; border-radius: 50%; display: block; box-shadow: 0 0 0 3px rgba(0,0,0,.5), 0 8px 24px rgba(0,0,0,.5); }
+  #speed { position: absolute; left: 250px; bottom: 30px; font-family: Anton, Impact, sans-serif; font-size: 40px; display: none; }
+  #speed small { font-size: 16px; }
+  #objective { position: absolute; left: 50%; bottom: 60px; transform: translateX(-50%); max-width: min(760px, calc(100% - 520px)); min-width: 260px; text-align: center; font-size: 21px; transition: opacity .4s; }
+  #objective b { color: var(--gold); }
+  #subtitle { position: absolute; left: 50%; bottom: 13vh; transform: translateX(-50%); width: min(900px, 90%); text-align: center; font-size: 25px; opacity: 0; transition: opacity .25s; z-index: 7; }
+  #subtitle .who { color: var(--gold); }
+  #big { position: absolute; top: 28%; left: 0; right: 0; text-align: center; opacity: 0; transform: scale(1.15); transition: opacity .4s, transform .4s; }
+  #big.show { opacity: 1; transform: scale(1); }
+  #bigTitle { font-family: Anton, Impact, sans-serif; font-size: clamp(42px, 7vw, 86px); letter-spacing: 3px; }
+  #bigSub { font-size: 24px; margin-top: 4px; }
+  #help { position: absolute; top: 18px; left: 22px; max-width: 360px; background: rgba(0,0,0,.72); border-radius: 6px; padding: 12px 16px; font-size: 17px; opacity: 0; transition: opacity .25s; }
+  #help.show { opacity: 1; }
+  #help b { color: var(--gold); }
+  #carname { position: absolute; right: 26px; bottom: 30px; font-family: Anton, Impact, sans-serif; font-size: 40px; color: #8fd3ff; opacity: 0; transition: opacity .5s; }
+  #carname.show { opacity: 1; }
+  #timer { position: absolute; top: 18px; left: 50%; transform: translateX(-50%); font-family: Anton, Impact, sans-serif; font-size: 44px; display: none; }
+  #crosshair { position: absolute; left: 50%; top: 50%; width: 22px; height: 22px; margin: -11px 0 0 -11px; display: none; }
+  #crosshair::before, #crosshair::after { content: ''; position: absolute; background: #fff; box-shadow: 0 0 2px #000; }
+  #crosshair::before { left: 10px; top: 0; width: 2px; height: 22px; }
+  #crosshair::after { top: 10px; left: 0; height: 2px; width: 22px; }
+  #crosshair.aim { transform: scale(.7); }
+  #damage { position: fixed; inset: 0; pointer-events: none; background: radial-gradient(ellipse at center, transparent 45%, rgba(200,0,0,.75)); opacity: 0; transition: opacity .25s; z-index: 4; }
+  #letterbox::before, #letterbox::after { content: ''; position: fixed; left: 0; right: 0; height: 0; background: #000; transition: height .6s; z-index: 6; }
+  #letterbox::before { top: 0; } #letterbox::after { bottom: 0; }
+  #letterbox.on::before, #letterbox.on::after { height: 11vh; }
+  #fade { position: fixed; inset: 0; background: #000; opacity: 0; transition: opacity .6s; pointer-events: none; z-index: 8; }
+  #pause { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; flex-direction: column; background: rgba(0,0,0,.7); z-index: 15; backdrop-filter: blur(4px); }
+  #pause h1 { font-family: Anton, Impact, sans-serif; font-size: 70px; margin: 0 0 16px; color: var(--gold); }
+  #pause .panel { background: rgba(0,0,0,.5); border-radius: 10px; padding: 16px 24px; max-width: 640px; width: calc(100% - 32px); box-sizing: border-box; }
+  @media (max-width: 700px) {
+    #minimap { width: 140px; height: 140px; } #objective { max-width: 90%; bottom: 180px; font-size: 16px; } #speed { left: 170px; }
+  }
+</style>
+<script type="importmap">
+{ "imports": { "three": "./vendor/three/build/three.module.js", "three/addons/": "./vendor/three/examples/jsm/" } }
+</script>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="menu">
+  <div class="sun"></div><div class="palms"></div>
+  <h1 class="title">PORTO SOL</h1>
+  <h2>Uma história de rua na costa</h2>
+  <div class="panel">
+    <div class="row">
+      <label>Gráficos:
+        <select id="quality">
+          <option value="high">Ultra (sombras 4K, bloom, MSAA)</option>
+          <option value="medium" selected>Alto</option>
+          <option value="low">Desempenho</option>
+        </select>
+      </label>
+      <label><input type="checkbox" id="voiceOn" checked /> Vozes dubladas</label>
+    </div>
+    <div class="row"><button class="big" id="play">JOGAR</button></div>
+    <div id="loading">Gerando a cidade de Porto Sol…</div>
+    <div class="controls">
+      <div><b>W A S D</b> andar / dirigir</div>
+      <div><b>Shift</b> correr</div>
+      <div><b>Espaço</b> pular / freio de mão</div>
+      <div><b>F</b> entrar / roubar / sair do carro</div>
+      <div><b>Mouse</b> câmera</div>
+      <div><b>Clique</b> soco / atirar</div>
+      <div><b>Botão dir.</b> mirar</div>
+      <div><b>Q</b> trocar arma</div>
+      <div><b>H</b> buzina · <b>R</b> rádio</div>
+      <div><b>E</b> sirene (viatura)</div>
+      <div><b>Espaço</b> pular fala (cena)</div>
+      <div><b>Esc</b> pausar</div>
+    </div>
+  </div>
+</div>
+
+<div id="hud">
+  <div id="topright" class="outline">
+    <div id="clock">09:30</div>
+    <div id="weapon"></div>
+    <div class="bar"><div id="hpbar" style="width:100%"></div></div>
+    <div class="bar" style="display:none"><div id="arbar" style="width:0"></div></div>
+    <div id="money">$00000000</div>
+    <div id="stars"></div>
+  </div>
+  <div id="minimapWrap"><canvas id="minimap" width="420" height="420"></canvas></div>
+  <div id="speed" class="outline"></div>
+  <div id="objective" class="outline"></div>
+  <div id="big"><div id="bigTitle" class="outline"></div><div id="bigSub" class="outline"></div></div>
+  <div id="help"></div>
+  <div id="carname" class="outline"></div>
+  <div id="timer" class="outline"></div>
+  <div id="crosshair"></div>
+</div>
+<div id="subtitle" class="outline"></div>
+<div id="damage"></div>
+<div id="letterbox"></div>
+<div id="fade"></div>
+
+<div id="pause">
+  <h1>PAUSADO</h1>
+  <button class="big" id="resume">CONTINUAR</button>
+  <div class="panel controls" style="margin-top:22px">
+    <div><b>W A S D</b> andar / dirigir</div><div><b>Shift</b> correr</div><div><b>Espaço</b> pular / freio de mão</div>
+    <div><b>F</b> entrar / roubar carro</div><div><b>Clique</b> soco / atirar</div><div><b>Q</b> trocar arma</div>
+    <div><b>H</b> buzina · <b>R</b> rádio</div><div><b>E</b> sirene</div>
+  </div>
+  <p><button class="small" id="resetSave">Apagar progresso e recomeçar</button></p>
+</div>
+
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
