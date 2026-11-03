@@ -15,6 +15,21 @@ import { ui, appIcon } from "../ui/icons.js";
 const V = (p) => new URL("../../vendor/v86/" + p, import.meta.url).href;
 const IMG = (p) => new URL("../../images/" + p, import.meta.url).href;
 
+// Loads a bundled binary. Hosts that refuse to serve raw binaries (e.g. a
+// claude.ai artifact) get a base64 copy next to it: <file>.b64.txt
+async function loadBin(url) {
+  try {
+    const r = await fetch(url);
+    if (r.ok && !/text\/html/.test(r.headers.get("content-type") || "")) return await r.arrayBuffer();
+  } catch {}
+  const r = await fetch(url + ".b64.txt");
+  if (!r.ok) throw new Error("Arquivo do sistema não encontrado: " + url.split("/").pop());
+  const bin = atob((await r.text()).trim());
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out.buffer;
+}
+
 export const BUILTIN = {
   "builtin:linux": { name: "VPC Linux (i686)", desc: "Linux 6.8 + BusyBox · pasta compartilhada · 2,8 MB", type: "bzimage", url: IMG("vpc-linux.bzImage"), minMB: 48, share: true },
   "builtin:memtest": { name: "Memtest86+ 7.0", desc: "Teste de RAM real no hardware emulado · 140 KB", type: "fda", url: IMG("memtest86plus.bin"), minMB: 16 },
@@ -104,8 +119,6 @@ export default async function x86vm({ win, shell, args }) {
       wasm_path: V("v86.wasm"),
       memory_size: memMB * 1024 * 1024,
       vga_memory_size: 8 * 1024 * 1024,
-      bios: { url: V("seabios.bin") },
-      vga_bios: { url: V("vgabios.bin") },
       screen_container: screenEl,
       autostart: true,
       disable_keyboard: true,
@@ -115,11 +128,13 @@ export default async function x86vm({ win, shell, args }) {
     };
     let name;
     try {
+      cfg.bios = { buffer: await loadBin(V("seabios.bin")) };
+      cfg.vga_bios = { buffer: await loadBin(V("vgabios.bin")) };
       if (b) {
         name = b.name;
         if (memMB < b.minMB) cfg.memory_size = b.minMB * 1024 * 1024;
-        if (b.type === "bzimage") { cfg.bzimage = { url: b.url }; cfg.cmdline = "console=tty0 loglevel=4 tsc=reliable"; cfg.filesystem = {}; }
-        else cfg.fda = { buffer: await padFloppy(await (await fetch(b.url)).arrayBuffer()) };
+        if (b.type === "bzimage") { cfg.bzimage = { buffer: await loadBin(b.url) }; cfg.cmdline = "console=tty0 loglevel=4 tsc=reliable"; cfg.filesystem = {}; }
+        else cfg.fda = { buffer: await padFloppy(await loadBin(b.url)) };
       } else {
         const st = await vfs.stat(image);
         if (!st) throw new Error("Imagem não encontrada: " + image);
