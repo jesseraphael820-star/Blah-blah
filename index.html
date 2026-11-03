@@ -169,6 +169,17 @@ html,body{margin:0;height:100%;overflow:hidden;background:#08131c;color:var(--tx
 .rk-tabs{margin:0 0 8px}
 .modal .rk-tabs button{flex:1;text-align:center;padding:7px 4px;font-size:12.5px;border:0;background:transparent;color:var(--mut);font-weight:700}
 .modal .rk-tabs button.on{background:#243446;color:var(--txt)}
+.fin-top{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;text-align:center}
+.fin-top div{display:flex;flex-direction:column;gap:1px;min-width:0}
+.fin-top small{font-size:10.5px;color:var(--mut)}
+.fin-top b{font-size:15px;font-variant-numeric:tabular-nums}
+.fin-top span{font-size:11px;font-weight:700}
+.rt{font-family:"Archivo Black",system-ui,sans-serif;letter-spacing:1px}
+.rt-0,.rt-1{color:#5fd39a}.rt-2,.rt-3{color:var(--gold)}.rt-4,.rt-5,.rt-6{color:#ff7a7a}
+.mk{background:#141f2a;border:1px solid var(--line);border-radius:10px;padding:8px;display:flex;flex-direction:column;gap:5px}
+.mk-h{display:flex;justify-content:space-between;gap:6px;font-size:12.5px;font-variant-numeric:tabular-nums}
+.mk .row button{padding:6px 2px;font-size:12px;text-align:center}
+.up{color:#5fd39a}.dn{color:#ff7a7a}
 @keyframes pop{from{transform:scale(.9);opacity:0}to{transform:none;opacity:1}}
 .modal{position:fixed;inset:0;background:#000a;display:none;align-items:center;justify-content:center;z-index:20}
 .modal .box{background:#111a24;border:1px solid var(--line);border-radius:14px;padding:22px;max-width:460px;width:90%;text-align:center}
@@ -294,7 +305,7 @@ let reqs = [], logs = [], anims = [];
 let dirty = true, ended = false, nCount = 20, worldMode = 'real';
 let nukes = [], nukeArmed = false, nukeReady = 0, units = [];
 // opções visuais (salvas só neste navegador)
-const opts = { fx: 'soldados', stripes: true, smooth: true, soldiers: true, flags: true, divs: true, frontNums: true, hud: true, map: 'cor' };
+const opts = { fxLevel: 'poucos', fx: 'soldados', stripes: true, smooth: true, soldiers: true, flags: true, divs: true, frontNums: true, hud: true, map: 'cor' };
 // tecnologias: custo = base × 1,7^nível, até o nível 10
 const TECH = [
   { k: 'atk', i: '⚔', n: 'Armamento', d: '+7% de força em combate e mais chance de tomar províncias', base: 8000 },
@@ -311,6 +322,7 @@ const clickVal = c => Math.round(10 * 1.55 ** c.clickLv);
 const clickCost = c => Math.round(200 * 1.75 ** c.clickLv / 10) * 10;
 let ptab = 'army', floaters = [];
 try { Object.assign(opts, JSON.parse(localStorage.getItem('gg-opts') || '{}')); } catch (e) {}
+const lite = () => opts.fxLevel !== 'normal';
 const saveOpts = () => { try { localStorage.setItem('gg-opts', JSON.stringify(opts)); } catch (e) {} };
 
 // ---------- geração do mundo ----------
@@ -553,6 +565,7 @@ function makeCountries(list) {
     recruitCD: 0, allyCD: 0, aidCD: 0,
     econ: d.econ || 1, money: cnt[i] * 60 * (d.econ || 1) + 3000, net: 0,
     tech: { atk: 0, def: 0, eco: 0, log: 0, nav: 0, air: 0 }, clickLv: 0, clickTotal: 0, raidReady: 0,
+    inv: { bond: 0, stock: 0, crypto: 0 }, invCost: { bond: 0, stock: 0, crypto: 0 }, proj: { usina: 0, porto: 0, banco: 0 },
     mil: { base: 0, trn: 0 }, loans: [], trades: [], tax: 1, boom: null, tradeCD: 0, loanCD: 0,
   }));
   computeLabels();
@@ -562,7 +575,7 @@ function makeCountries(list) {
     if (c.flag.url) c.flagURL = c.flag.url;
     else { const fc = document.createElement('canvas'); fc.width = 36; fc.height = 24; drawFlag(fc.getContext('2d'), c.flag, 0, 0, 36, 24); c.flagURL = fc.toDataURL(); }
   }
-  core.set(owner); units = [];
+  core.set(owner); units = []; initMarket();
   rel = new Float32Array(N * N); allied = new Uint8Array(N * N); adj = new Uint16Array(N * N);
   for (let a = 0; a < N; a++) for (let b = a + 1; b < N; b++) { const v = -15 + R() * 50; rel[a * N + b] = rel[b * N + a] = v; }
   wars = []; rebuildWarMat();
@@ -669,7 +682,7 @@ function kill(id) {
   for (let i = 0; i < NC; i++) if (core[i] === id && owner[i] >= 0) core[i] = owner[i];
   for (const w of warsOf(id)) endWar(w, 'elim');
   for (let o = 0; o < N; o++) allied[id * N + o] = allied[o * N + id] = 0;
-  toast(id === P ? `☠ ${c.name} caiu.` : `☠ ${c.name} foi eliminado!`, id === P ? 'bad' : '');
+  toast(id === P ? `☠ ${c.name} caiu.` : `☠ ${c.name} foi eliminado!`, id === P ? 'bad' : (P >= 0 && (adj[id * N + P] || warMat[P * N + id] >= 0 || isAllied(P, id))) ? '' : 'g');
   if (sel === id && phase === 'game') sel = P;
   if (id === P && !ended) { ended = true; showModal('Derrota', `${c.name} perdeu todo o território no dia ${day}.`, [['Escolher outro país', () => { phase = 'select'; sel = -1; P = -1; ended = false; focus = null; reqs = []; reqsChanged = true; }], ['Novo mapa', () => newWorld()]]); }
   dirty = true;
@@ -714,7 +727,7 @@ function capture(cell, to, from) {
 }
 function captureCell(cell, to, from) {
   owner[cell] = to; C[to].cells++; C[from].cells--; flash[cell] = day; dirty = true;
-  if (anims.length < 500 && opts.fx !== 'listras') anims.push({ c: cell, from, to, t: performance.now() });
+  if (anims.length < 500 && opts.fx !== 'listras' && !lite()) anims.push({ c: cell, from, to, t: performance.now() });
   const wi = warMat[to * N + from]; if (wi >= 0) { const w = wars[wi]; w.mom = (w.mom || 0) + (w.a === to ? 1 : -1); }
   if (C[from].cap === cell) {
     C[from].troops *= .88;
@@ -809,15 +822,19 @@ function tick() {
   }
   for (const c of C) if (c.alive && c.cells <= 0) kill(c.id);
   if (day % 6 === 0) updateDivs();
+  marketTick();
   const atWar = new Uint8Array(N); for (const w of wars) { atWar[w.a] = 1; atWar[w.b] = 1; }
   for (const c of C) {
     if (!c.alive) continue;
     payLoans(c);
+    if (c.proj.banco && c.money > 0) c.money += c.money * .0002 * c.proj.banco;
     if (R() < 1 / 110) randomEvent(c);
     c.inc = income(c); c.up = c.troops * CFG.UPKEEP * Math.max(.4, 1 - .06 * c.tech.log); c.net = c.inc - c.up;
     if (c.id !== P && day % 30 === c.id % 30) {
       const k = atWar[c.id] ? (R() < .5 ? 'atk' : 'def') : TECH[ri(0, TECH.length - 1)].k;
       if (c.tech[k] < TECH_MAX && c.money > techCost(c, k) * 1.5) { c.money -= techCost(c, k); c.tech[k]++; }
+      const pk = PROJ[ri(0, PROJ.length - 1)].k;
+      if (c.proj[pk] < PROJ_MAX && c.money > projCost(c, pk) * 2.5) { c.money -= projCost(c, pk); c.proj[pk]++; }
       const mk = R() < .5 ? 'base' : 'trn';
       if (c.mil[mk] < TECH_MAX && c.money > milCost(c, mk) * 2) { c.money -= milCost(c, mk); c.mil[mk]++; }
     }
@@ -966,8 +983,8 @@ const TAX = [{ n: 'Baixos', inc: .8, regen: 1.15, d: '−20% de renda, +15% de r
 const baseIncome = c => (c.cells * 2.2 + 40) * c.econ;
 const tradeGain = o => 30 + .04 * baseIncome(C[o]);
 function income(c) {
-  let v = baseIncome(c) * (1 + .12 * c.tech.eco) * (warsOf(c.id).length ? .9 : 1) * TAX[c.tax].inc * (c.boom && day < c.boom.until ? c.boom.m : 1);
-  for (const o of c.trades) if (C[o].alive && warMat[c.id * N + o] < 0) v += tradeGain(o);
+  let v = baseIncome(c) * (1 + .12 * c.tech.eco) * (1 + .08 * c.proj.usina) * (warsOf(c.id).length ? .9 : 1) * TAX[c.tax].inc * (c.boom && day < c.boom.until ? c.boom.m : 1);
+  for (const o of c.trades) if (C[o].alive && warMat[c.id * N + o] < 0) v += tradeGain(o) * (1 + .3 * c.proj.porto);
   return v;
 }
 // poder militar: tropas × tecnologia × treinamento (+10% para potências nucleares)
@@ -999,7 +1016,7 @@ function actTrade(o) {
 }
 // ---------- empréstimos ----------
 const LOAN_DAYS = 100;
-const loanRate = (lender, borrower) => clamp(.25 - rel[lender * N + borrower] / 400 - (isAllied(lender, borrower) ? .08 : 0), .03, .35);
+const loanRate = (lender, borrower) => clamp((.25 - rel[lender * N + borrower] / 400 - (isAllied(lender, borrower) ? .08 : 0) + RATING_ADD[ratingOf(C[borrower])]) * (1 - .15 * C[borrower].proj.banco), .02, .4);
 const loanOptions = o => [.1, .25, .5].map(f => Math.max(1000, Math.round(C[o].money * f / 1000) * 1000));
 const debtOf = c => c.loans.reduce((s, l) => s + l.remaining, 0);
 function makeLoan(lender, borrower, amount) {
@@ -1013,7 +1030,7 @@ function actLoan(o, amount) {
   if (day < L.loanCD || warMat[P * N + o] >= 0) return;
   if (C[P].loans.length >= 3) { toast('🏦 Você já tem 3 empréstimos. Pague um antes de pedir outro.', 'bad'); return; }
   if (L.money < amount * 1.2) { toast(`🏦 ${L.name} não tem dinheiro suficiente para emprestar isso.`, 'bad'); return; }
-  const p = clamp(.45 + rel[P * N + o] / 100 + (isAllied(P, o) ? .25 : 0) - debtOf(C[P]) / Math.max(1, baseIncome(C[P]) * 60), .05, .95);
+  const p = clamp(.45 + rel[P * N + o] / 100 + (isAllied(P, o) ? .25 : 0) - debtOf(C[P]) / Math.max(1, baseIncome(C[P]) * 60) - RATING_ADD[ratingOf(C[P])] * 2, .05, .95);
   if (R() < p) { const rate = makeLoan(o, P, amount); toast(`🏦 ${L.name} emprestou ${fmtM(amount)} a ${Math.round(rate * 100)}% de juros (pague em ${LOAN_DAYS} dias).`, 'good'); }
   else { L.loanCD = day + 20; toast(`🏦 ${L.name} recusou o empréstimo.`, 'bad'); }
   loanOpen = -1;
@@ -1046,17 +1063,79 @@ function payLoans(c) {
 const EVENTS = [
   { t: '📈 Boom econômico! +25% de renda por 40 dias.', good: 1, f: c => { c.boom = { m: 1.25, until: day + 40 }; } },
   { t: '📉 Crise econômica: −20% de renda por 40 dias.', good: 0, f: c => { c.boom = { m: .8, until: day + 40 }; } },
-  { t: '🛢 Descobriram petróleo! +$ de 25 dias de renda.', good: 1, f: c => { c.money += income(c) * 25; } },
+  { t: '🛢 Descobriram petróleo! +{v}.', good: 1, f: c => { const v = income(c) * 25; c.money += v; return v; } },
   { t: '🙋 Onda de voluntários: +8% de tropas.', good: 1, f: c => { c.troops += maxT(c) * .08; } },
   { t: '🦠 Epidemia no exército: −6% de tropas.', good: 0, f: c => { c.troops *= .94; } },
   { t: '🔬 Cientistas fizeram uma descoberta: +1 nível de tecnologia!', good: 1, f: c => { const ks = TECH.map(t => t.k).filter(k => c.tech[k] < TECH_MAX); if (ks.length) c.tech[ks[ri(0, ks.length - 1)]]++; } },
-  { t: '🌪 Desastre natural: −$ de 10 dias de renda.', good: 0, f: c => { c.money = Math.max(0, c.money - income(c) * 10); } },
+  { t: '🌪 Desastre natural: −{v} para a reconstrução.', good: 0, f: c => { const v = Math.min(c.money, income(c) * 10); c.money -= v; return v; } },
 ];
 function randomEvent(c) {
-  const e = EVENTS[ri(0, EVENTS.length - 1)]; e.f(c);
-  if (c.id === P) toast(e.t, e.good ? 'good' : 'bad');
+  const e = EVENTS[ri(0, EVENTS.length - 1)], v = e.f(c);
+  if (c.id === P) toast(e.t.replace('{v}', fmtM(v || 0)), e.good ? 'good' : 'bad');
 }
 let loanOpen = -1, rankTab = 'mil';
+// nota de crédito: depende da dívida em relação à renda e das parcelas atrasadas
+const RATINGS = ['AAA', 'AA', 'A', 'BBB', 'BB', 'B', 'CCC'];
+const RATING_ADD = { AAA: -.04, AA: -.02, A: 0, BBB: .03, BB: .06, B: .1, CCC: .16 };
+function ratingOf(c) {
+  const ratio = debtOf(c) / Math.max(1, baseIncome(c) * 30), missed = c.loans.reduce((s, l) => s + l.missed, 0);
+  let i = ratio < .1 ? 0 : ratio < .3 ? 1 : ratio < .6 ? 2 : ratio < 1 ? 3 : ratio < 1.6 ? 4 : ratio < 2.5 ? 5 : 6;
+  i = Math.min(6, i + Math.floor(missed / 5) + (c.money < 0 ? 1 : 0));
+  return RATINGS[i];
+}
+// mercado financeiro mundial: preço sobe e desce todo dia
+const MKT = [
+  { k: 'bond', i: '🏦', n: 'Títulos do governo', d: 'Seguro: rende pouco, quase não cai', drift: .0007, vol: .0015 },
+  { k: 'stock', i: '📈', n: 'Ações (bolsa)', d: 'Médio risco: sobe com a paz, cai com muitas guerras', drift: .0016, vol: .017 },
+  { k: 'crypto', i: '🪙', n: 'Criptomoedas', d: 'Alto risco: pode dobrar ou despencar', drift: .0022, vol: .05 },
+];
+let market = null;
+function initMarket() { market = {}; for (const a of MKT) market[a.k] = { price: 100, hist: [100] }; }
+initMarket();
+const gauss = () => { let u = 0, v = 0; while (!u) u = R(); while (!v) v = R(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
+function marketTick() {
+  const warsNow = wars.filter(w => !w.parent).length;
+  for (const a of MKT) {
+    const m = market[a.k];
+    let r = a.drift + a.vol * gauss();
+    if (a.k === 'stock') r -= .0001 * Math.max(0, warsNow - 6);
+    if (a.k === 'crypto' && R() < 1 / 220) { r = -.35; if (C[P] && C[P].inv.crypto > 0) toast('🪙 As criptomoedas despencaram 30%!', 'bad'); }
+    m.price = Math.max(1, m.price * Math.exp(r));
+    if (day % 2 === 0) { m.hist.push(Math.round(m.price * 100) / 100); if (m.hist.length > 80) m.hist.shift(); }
+  }
+}
+const invValue = (c, k) => c.inv[k] * market[k].price;
+const invTotal = c => MKT.reduce((s, a) => s + invValue(c, a.k), 0);
+function actInvest(k, amount) {
+  const c = C[P], v = amount === 'all' ? Math.floor(c.money) : amount;
+  if (v <= 0 || c.money < v) { toast('💸 Dinheiro insuficiente.', 'bad'); return; }
+  c.money -= v; c.inv[k] += v / market[k].price; c.invCost[k] += v;
+  toast(`📈 Investiu ${fmtM(v)} em ${MKT.find(a => a.k === k).n}.`, 'good');
+}
+function actSell(k) {
+  const c = C[P], v = invValue(c, k); if (v <= 0) return;
+  const profit = v - c.invCost[k];
+  c.money += v; c.inv[k] = 0; c.invCost[k] = 0;
+  toast(`💰 Vendeu por ${fmtM(v)} (${profit >= 0 ? 'lucro' : 'prejuízo'} de ${fmtM(Math.abs(profit))}).`, profit >= 0 ? 'good' : 'bad');
+}
+// obras públicas: melhoram a economia para sempre
+const PROJ = [
+  { k: 'usina', i: '⚡', n: 'Usinas de energia', d: '+8% de renda por nível', base: 12000 },
+  { k: 'porto', i: '🚢', n: 'Portos comerciais', d: '+30% de ganho em cada acordo comercial', base: 9000 },
+  { k: 'banco', i: '🏛', n: 'Banco central', d: '−15% de juros nos empréstimos e o caixa rende 0,02% ao dia', base: 15000 },
+];
+const PROJ_MAX = 5;
+const projCost = (c, k) => Math.round(PROJ.find(t => t.k === k).base * 1.8 ** c.proj[k] / 100) * 100;
+function actProj(k) {
+  const c = C[P]; if (c.proj[k] >= PROJ_MAX) return;
+  const cost = projCost(c, k); if (c.money < cost) { toast('💸 Dinheiro insuficiente.', 'bad'); return; }
+  c.money -= cost; c.proj[k]++;
+  const t = PROJ.find(t => t.k === k); toast(`${t.i} ${t.n} nível ${c.proj[k]} construído!`, 'good');
+}
+function sparkPts(h) {
+  const mn = Math.min(...h), mx = Math.max(...h), d = mx - mn || 1;
+  return h.map((v, i) => `${(i / Math.max(1, h.length - 1) * 118 + 1).toFixed(1)},${(22 - (v - mn) / d * 20).toFixed(1)}`).join(' ');
+}
 function actTech(k) {
   const c = C[P]; if (c.tech[k] >= TECH_MAX) return;
   const cost = techCost(c, k); if (c.money < cost) { toast('💸 Dinheiro insuficiente.', 'bad'); return; }
@@ -1136,8 +1215,9 @@ function addReq(text, key, yes, no) {
 function toast(text, cls = '') {
   if (phase !== 'game') return;
   addLog(text);
+  if (lite() && cls === 'g') return;
   const box = $('toasts');
-  while (box.children.length >= 4) box.firstChild.remove();
+  while (box.children.length >= (lite() ? 2 : 4)) box.firstChild.remove();
   const d = document.createElement('div'); d.className = 'toast ' + cls; d.textContent = text; box.appendChild(d);
   setTimeout(() => d.remove(), cls === 'g' ? 2500 : 4200);
 }
@@ -1276,7 +1356,7 @@ function draw() {
   ctx.drawImage(off, cam.x, cam.y, GW * cam.z, GH * cam.z);
   if (opts.fx === 'neon') {
     ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.imageSmoothingEnabled = true;
-    ctx.globalAlpha = .9 + .1 * Math.sin(performance.now() / 400);
+    ctx.globalAlpha = lite() ? .85 : .9 + .1 * Math.sin(performance.now() / 400);
     ctx.drawImage(glowCv, cam.x, cam.y, GW * cam.z, GH * cam.z); ctx.restore();
   }
   const z = cam.z, sx = x => cam.x + (x + .5) * z, sy = y => cam.y + (y + .5) * z;
@@ -1438,7 +1518,7 @@ function draw() {
     }
   }
   // divisões (bandeirinhas)
-  if (opts.divs) {
+  if (opts.divs && !lite()) {
     const dw = clamp(z * 1.15, 6, 13), dh = dw * .66;
     const dflag = (c, x, y) => {
       if (x < -dw || y < -dh || x > VW + dw || y > VH + dh) return;
@@ -1475,7 +1555,7 @@ function draw() {
       }
     }
   }
-  if (opts.frontNums && opts.fx !== 'neon') {
+  if (opts.frontNums && opts.fx !== 'neon' && !lite()) {
     const fs = clamp(z * 1.9, 11, 24);
     ctx.font = `${fs}px "Archivo Black", system-ui, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
     for (const w of wars) {
@@ -1602,6 +1682,7 @@ function infoHTML() {
     <span class="mut">Baixas</span><b>${fmt(c.casualties)}</b>
     <span class="mut">Dinheiro</span><b>${fmtM(c.money)}</b>
     <span class="mut">Saldo por dia</span><b style="color:${c.net >= 0 ? '#5fd39a' : '#ff7a7a'}">${c.net >= 0 ? '+' : ''}${fmtM(c.net)}</b>
+    <span class="mut">Nota de crédito</span><b>${ratingOf(c)}</b>
     <span class="mut">Tecnologia</span><b class="tl">${TECH.map(t => `${t.i}${c.tech[t.k]}`).join(' ')}</b>
     <span class="mut">Agressividade</span><b>${c.aggr > .65 ? 'Alta' : c.aggr > .4 ? 'Média' : 'Baixa'}</b>
   </div>`;
@@ -1630,7 +1711,7 @@ function actionsHTML() {
   const cd = (t, label) => day < t ? `${label} (${t - day}d)` : label;
   if (sel === P) {
     const me = C[P], full = me.troops >= buyCap(me);
-    const tabs = `<div class="tabs">${[['army', '🪖 Exército'], ['mil', '🎖 Militar'], ['tech', '🔬 Tec.'], ['eco', '💼 Economia'], ['click', '👆 Clique']].map(([t, l]) => `<button data-act="tab" data-t="${t}" class="${ptab === t ? 'on' : ''}">${l}</button>`).join('')}</div>`;
+    const tabs = `<div class="tabs">${[['army', '🪖 Exército'], ['mil', '🎖 Militar'], ['tech', '🔬 Tec.'], ['eco', '💼 Economia'], ['fin', '📈 Finanças'], ['click', '👆 Clique']].map(([t, l]) => `<button data-act="tab" data-t="${t}" class="${ptab === t ? 'on' : ''}">${l}</button>`).join('')}</div>`;
     if (ptab === 'mil') {
       const rank = C.filter(c => c.alive).sort((a, b) => milPower(b) - milPower(a)).indexOf(me) + 1;
       return tabs + `<div class="clk"><div class="clk-v">${fmt(milPower(me))}<small>poder militar · ${rank}º do mundo</small></div>
@@ -1642,6 +1723,29 @@ function actionsHTML() {
             <span class="pips">${'<i class="on"></i>'.repeat(lv)}${'<i></i>'.repeat(TECH_MAX - lv)}</span></span>
             <span class="tc">${maxed ? 'MÁX' : fmtM(cost)}</span></button>`;
         }).join('') + `<div class="hint">O poder militar soma tropas, tecnologia, treinamento e armas nucleares. Veja o top no 🏆 Ranking.</div>`;
+    }
+    if (ptab === 'fin') {
+      const rt = ratingOf(me), tot = invTotal(me), cost = MKT.reduce((s, a) => s + me.invCost[a.k], 0);
+      return tabs + `<div class="clk"><div class="fin-top"><div><small>Nota de crédito</small><b class="rt rt-${RATINGS.indexOf(rt)}">${rt}</b></div>
+          <div><small>Investido</small><b>${fmtM(tot)}</b><span class="${tot >= cost ? 'up' : 'dn'}">${cost ? `${tot >= cost ? '+' : ''}${((tot / cost - 1) * 100).toFixed(1)}%` : '—'}</span></div>
+          <div><small>Patrimônio</small><b>${fmtM(me.money + tot - debtOf(me))}</b></div></div>
+        <div class="hint">Nota boa = juros menores e mais países aceitam te emprestar. Dívida alta e parcelas atrasadas derrubam a nota.</div></div>
+        <div class="sect">📊 Mercado financeiro</div>`
+        + MKT.map(a => {
+          const m = market[a.k], h = m.hist, ch = h.length > 1 ? (m.price / h[Math.max(0, h.length - 16)] - 1) * 100 : 0, val = invValue(me, a.k), pl = val - me.invCost[a.k];
+          return `<div class="mk"><div class="mk-h"><span>${a.i} <b>${a.n}</b></span><span class="${ch >= 0 ? 'up' : 'dn'}">${m.price.toFixed(2)} ${ch >= 0 ? '▲' : '▼'}${Math.abs(ch).toFixed(1)}%</span></div>
+            <svg class="spk" viewBox="0 0 120 24" preserveAspectRatio="none"><polyline points="${sparkPts(h)}" stroke="${ch >= 0 ? '#5fd39a' : '#ff7a7a'}"/></svg>
+            <div class="hint">${a.d}${val > 0 ? ` · você tem <b>${fmtM(val)}</b> (<span class="${pl >= 0 ? 'up' : 'dn'}">${pl >= 0 ? '+' : '−'}${fmtM(Math.abs(pl))}</span>)` : ''}</div>
+            <div class="row"><button data-act="inv" data-k="${a.k}" data-n="1000"${me.money < 1000 ? ' disabled' : ''}>+$1 mil</button><button data-act="inv" data-k="${a.k}" data-n="10000"${me.money < 10000 ? ' disabled' : ''}>+$10 mil</button><button data-act="inv" data-k="${a.k}" data-n="all"${me.money < 100 ? ' disabled' : ''}>Tudo</button><button data-act="sell" data-k="${a.k}"${val <= 0 ? ' disabled' : ''}>Vender</button></div></div>`;
+        }).join('')
+        + `<div class="sect">🏗 Obras públicas</div>`
+        + PROJ.map(t => {
+          const lv = me.proj[t.k], maxed = lv >= PROJ_MAX, cost = projCost(me, t.k);
+          return `<button class="tech" data-act="proj" data-k="${t.k}"${maxed || me.money < cost ? ' disabled' : ''}>
+            <span class="ti">${t.i}</span><span class="tb"><b>${t.n}</b> <span class="lv">Nv ${lv}/${PROJ_MAX}</span><small>${t.d}</small>
+            <span class="pips">${'<i class="on"></i>'.repeat(lv)}${'<i></i>'.repeat(PROJ_MAX - lv)}</span></span>
+            <span class="tc">${maxed ? 'MÁX' : fmtM(cost)}</span></button>`;
+        }).join('');
     }
     if (ptab === 'eco') {
       const parts = me.trades.filter(o => C[o].alive);
@@ -1669,7 +1773,7 @@ function actionsHTML() {
     if (ptab === 'click') {
       const v = clickVal(me), cost = clickCost(me), next = Math.round(10 * 1.55 ** (me.clickLv + 1));
       return tabs + `<div class="clk"><div class="clk-v">${fmtM(v)}<small>por toque</small></div>
-        <div class="hint">Toque no mapa, em cima do território de ${esc(me.name)}, para ganhar dinheiro.</div>
+        <div class="hint">Toque no mapa em cima de ${esc(me.name)} para ganhar dinheiro. <b>Segure o dedo</b> para ganhar sem parar (${fmtM(v * 8)} por segundo).</div>
         <div class="econ"><span>Nível <b>${me.clickLv}</b></span><span>Ganho com cliques <b>${fmtM(me.clickTotal)}</b></span></div></div>
         <button class="tech" data-act="clickup"${me.money < cost ? ' disabled' : ''}><span class="ti">👆</span><span class="tb"><b>Melhorar clique</b> <span class="lv">Nv ${me.clickLv} → ${me.clickLv + 1}</span><small>Cada toque passa a valer ${fmtM(next)} (+${fmtM(next - v)})</small></span><span class="tc">${fmtM(cost)}</span></button>
         <div class="hint">Quanto mais você investe, mais cada toque rende — e mais caro fica o próximo nível.</div>`;
@@ -1776,7 +1880,7 @@ function setIf(id, key, html) { if (last[key] !== html) { last[key] = html; $(id
 function updateUI() {
   $('day').textContent = phase === 'game' ? (opts.hud ? fmtDateBig(day) : fmtDate(day)) : 'Escolha um país';
   $('day').classList.toggle('big', phase === 'game' && opts.hud);
-  const wt = $('wartitle'), myW = phase === 'game' && P >= 0 && C[P].alive && opts.hud ? warsOf(P).sort((a, b) => (b.casA + b.casB) - (a.casA + a.casB))[0] : null;
+  const wt = $('wartitle'), myW = phase === 'game' && P >= 0 && C[P].alive && opts.hud && !lite() ? warsOf(P).sort((a, b) => (b.casA + b.casB) - (a.casA + a.casB))[0] : null;
   wt.hidden = !myW;
   if (myW) {
     const h = `<div class="wt1">${esc(warName(myW))}</div><div class="wt2">${fmtDateLong(myW.start)} – EM ANDAMENTO</div>`;
@@ -1818,6 +1922,9 @@ $('panel').addEventListener('click', e => {
   else if (act === 'recruit') actRecruit();
   else if (act === 'tab') ptab = b.dataset.t;
   else if (act === 'mil') actMil(b.dataset.k);
+  else if (act === 'inv') actInvest(b.dataset.k, b.dataset.n === 'all' ? 'all' : +b.dataset.n);
+  else if (act === 'sell') actSell(b.dataset.k);
+  else if (act === 'proj') actProj(b.dataset.k);
   else if (act === 'tax') { C[P].tax = +b.dataset.i; toast(`🏛 Impostos ${TAX[C[P].tax].n.toLowerCase()}.`); }
   else if (act === 'payloan') actPayLoan(+b.dataset.i);
   else if (act === 'trade') actTrade(sel);
@@ -1856,10 +1963,10 @@ function renderRank() {
   const rows = alive.slice(0, 15);
   if (P >= 0 && C[P].alive && !rows.includes(C[P])) rows.push(C[P]);
   const atWar = wars.filter(w => !w.parent).length;
-  const head = { mil: '<th>Poder</th><th>Tropas</th><th>Tec.</th>', terr: '<th>Prov.</th><th>Tropas</th><th>Baixas</th>', eco: '<th>Renda/dia</th><th>Dinheiro</th><th>Dívida</th>' }[rankTab];
+  const head = { mil: '<th>Poder</th><th>Tropas</th><th>Tec.</th>', terr: '<th>Prov.</th><th>Tropas</th><th>Baixas</th>', eco: '<th>Renda/dia</th><th>Dinheiro</th><th>Nota</th>' }[rankTab];
   const cells = c => ({ mil: `<td>${fmt(milPower(c))}</td><td>${fmt(c.troops)}</td><td>${Object.values(c.tech).reduce((a, b) => a + b, 0) + c.mil.base + c.mil.trn}</td>`,
     terr: `<td>${fmt(c.cells)}</td><td>${fmt(c.troops)}</td><td>${fmt(c.casualties)}</td>`,
-    eco: `<td>${fmtM(c.inc || income(c))}</td><td>${fmtM(c.money)}</td><td>${fmtM(debtOf(c))}</td>` }[rankTab]);
+    eco: `<td>${fmtM(c.inc || income(c))}</td><td>${fmtM(c.money)}</td><td>${ratingOf(c)}</td>` }[rankTab]);
   $('mtext').innerHTML = `<div class="rk-sum"><span><b>${alive.length}</b> países vivos</span><span><b>${atWar}</b> guerras</span><span><b>${fmt(C.reduce((s, c) => s + c.casualties, 0))}</b> baixas</span></div>
   <div class="tabs rk-tabs">${[['mil', '⚔ Poder militar'], ['terr', '🗺 Território'], ['eco', '💰 Economia']].map(([t, l]) => `<button data-rk="${t}" class="${rankTab === t ? 'on' : ''}">${l}</button>`).join('')}</div>
   <div class="rk-wrap"><table class="rk"><thead><tr><th>#</th><th>País</th>${head}</tr></thead><tbody>
@@ -1875,6 +1982,9 @@ $('cfg').addEventListener('click', () => {
     <label><input type="radio" name="fx" value="cinza"${opts.fx === 'cinza' ? ' checked' : ''}> Frente cinza (só o território avançando e recuando)</label>
     <label><input type="radio" name="fx" value="listras"${opts.fx === 'listras' ? ' checked' : ''}> Listras (só listras avançando e recuando na frente)</label>
     <label><input type="radio" name="fx" value="neon"${opts.fx === 'neon' ? ' checked' : ''}> Neon: seu time azul × inimigos vermelhos, mapa satélite e bordas brilhando</label></div>
+    <div class="opt"><b>Efeitos visuais</b>
+    <label><input type="radio" name="fxl" value="poucos"${opts.fxLevel !== 'normal' ? ' checked' : ''}> Poucos (tela limpa: sem divisões, números na frente, título da guerra, tremida e avisos do resto do mundo)</label>
+    <label><input type="radio" name="fxl" value="normal"${opts.fxLevel === 'normal' ? ' checked' : ''}> Todos os detalhes</label></div>
     <div class="opt"><b>Mapa</b>
     <label><input type="radio" name="map" value="cor"${opts.map === 'cor' ? ' checked' : ''}> Colorido (todos os países pintados)</label>
     <label><input type="radio" name="map" value="sat"${opts.map === 'sat' ? ' checked' : ''}> Satélite (só países em guerra pintados)</label></div>
@@ -1896,6 +2006,7 @@ $('mtext').addEventListener('change', e => {
   else if (e.target.id === 'o-soldiers') opts.soldiers = e.target.checked;
   else if (e.target.id === 'o-flags') opts.flags = e.target.checked;
   else if (e.target.name === 'map') opts.map = e.target.value;
+  else if (e.target.name === 'fxl') { opts.fxLevel = e.target.value; updateUI(); }
   else if (e.target.id === 'o-divs') opts.divs = e.target.checked;
   else if (e.target.id === 'o-fnums') opts.frontNums = e.target.checked;
   else if (e.target.id === 'o-hud') { opts.hud = e.target.checked; updateUI(); }
@@ -2014,12 +2125,13 @@ async function unpackSave(p) {
 }
 function snapshotGame() {
   return {
-    v: 1, mode: worldMode, split: splitOrig, gw: GW, gh: GH, s: S, nCount, day, P, warSeq,
+    v: 1, market, mode: worldMode, split: splitOrig, gw: GW, gh: GH, s: S, nCount, day, P, warSeq,
     land: worldMode === 'real' ? null : rle(land), owner: rle(owner), core: rle(core),
     C: C.map(c => ({ n: c.name, col: c.col.map(v => Math.round(v)), fo: c.flag.img ? c.orig : -1, band: !!c.flag.band, fl: c.flag.img ? null : c.flag,
       alive: c.alive, cells: c.cells, mult: c.mult, nuclear: c.nuclear, troops: Math.round(c.troops), cas: Math.round(c.casualties), cap: c.cap, aggr: c.aggr,
       lx: c.lx, ly: c.ly, rcd: c.recruitCD, acd: c.allyCD, dcd: c.aidCD, econ: c.econ, money: Math.round(c.money), tech: c.tech,
       clv: c.clickLv, ctot: Math.round(c.clickTotal), rr: c.raidReady, orig: c.orig, st: c.isState, par: c.parent,
+      inv: c.inv, ic: c.invCost, proj: c.proj,
       mil: c.mil, loans: c.loans, trades: c.trades, tax: c.tax, boom: c.boom, tcd: c.tradeCD, lcd: c.loanCD })),
     rel: Array.from(rel, v => Math.round(v)), allied: rle(allied),
     wars: wars.map(w => ({ id: w.id, a: w.a, b: w.b, mode: w.mode, start: w.start, parent: w.parent, helpFor: w.helpFor, casA: Math.round(w.casA), casB: Math.round(w.casB),
@@ -2039,6 +2151,7 @@ function restoreGame(sv) {
     alive: d.alive, cells: d.cells, mult: d.mult, nuclear: d.nuclear, nukeReady: 0, troops: d.troops, casualties: d.cas, cap: d.cap, aggr: d.aggr,
     lx: d.lx, ly: d.ly, recruitCD: d.rcd, allyCD: d.acd, aidCD: d.dcd, econ: d.econ, money: d.money, net: 0,
     tech: { atk: 0, def: 0, eco: 0, log: 0, nav: 0, air: 0, ...d.tech }, clickLv: d.clv || 0, clickTotal: d.ctot || 0, raidReady: d.rr || 0,
+    inv: { bond: 0, stock: 0, crypto: 0, ...(d.inv || {}) }, invCost: { bond: 0, stock: 0, crypto: 0, ...(d.ic || {}) }, proj: { usina: 0, porto: 0, banco: 0, ...(d.proj || {}) },
     mil: { base: 0, trn: 0, ...(d.mil || {}) }, loans: d.loans || [], trades: d.trades || [], tax: d.tax ?? 1, boom: d.boom || null, tradeCD: d.tcd || 0, loanCD: d.lcd || 0,
     orig: d.orig, isState: d.st, parent: d.par || '',
   }));
@@ -2049,6 +2162,7 @@ function restoreGame(sv) {
   rel = Float32Array.from(sv.rel); allied = new Uint8Array(N * N); unrle(sv.allied, allied); adj = new Uint16Array(N * N);
   wars = sv.wars.map(w => ({ ...w, fa: [], fb: [], fs: [], aid: 0 })); warSeq = sv.warSeq; rebuildWarMat();
   units = sv.units || []; logs = sv.logs || [];
+  if (sv.market) market = sv.market; else initMarket();
   anims = []; nukes = []; raids = []; reqs = []; focus = null; nukeArmed = false; airArmed = false; nukeReady = 0;
   day = sv.day; P = sv.P; sel = P; phase = 'game'; ended = false;
   scanBorders(); computeLabels(); updateDivs(); fillSearch();
@@ -2169,7 +2283,7 @@ function drawNukes(now, z) {
       continue;
     }
     const e = (now - n.t - CFG.NUKE_FLY_MS) / CFG.NUKE_FX_MS;
-    if (e < .3) shake = Math.max(shake, (1 - e / .3) * 7);
+    if (e < .3 && !lite()) shake = Math.max(shake, (1 - e / .3) * 7);
     const fr = R0 * (.4 + Math.min(1, e * 3) * .9), a = 1 - e;
     const g = ctx.createRadialGradient(sx1, sy1, 0, sx1, sy1, fr);
     g.addColorStop(0, `rgba(255,255,230,${a})`); g.addColorStop(.35, `rgba(255,200,70,${a * .95})`);
@@ -2323,7 +2437,24 @@ function zoomAt(mx, my, f) {
   const nz = clamp(cam.z * f, cam.fit * .7, cam.fit * (worldMode === 'real' ? 16 : 9));
   cam.x = mx - (mx - cam.x) * nz / cam.z; cam.y = my - (my - cam.y) * nz / cam.z; cam.z = nz;
 }
-cv.addEventListener('pointerdown', e => { cv.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY }); moved = ptrs.size > 1 ? 99 : 0; pinch0 = null; });
+cv.addEventListener('pointerdown', e => { cv.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY }); moved = ptrs.size > 1 ? 99 : 0; pinch0 = null; if (ptrs.size === 1) startHold(e.clientX, e.clientY); else stopHold(); });
+// segurar o dedo/mouse em cima do seu território: ganha o valor do clique 8× por segundo
+let hold = null, holdFired = false;
+function startHold(px, py) {
+  stopHold(); holdFired = false;
+  if (phase !== 'game' || P < 0 || !C[P].alive || nukeArmed || airArmed) return;
+  const x = Math.floor((px - cam.x) / cam.z), y = Math.floor((py - cam.y) / cam.z);
+  if (x < 0 || y < 0 || x >= GW || y >= GH || owner[y * GW + x] !== P) return;
+  const h = { px, py, n: 0, fired: false, iv: 0 };
+  h.t = setTimeout(() => { if (hold === h) { h.fired = true; h.iv = setInterval(holdTick, 125); holdTick(); } }, 320);
+  hold = h;
+}
+function holdTick() {
+  if (!hold || moved > 6 || ptrs.size !== 1 || !C[P] || !C[P].alive) { stopHold(); return; }
+  const v = clickVal(C[P]); C[P].money += v; C[P].clickTotal += v; hold.n++;
+  if (hold.n % 8 === 1) floaters.push({ x: hold.px, y: hold.py, t: performance.now(), text: '+' + fmtM(v * 8) + '/s' });
+}
+function stopHold() { if (!hold) return; clearTimeout(hold.t); clearInterval(hold.iv); if (hold.fired) holdFired = true; hold = null; }
 cv.addEventListener('pointermove', e => {
   const p = ptrs.get(e.pointerId); if (!p) return;
   if (ptrs.size === 1) {
@@ -2345,6 +2476,7 @@ cv.addEventListener('pointermove', e => {
 const endPtr = e => {
   if (!ptrs.has(e.pointerId)) return;
   ptrs.delete(e.pointerId);
+  stopHold();
   if (ptrs.size === 0 && moved <= 6 && e.type === 'pointerup') tap(e.clientX, e.clientY);
   pinch0 = null;
 };
@@ -2365,8 +2497,8 @@ function tap(px, py) {
     return;
   }
   if (phase === 'game' && P >= 0 && o === P && C[P].alive) {
-    const v = clickVal(C[P]); C[P].money += v; C[P].clickTotal += v;
-    if (floaters.length < 40) floaters.push({ x: px, y: py, t: performance.now(), text: '+' + fmtM(v) });
+    const v = holdFired ? 0 : clickVal(C[P]); holdFired = false; C[P].money += v; C[P].clickTotal += v;
+    if (v && floaters.length < (lite() ? 4 : 40)) floaters.push({ x: px, y: py, t: performance.now(), text: '+' + fmtM(v) });
   }
   if (o < 0) { sel = phase === 'game' ? P : -1; }
   else {

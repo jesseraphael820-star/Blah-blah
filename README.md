@@ -21,6 +21,8 @@ Jogo de estratégia de guerra no mapa-múndi atual (193 países com bandeiras re
 - **🎬 Estilo de vídeo**: mapa satélite (só países em guerra pintados), divisões com bandeirinhas, tropas escritas na linha de frente, data grande e título da guerra.
 - **💾 Salvar**: 3 espaços + salvamento automático a cada 30 s e ao sair; "Continuar" abre o save mais recente.
 - **💼 Economia**: impostos, acordos comerciais, empréstimos (pedir e emprestar) e eventos aleatórios.
+- **📈 Finanças**: mercado (títulos, ações, cripto), obras públicas (usinas, portos, banco central) e nota de crédito.
+- **👆 Segurar**: segure o dedo no seu país para ganhar dinheiro sem parar.
 - **🎖 Militar**: bases militares e treinamento; ranking de poder militar.
 - **Estilo neon**: seu time azul × inimigos vermelhos sobre mapa satélite, bordas brilhando, tropas no centro e bandeirinhas na frente.
 - **⚙ Configurações**: animação de guerra com soldados e bandeiras, frente cinza ou listras que avançam e recuam; território ocupado listrado; bordas sombreadas.
