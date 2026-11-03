@@ -120,7 +120,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#08131c;color:var(--tx
 #pact .shop button small{font-size:11px;font-weight:600;color:var(--gold)}
 .econ{display:flex;justify-content:space-between;gap:8px;font-size:12px;color:var(--mut)}
 .econ b{color:var(--txt);font-variant-numeric:tabular-nums}
-@media (max-width:440px){#money{font-size:12px;padding:3px 6px}#money small{display:none}#day{font-size:11px;min-width:0}}
+@media (max-width:440px){#money{font-size:12px;padding:3px 6px}#money small{display:none}#day{font-size:11px;min-width:0}#top{gap:3px!important}#top .sp{padding:3px 5px;font-size:11px}#day.big{font-size:12px}}
 .tabs{display:flex;gap:4px;background:#0f1720;border:1px solid var(--line);border-radius:10px;padding:3px}
 #pact .tabs button{flex:1;text-align:center;padding:7px 2px;font-size:12.5px;border:0;background:transparent;color:var(--mut);font-weight:700}
 #pact .tabs button.on{background:#243446;color:var(--txt)}
@@ -140,6 +140,23 @@ html,body{margin:0;height:100%;overflow:hidden;background:#08131c;color:var(--tx
 #wartitle .wt1{font-size:clamp(16px,2.6vw,34px);line-height:1.05;letter-spacing:.5px;overflow-wrap:anywhere}
 #wartitle .wt2{font-size:clamp(12px,1.9vw,26px);line-height:1.1;margin-top:2px}
 @media (max-width:760px){#wartitle{left:auto;right:8px;transform:none;text-align:right;bottom:calc(43vh + 12px);max-width:calc(100vw - 150px)}#wartitle .wt1{font-size:14px}#wartitle .wt2{font-size:11px}#day.big{font-size:14px}}
+.saves{display:flex;flex-direction:column;gap:8px;text-align:left;margin-top:6px}
+.sv{background:#141f2a;border:1px solid var(--line);border-radius:10px;padding:9px 10px;display:flex;flex-direction:column;gap:7px}
+.svm{display:flex;flex-direction:column;gap:2px;color:var(--txt);min-width:0}
+.svm span{font-size:12px;color:var(--mut);overflow-wrap:anywhere}
+.svm img{width:20px;height:13px;vertical-align:-2px;margin-right:5px;border:1px solid #0008}
+.svb{display:flex;gap:6px}
+.modal .svb button{flex:1;padding:7px 4px;font-size:13px}
+.modal .svb button.del{flex:none;padding:7px 10px;color:#ff9a9a}
+.modal .svb button.warn{background:#5a3a10;border-color:#a8741e;color:#ffd58a}
+#pact button.cont{background:#24406a;border-color:#3d68a8;display:flex;flex-direction:column;align-items:center;gap:2px}
+#pact button.cont small{font-size:11.5px;font-weight:600;color:#bcd6ff}
+#intro{position:fixed;inset:0;z-index:30;pointer-events:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:radial-gradient(ellipse at center,rgba(5,10,20,.82),rgba(0,0,0,.94));text-align:center;padding:0 16px}
+#intro.go{animation:intro 2.6s ease forwards}
+#intro .i1{font-family:Georgia,"Times New Roman",serif;font-weight:900;font-size:clamp(30px,7vw,64px);color:#f4f7ff;letter-spacing:2px;text-shadow:0 0 18px #6aa8ff,0 3px 0 #0a1a3a}
+#intro .i2{font-family:"Archivo Black",system-ui,sans-serif;font-size:clamp(22px,5vw,46px);color:#8fc4ff;text-shadow:0 0 16px #2f6fd6,0 3px 0 #000}
+#intro .i3{font-family:Georgia,serif;font-size:clamp(14px,2.6vw,22px);color:#d6b8ff;text-shadow:0 0 12px #7a3fd6}
+@keyframes intro{0%{opacity:0}15%{opacity:1}75%{opacity:1}100%{opacity:0}}
 @keyframes pop{from{transform:scale(.9);opacity:0}to{transform:none;opacity:1}}
 .modal{position:fixed;inset:0;background:#000a;display:none;align-items:center;justify-content:center;z-index:20}
 .modal .box{background:#111a24;border:1px solid var(--line);border-radius:14px;padding:22px;max-width:460px;width:90%;text-align:center}
@@ -178,6 +195,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#08131c;color:var(--tx
   <button class="sp on" data-spd="1">1x</button>
   <button class="sp" data-spd="2">2x</button>
   <button class="sp" data-spd="4">4x</button>
+  <button class="sp" id="save" title="Salvar e carregar">💾</button>
   <button class="sp" id="rank" title="Ranking mundial">🏆</button>
   <button class="sp" id="cfg" title="Configurações">⚙</button>
   <button class="sp" id="newgame" title="Novo jogo">↺</button>
@@ -188,6 +206,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#08131c;color:var(--tx
 <div id="panel"><button id="ptog" aria-label="Minimizar painel"></button><div id="pinfo"></div><div id="pact"></div><div id="log"></div></div>
 <div id="reqs"></div>
 <div id="wartitle" hidden></div>
+<div id="intro" hidden></div>
 <button id="nuke" hidden aria-label="Bomba nuclear"></button>
 <button id="air" class="" hidden aria-label="Bombardeio aéreo"></button>
 <datalist id="clist"></datalist>
@@ -251,6 +270,8 @@ function alloc(gw, gh, s) {
   core = new Int16Array(NC); frontMark = new Uint8Array(NC);
   off.width = GW * S; off.height = GH * S;
   img = octx.createImageData(GW * S, GH * S); u32 = new Uint32Array(img.data.buffer);
+  maskCv.width = GW; maskCv.height = GH; maskImg = maskCtx.createImageData(GW, GH);
+  glowCv.width = GW * 4; glowCv.height = GH * 4;
   fitted = false; resize();
 }
 let seaA = new Int32Array(0), seaB = new Int32Array(0), coastList = [];
@@ -1008,13 +1029,16 @@ function showModal(title, text, btns) {
 const cv = $('map'), ctx = cv.getContext('2d');
 const off = document.createElement('canvas'); off.width = GW * S; off.height = GH * S;
 const octx = off.getContext('2d'); let img, u32;
+const maskCv = document.createElement('canvas'), maskCtx = maskCv.getContext('2d'); let maskImg;
+const glowCv = document.createElement('canvas'), glowCtx = glowCv.getContext('2d');
 const cam = { x: 0, y: 0, z: 4, fit: 4 };
 let dpr = 1, VW = 0, VH = 0, fitted = false;
 const COL_EDGE = pack(12, 12, 16), COL_WAR = pack(225, 45, 45), COL_WAR_G = pack(58, 58, 64), COL_COAST = pack(18, 30, 40), COL_ME = pack(5, 5, 8);
 
 function renderOff() {
   const W = GW * S, inWar = new Uint8Array(N); for (const w of wars) { inWar[w.a] = 1; inWar[w.b] = 1; }
-  const sat = opts.map === 'sat';
+  const neon = opts.fx === 'neon', sat = opts.map === 'sat' || neon;
+  const involved = o => inWar[o] || (o === P && P >= 0);
   for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) {
     const c = y * GW + x, o = owner[c];
     let col;
@@ -1023,7 +1047,12 @@ function renderOff() {
       const k = C[o].col; let s = shade[c];
       if (opts.smooth && ((x > 0 && owner[c - 1] !== o) || (x < GW - 1 && owner[c + 1] !== o) || (y > 0 && owner[c - GW] !== o) || (y < GH - 1 && owner[c + GW] !== o))) s *= .84;
       let r = k[0] * s, g = k[1] * s, b = k[2] * s;
-      if (sat) {
+      if (neon) {
+        const tm = teamOf(o), kk = tm ? TEAM[tm] : C[o].col, e = s / shade[c];
+        const al = involved(o) ? .8 : o === sel ? .3 : 0, gl = .85 + .15 * ((x + y) & 1);
+        const tr = terr[c * 3] * e, tg = terr[c * 3 + 1] * e, tb = terr[c * 3 + 2] * e;
+        r = tr + (kk[0] * gl * e - tr) * al; g = tg + (kk[1] * gl * e - tg) * al; b = tb + (kk[2] * gl * e - tb) * al;
+      } else if (sat) {
         const al = inWar[o] || o === P ? .55 : o === sel ? .35 : .1, e = s / shade[c];
         const tr = terr[c * 3] * e, tg = terr[c * 3 + 1] * e, tb = terr[c * 3 + 2] * e;
         r = tr + (r - tr) * al; g = tg + (g - tg) * al; b = tb + (b - tb) * al;
@@ -1049,6 +1078,11 @@ function renderOff() {
     for (let dy = 0; dy < S; dy++) { const row = base + dy * W; for (let dx = 0; dx < S; dx++) u32[row + dx] = col; }
   }
   const edge = (o, o2) => {
+    if (neon) {
+      const io = o >= 0 && involved(o), io2 = o2 >= 0 && involved(o2);
+      if (!io && !io2) return [0, false];
+      return [COL_EDGE, false];
+    }
     if (o < 0 || o2 < 0) return [COL_COAST, (o === P || o2 === P) && P >= 0];
     if (warMat[o * N + o2] >= 0) return [opts.fx === 'cinza' ? COL_WAR_G : opts.fx === 'listras' ? COL_EDGE : COL_WAR, true];
     const me = P >= 0 && (o === P || o2 === P);
@@ -1060,18 +1094,45 @@ function renderOff() {
       const o2 = owner[c + 1];
       if (o !== o2) {
         const [col, thick] = edge(o, o2), px = x * S + S - 1;
-        for (let dy = 0; dy < S; dy++) { const i = (y * S + dy) * W + px; u32[i] = col; if (thick) u32[i + 1] = col; }
+        if (col) for (let dy = 0; dy < S; dy++) { const i = (y * S + dy) * W + px; u32[i] = col; if (thick) u32[i + 1] = col; }
       }
     }
     if (y < GH - 1) {
       const o2 = owner[c + GW];
       if (o !== o2) {
         const [col, thick] = edge(o, o2), row = (y * S + S - 1) * W + x * S;
-        for (let dx = 0; dx < S; dx++) { u32[row + dx] = col; if (thick) u32[row + W + dx] = col; }
+        if (col) for (let dx = 0; dx < S; dx++) { u32[row + dx] = col; if (thick) u32[row + W + dx] = col; }
       }
     }
   }
   octx.putImageData(img, 0, 0);
+  if (neon) {
+    // máscara de bordas → camada de brilho borrada
+    const m = new Uint32Array(maskImg.data.buffer); m.fill(0);
+    for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) {
+      const c = y * GW + x, o = owner[c]; if (o < 0 || !involved(o)) continue;
+      if ((x > 0 && owner[c - 1] !== o) || (x < GW - 1 && owner[c + 1] !== o) || (y > 0 && owner[c - GW] !== o) || (y < GH - 1 && owner[c + GW] !== o)) {
+        const tm = teamOf(o), k = tm ? TEAM_L[tm] : C[o].col.map(v => v + (255 - v) * .55);
+        m[c] = pack(k[0], k[1], k[2]);
+      }
+    }
+    maskCtx.putImageData(maskImg, 0, 0);
+    glowCtx.clearRect(0, 0, glowCv.width, glowCv.height);
+    glowCtx.imageSmoothingEnabled = true;
+    glowCtx.shadowColor = 'rgba(255,255,255,.85)'; glowCtx.shadowBlur = 7;
+    glowCtx.drawImage(maskCv, 0, 0, glowCv.width, glowCv.height);
+    glowCtx.shadowBlur = 0; glowCtx.globalAlpha = .9;
+    glowCtx.drawImage(maskCv, 0, 0, glowCv.width, glowCv.height);
+    glowCtx.globalAlpha = 1;
+  }
+}
+// times do estilo neon: 1 = seu lado (azul), 2 = inimigos (vermelho), 0 = outros
+const TEAM = [null, [24, 46, 128], [168, 20, 30]], TEAM_L = [null, [150, 205, 255], [255, 170, 190]];
+function teamOf(o) {
+  if (P < 0 || !C[P] || !C[P].alive) return 0;
+  if (o === P || isAllied(P, o)) return 1;
+  if (warMat[P * N + o] >= 0) return 2;
+  return 0;
 }
 function resize() {
   dpr = Math.min(window.devicePixelRatio || 1, 2); VW = innerWidth; VH = innerHeight;
@@ -1089,6 +1150,11 @@ function draw() {
   if (shakeAmt > 0) ctx.translate((R() - .5) * shakeAmt * 2, (R() - .5) * shakeAmt * 2);
   ctx.imageSmoothingEnabled = false;
   ctx.drawImage(off, cam.x, cam.y, GW * cam.z, GH * cam.z);
+  if (opts.fx === 'neon') {
+    ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.imageSmoothingEnabled = true;
+    ctx.globalAlpha = .9 + .1 * Math.sin(performance.now() / 400);
+    ctx.drawImage(glowCv, cam.x, cam.y, GW * cam.z, GH * cam.z); ctx.restore();
+  }
   const z = cam.z, sx = x => cam.x + (x + .5) * z, sy = y => cam.y + (y + .5) * z;
   const now = performance.now();
   // conquista: a cor antiga encolhe e revela o novo dono, com um contorno que se expande
@@ -1267,7 +1333,25 @@ function draw() {
     }
   }
   // número de tropas escrito ao longo da linha de frente
-  if (opts.frontNums) {
+  if (opts.fx === 'neon') {
+    const dw = clamp(z * .9, 5, 11), dh = dw * .66;
+    for (const w of wars) {
+      const L = w.fa.length; if (!L) continue;
+      const step = Math.max(1, Math.floor(L / 80));
+      for (let j = 0; j < L; j += step) {
+        if (w.fs[j]) continue;
+        const a = w.fa[j], b = w.fb[j], ax = a % GW, ay = (a / GW) | 0, bx = b % GW, by = (b / GW) | 0;
+        const jt = Math.sin(now / 80 + j * 1.9) * .35;
+        for (const [k, cx, cy, d] of [[C[w.a], ax, ay, -1], [C[w.b], bx, by, 1]]) {
+          const x = sx(cx + (bx - ax) * d * (.15 + jt * .3)) + Math.cos(j) * z * .3, y = sy(cy + (by - ay) * d * (.15 + jt * .3)) + Math.sin(j * 2) * z * .3;
+          if (x < -dw || y < -dh || x > VW + dw || y > VH + dh) continue;
+          ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillRect(x - dw / 2 - .5, y - dh / 2 - .5, dw + 1, dh + 1);
+          drawFlag(ctx, k.flag, x - dw / 2, y - dh / 2, dw, dh);
+        }
+      }
+    }
+  }
+  if (opts.frontNums && opts.fx !== 'neon') {
     const fs = clamp(z * 1.9, 11, 24);
     ctx.font = `${fs}px "Archivo Black", system-ui, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
     for (const w of wars) {
@@ -1292,8 +1376,30 @@ function draw() {
       }
     }
   }
+  const neonOn = opts.fx === 'neon';
+  const inv = new Uint8Array(N); for (const w of wars) { inv[w.a] = 1; inv[w.b] = 1; } if (P >= 0) inv[P] = 1;
+  if (neonOn) {
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
+    for (const c of C) {
+      if (!c.alive || (!inv[c.id] && c.id !== sel)) continue;
+      // capital: "+" amarelo com o nome
+      const cx = sx(c.cap % GW), cy = sy((c.cap / GW) | 0), pz = clamp(z * 1.1, 6, 12);
+      ctx.strokeStyle = '#000'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(cx - pz, cy); ctx.lineTo(cx + pz, cy); ctx.moveTo(cx, cy - pz); ctx.lineTo(cx, cy + pz); ctx.stroke();
+      ctx.strokeStyle = '#ffc928'; ctx.lineWidth = 2; ctx.stroke();
+      ctx.font = `700 ${clamp(z * 1.3, 9, 13)}px system-ui,sans-serif`; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.8)';
+      ctx.strokeText(c.name, cx, cy + pz + 8); ctx.fillStyle = '#ffc928'; ctx.fillText(c.name, cx, cy + pz + 8);
+      // tropas grandes no centro, com brilho
+      const tm = teamOf(c.id), kl = tm ? TEAM_L[tm] : c.col.map(v => v + (255 - v) * .5), kd = tm ? TEAM[tm] : c.col;
+      const fsz = clamp(Math.sqrt(c.cells) * z * .2, 13, 42), t = fmt(c.troops).replace(/ /g, '.');
+      ctx.font = `${fsz}px "Archivo Black", system-ui, sans-serif`;
+      ctx.save(); ctx.shadowColor = `rgb(${kd[0] | 0},${kd[1] | 0},${kd[2] | 0})`; ctx.shadowBlur = 14;
+      ctx.lineWidth = Math.max(2, fsz * .12); ctx.strokeStyle = 'rgba(0,0,0,.55)'; ctx.strokeText(t, sx(c.lx), sy(c.ly));
+      ctx.fillStyle = `rgb(${kl[0] | 0},${kl[1] | 0},${kl[2] | 0})`; ctx.fillText(t, sx(c.lx), sy(c.ly)); ctx.restore();
+    }
+  }
   // capitais
   for (const c of C) {
+    if (neonOn) break;
     if (!c.alive || (c.cells < 6 && z < 7 && c.id !== P && c.id !== sel)) continue;
     const x = sx(c.cap % GW), y = sy((c.cap / GW) | 0), r = Math.max(2.5, Math.min(6, z * .9));
     ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fillStyle = c.id === P ? '#f2c443' : '#e8eef5'; ctx.fill();
@@ -1302,7 +1408,7 @@ function draw() {
   // rótulos
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
   for (const c of C) {
-    if (!c.alive) continue;
+    if (!c.alive || neonOn) continue;
     const fs = clamp(Math.sqrt(c.cells) * z * .14, 0, 26);
     if (fs < 8.5 && c.id !== P && c.id !== sel) continue;
     const f = Math.max(fs, 10), x = sx(c.lx), y = sy(c.ly);
@@ -1384,6 +1490,7 @@ function infoHTML() {
 function actionsHTML() {
   if (phase === 'select') {
     let h = '';
+    if (autoMeta) h += `<button class="big cont" data-act="continue">▶ Continuar jogo salvo<small>${esc(autoMeta.country)} · ${esc(autoMeta.date)}</small></button>`;
     if (sel >= 0 && C[sel].alive) {
       h += `<button class="big" data-act="play">▶ Jogar com ${C[sel].isState ? 'o estado' : 'o país'} ${esc(C[sel].name)}</button>`;
       const n = STATES_PER[C[sel].orig] || 0;
@@ -1469,6 +1576,13 @@ const MESES_L = ['JANEIRO', 'FEVEREIRO', 'MARÇO', 'ABRIL', 'MAIO', 'JUNHO', 'JU
 function fmtDateBig(d) { const t = new Date(2026, 0, 1 + d); return `${t.getFullYear()}/${String(t.getMonth() + 1).padStart(2, '0')}/${String(t.getDate()).padStart(2, '0')}`; }
 function fmtDateLong(d) { const t = new Date(2026, 0, 1 + d); return `${t.getDate()} ${MESES_L[t.getMonth()]} ${t.getFullYear()}`; }
 function warName(w) { return `GUERRA ${C[w.a].name.toUpperCase()}–${C[w.b].name.toUpperCase()}`; }
+let introT = 0;
+function showIntro(name) {
+  const el = $('intro');
+  el.innerHTML = `<div class="i1">NOVO JOGO</div><div class="i2">${esc(name.toUpperCase())}</div><div class="i3">Guerra Global · ${fmtDateLong(day)}</div>`;
+  el.hidden = false; el.classList.remove('go'); void el.offsetWidth; el.classList.add('go');
+  clearTimeout(introT); introT = setTimeout(() => { el.hidden = true; }, 2600);
+}
 function fmtDate(d) { const t = new Date(2026, 0, 1 + d); return `${t.getDate()} ${MESES[t.getMonth()]} ${t.getFullYear()}`; }
 function spark(w) {
   const h = w.hist || []; if (h.length < 2) return '';
@@ -1523,8 +1637,9 @@ $('panel').addEventListener('click', e => {
   if (e.target.id === 'ptog') { $('panel').classList.toggle('min'); return; }
   const b = e.target.closest('button[data-act]'); if (!b || b.disabled) return;
   const act = b.dataset.act;
-  if (act === 'play') { P = sel; phase = 'game'; if (VW < 760 || worldMode === 'real') { cam.z = worldMode === 'real' ? Math.max(cam.fit * 2.6, 6) : cam.fit * 2.2; cam.x = VW / 2 - (C[P].lx + .5) * cam.z; cam.y = VH * .3 - (C[P].ly + .5) * cam.z; } toast(`Você governa ${C[P].name}. Boa sorte!`, 'good'); }
+  if (act === 'play') { P = sel; phase = 'game'; lastAuto = performance.now(); showIntro(C[P].name); if (VW < 760 || worldMode === 'real') { cam.z = worldMode === 'real' ? Math.max(cam.fit * 2.6, 6) : cam.fit * 2.2; cam.x = VW / 2 - (C[P].lx + .5) * cam.z; cam.y = VH * .3 - (C[P].ly + .5) * cam.z; } toast(`Você governa ${C[P].name}. Boa sorte!`, 'good'); }
   else if (act === 'newmap') newWorld();
+  else if (act === 'continue') { loadGame('auto'); return; }
   else if (act === 'split') { const o = C[sel].orig, lx = C[sel].lx, ly = C[sel].ly; regenKeepCam(o); cam.z = Math.max(cam.z, cam.fit * 3); cam.x = VW / 2 - (lx + .5) * cam.z; cam.y = VH * (VW < 760 ? .3 : .5) - (ly + .5) * cam.z; }
   else if (act === 'unsplit') regenKeepCam(-1);
   else if (act === 'war') declareWar(P, sel, 'ataque');
@@ -1582,7 +1697,8 @@ $('cfg').addEventListener('click', () => {
   $('mtext').innerHTML = `<div class="opt"><b>Animação de guerra</b>
     <label><input type="radio" name="fx" value="soldados"${opts.fx === 'soldados' ? ' checked' : ''}> Soldados e bandeiras nas frentes</label>
     <label><input type="radio" name="fx" value="cinza"${opts.fx === 'cinza' ? ' checked' : ''}> Frente cinza (só o território avançando e recuando)</label>
-    <label><input type="radio" name="fx" value="listras"${opts.fx === 'listras' ? ' checked' : ''}> Listras (só listras avançando e recuando na frente)</label></div>
+    <label><input type="radio" name="fx" value="listras"${opts.fx === 'listras' ? ' checked' : ''}> Listras (só listras avançando e recuando na frente)</label>
+    <label><input type="radio" name="fx" value="neon"${opts.fx === 'neon' ? ' checked' : ''}> Neon: seu time azul × inimigos vermelhos, mapa satélite e bordas brilhando</label></div>
     <div class="opt"><b>Mapa</b>
     <label><input type="radio" name="map" value="cor"${opts.map === 'cor' ? ' checked' : ''}> Colorido (todos os países pintados)</label>
     <label><input type="radio" name="map" value="sat"${opts.map === 'sat' ? ' checked' : ''}> Satélite (só países em guerra pintados)</label></div>
@@ -1683,6 +1799,132 @@ function actShip(e) {
   const w = warOf(P, e); if (!w || day < (w.shipCD || 0)) return;
   if (sendExpedition(w, P, focus && focus.enemy === e ? focus.c : -1)) w.shipCD = day + 15;
 }
+
+// ---------- salvar e carregar ----------
+// Na página publicada os saves ficam no banco privado de cada pessoa (data/users/<id>);
+// fora dela (arquivo local), no armazenamento do navegador.
+const store = { db: null, uid: null };
+let autoMeta = null, lastAuto = 0;
+(async () => {
+  try {
+    if (window.claude && claude.use) {
+      const db = await claude.use('db'), user = await claude.use('user');
+      if (db && user) { const id = await user.id(); if (id) { store.db = db; store.uid = id; } }
+    }
+  } catch (e) {}
+  autoMeta = await readMeta('auto'); last.act = ''; updateUI();
+})();
+function rle(arr) { const out = []; let cur = arr[0], n = 0; for (let i = 0; i < arr.length; i++) { if (arr[i] === cur) n++; else { out.push(cur, n); cur = arr[i]; n = 1; } } out.push(cur, n); return out; }
+function unrle(r, arr) { let k = 0; for (let i = 0; i < r.length; i += 2) for (let j = 0; j < r[i + 1]; j++) arr[k++] = r[i]; }
+async function packSave(obj) {
+  const str = JSON.stringify(obj);
+  if (typeof CompressionStream === 'undefined') return { z: 0, d: str };
+  const buf = new Uint8Array(await new Response(new Blob([str]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer());
+  let bin = ''; for (let i = 0; i < buf.length; i += 32768) bin += String.fromCharCode.apply(null, buf.subarray(i, i + 32768));
+  return { z: 1, d: btoa(bin) };
+}
+async function unpackSave(p) {
+  if (!p.z) return JSON.parse(p.d);
+  const bin = atob(p.d), u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+  return JSON.parse(await new Response(new Blob([u]).stream().pipeThrough(new DecompressionStream('gzip'))).text());
+}
+function snapshotGame() {
+  return {
+    v: 1, mode: worldMode, split: splitOrig, gw: GW, gh: GH, s: S, nCount, day, P, warSeq,
+    land: worldMode === 'real' ? null : rle(land), owner: rle(owner), core: rle(core),
+    C: C.map(c => ({ n: c.name, col: c.col.map(v => Math.round(v)), fo: c.flag.img ? c.orig : -1, band: !!c.flag.band, fl: c.flag.img ? null : c.flag,
+      alive: c.alive, cells: c.cells, mult: c.mult, nuclear: c.nuclear, troops: Math.round(c.troops), cas: Math.round(c.casualties), cap: c.cap, aggr: c.aggr,
+      lx: c.lx, ly: c.ly, rcd: c.recruitCD, acd: c.allyCD, dcd: c.aidCD, econ: c.econ, money: Math.round(c.money), tech: c.tech,
+      clv: c.clickLv, ctot: Math.round(c.clickTotal), rr: c.raidReady, orig: c.orig, st: c.isState, par: c.parent })),
+    rel: Array.from(rel, v => Math.round(v)), allied: rle(allied),
+    wars: wars.map(w => ({ id: w.id, a: w.a, b: w.b, mode: w.mode, start: w.start, parent: w.parent, helpFor: w.helpFor, casA: Math.round(w.casA), casB: Math.round(w.casB),
+      a0: w.a0, b0: w.b0, peaceCD: w.peaceCD, shipCD: w.shipCD || 0, mom: w.mom || 0, hist: w.hist || [] })),
+    units: units.map(u => ({ war: u.war, from: u.from, to: u.to, kind: u.kind, path: u.path, prog: u.prog, troops: Math.round(u.troops), speed: u.speed, ph: u.ph })),
+    logs: logs.slice(0, 20),
+  };
+}
+function restoreGame(sv) {
+  worldMode = sv.mode; nCount = sv.nCount || nCount;
+  if (sv.mode === 'real') genReal(sv.split);
+  else { alloc(sv.gw, sv.gh, sv.s); unrle(sv.land, land); latOfRow = y => 55 - y / GH * 110; finishTerrain(() => .5); splitOrig = -1; }
+  unrle(sv.owner, owner); unrle(sv.core, core);
+  N = sv.C.length;
+  C = sv.C.map((d, i) => ({
+    id: i, name: d.n, col: d.col, flag: d.fo >= 0 ? (d.band ? { ...countryFlag(d.fo), band: d.col } : countryFlag(d.fo)) : d.fl,
+    alive: d.alive, cells: d.cells, mult: d.mult, nuclear: d.nuclear, nukeReady: 0, troops: d.troops, casualties: d.cas, cap: d.cap, aggr: d.aggr,
+    lx: d.lx, ly: d.ly, recruitCD: d.rcd, allyCD: d.acd, aidCD: d.dcd, econ: d.econ, money: d.money, net: 0,
+    tech: { atk: 0, def: 0, eco: 0, log: 0, nav: 0, air: 0, ...d.tech }, clickLv: d.clv || 0, clickTotal: d.ctot || 0, raidReady: d.rr || 0,
+    orig: d.orig, isState: d.st, parent: d.par || '',
+  }));
+  for (const c of C) {
+    if (c.flag.url) c.flagURL = c.flag.url;
+    else { const fc = document.createElement('canvas'); fc.width = 36; fc.height = 24; drawFlag(fc.getContext('2d'), c.flag, 0, 0, 36, 24); c.flagURL = fc.toDataURL(); }
+  }
+  rel = Float32Array.from(sv.rel); allied = new Uint8Array(N * N); unrle(sv.allied, allied); adj = new Uint16Array(N * N);
+  wars = sv.wars.map(w => ({ ...w, fa: [], fb: [], fs: [], aid: 0 })); warSeq = sv.warSeq; rebuildWarMat();
+  units = sv.units || []; logs = sv.logs || [];
+  anims = []; nukes = []; raids = []; reqs = []; focus = null; nukeArmed = false; airArmed = false; nukeReady = 0;
+  day = sv.day; P = sv.P; sel = P; phase = 'game'; ended = false;
+  scanBorders(); computeLabels(); updateDivs(); fillSearch();
+  if (C[P]) { cam.z = Math.max(cam.fit * 2.6, 6); cam.x = VW / 2 - (C[P].lx + .5) * cam.z; cam.y = VH * (VW < 760 ? .3 : .5) - (C[P].ly + .5) * cam.z; }
+  dirty = true; reqsChanged = true; last.act = ''; updateUI();
+}
+const slotRef = k => store.db.collection('data/users/' + store.uid).doc('save-' + k);
+async function readSlot(k) {
+  try {
+    if (store.db) { const snap = await slotRef(k).get(); return snap.exists ? snap.data() : null; }
+    const raw = localStorage.getItem('gg-save-' + k); return raw ? JSON.parse(raw) : null;
+  } catch (e) { return null; }
+}
+async function readMeta(k) { const d = await readSlot(k); return d ? d.meta : null; }
+async function saveGame(k, quiet = false) {
+  if (phase !== 'game' || P < 0 || !C[P].alive) return false;
+  try {
+    const doc = { meta: { country: C[P].name, flag: C[P].flagURL.length < 4000 ? C[P].flagURL : '', date: fmtDateBig(day), savedAt: Date.now(), mode: worldMode }, ...(await packSave(snapshotGame())) };
+    if (store.db) await slotRef(k).set(doc); else localStorage.setItem('gg-save-' + k, JSON.stringify(doc));
+    if (k === 'auto') autoMeta = doc.meta;
+    if (!quiet) toast(`💾 Jogo salvo (${C[P].name}, ${fmtDateBig(day)}).`, 'good');
+    return true;
+  } catch (e) {
+    if (!quiet) toast(e && e.code === 'quota_exceeded' ? '💾 Espaço de salvamento cheio. Apague um save antigo.' : '💾 Não foi possível salvar agora. Tente de novo.', 'bad');
+    return false;
+  }
+}
+async function loadGame(k) {
+  const d = await readSlot(k);
+  if (!d) { toast('💾 Esse espaço está vazio.', 'bad'); return; }
+  try { restoreGame(await unpackSave(d)); toast(`💾 Jogo carregado: ${d.meta.country}, ${d.meta.date}.`, 'good'); }
+  catch (e) { toast('💾 Esse save está corrompido e não pôde ser carregado.', 'bad'); }
+}
+async function deleteSlot(k) {
+  try { if (store.db) await slotRef(k).delete(); else localStorage.removeItem('gg-save-' + k); } catch (e) {}
+}
+const SLOTS = [['auto', 'Salvamento automático'], ['1', 'Espaço 1'], ['2', 'Espaço 2'], ['3', 'Espaço 3']];
+const ago = t => { const m = Math.round((Date.now() - t) / 60000); return m < 1 ? 'agora' : m < 60 ? `há ${m} min` : m < 1440 ? `há ${Math.round(m / 60)} h` : `há ${Math.round(m / 1440)} d`; };
+async function openSaves() {
+  showModal('Salvar e carregar', '', [['Fechar', () => {}]]);
+  $('mtext').innerHTML = '<div class="mut small">Carregando os saves…</div>';
+  const rows = await Promise.all(SLOTS.map(async ([k, label]) => ({ k, label, m: await readMeta(k) })));
+  const canSave = phase === 'game' && P >= 0 && C[P].alive;
+  $('mtext').innerHTML = `<div class="saves">${rows.map(r => `<div class="sv">
+      <div class="svm"><b>${r.label}</b><span>${r.m ? `${r.m.flag ? `<img src="${r.m.flag}" alt="">` : ''}${esc(r.m.country)} · ${esc(r.m.date)} · ${ago(r.m.savedAt)}` : 'Vazio'}</span></div>
+      <div class="svb">${r.k !== 'auto' ? `<button data-sv="save" data-k="${r.k}"${canSave ? '' : ' disabled'}>Salvar</button>` : ''}
+      <button data-sv="load" data-k="${r.k}"${r.m ? '' : ' disabled'}>Carregar</button>
+      ${r.m && r.k !== 'auto' ? `<button data-sv="del" data-k="${r.k}" class="del">Apagar</button>` : ''}</div></div>`).join('')}</div>
+    <div class="hint">${store.db ? 'Os saves ficam na sua conta: só você vê e dá pra continuar em outro aparelho.' : 'Os saves ficam neste navegador.'} O jogo salva sozinho a cada 2 minutos.${canSave ? '' : ' Comece uma partida para salvar.'}</div>`;
+}
+$('mtext').addEventListener('click', async e => {
+  const b = e.target.closest('button[data-sv]'); if (!b || b.disabled) return;
+  const k = b.dataset.k, act = b.dataset.sv;
+  if ((act === 'load' && phase === 'game' && P >= 0 && C[P].alive) || act === 'del' || (act === 'save' && !b.closest('.sv').querySelector('.svm span').textContent.startsWith('Vazio'))) {
+    if (!b.dataset.ok) { b.dataset.ok = '1'; b.textContent = act === 'load' ? 'Confirmar?' : act === 'del' ? 'Apagar mesmo?' : 'Substituir?'; b.classList.add('warn'); return; }
+  }
+  b.disabled = true;
+  if (act === 'save') { await saveGame(k); openSaves(); }
+  else if (act === 'load') { $('modal').style.display = 'none'; await loadGame(k); }
+  else if (act === 'del') { await deleteSlot(k); openSaves(); }
+});
+$('save').addEventListener('click', openSaves);
 
 // ---------- bomba nuclear ----------
 function launchNuke(from, cell) {
@@ -1968,6 +2210,7 @@ function frame(t) {
     acc += dt * CFG.TPS * speed / 1000; while (acc >= 1) { tick(); acc -= 1; }
   }
   if (dirty && t - lastRO > 60) { renderOff(); dirty = false; lastRO = t; }
+  if (phase === 'game' && P >= 0 && C[P].alive && !ended && t - lastAuto > 120000) { lastAuto = t; if (lastAuto > 1000) saveGame('auto', true); }
   updateNukes(t); updateRaids(t);
   draw();
   uiT += dt; if (uiT > 250) { uiT = 0; updateUI(); nukeButton(); airButton(); }

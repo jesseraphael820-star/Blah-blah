@@ -19,4 +19,6 @@ Jogo de estratégia de guerra no mapa-múndi atual (193 países com bandeiras re
 - **👆 Clique**: toque no seu território para ganhar dinheiro; melhore o clique para ganhar mais por toque.
 - **🏆 Ranking**, data no calendário, indicador de avanço/recuo e gráfico de território em cada guerra.
 - **🎬 Estilo de vídeo**: mapa satélite (só países em guerra pintados), divisões com bandeirinhas, tropas escritas na linha de frente, data grande e título da guerra.
+- **💾 Salvar**: 3 espaços + salvamento automático a cada 2 minutos e botão "Continuar" na tela inicial.
+- **Estilo neon**: seu time azul × inimigos vermelhos sobre mapa satélite, bordas brilhando, tropas no centro e bandeirinhas na frente.
 - **⚙ Configurações**: animação de guerra com soldados e bandeiras, frente cinza ou listras que avançam e recuam; território ocupado listrado; bordas sombreadas.
