@@ -157,6 +157,18 @@ html,body{margin:0;height:100%;overflow:hidden;background:#08131c;color:var(--tx
 #intro .i2{font-family:"Archivo Black",system-ui,sans-serif;font-size:clamp(22px,5vw,46px);color:#8fc4ff;text-shadow:0 0 16px #2f6fd6,0 3px 0 #000}
 #intro .i3{font-family:Georgia,serif;font-size:clamp(14px,2.6vw,22px);color:#d6b8ff;text-shadow:0 0 12px #7a3fd6}
 @keyframes intro{0%{opacity:0}15%{opacity:1}75%{opacity:1}100%{opacity:0}}
+#pact .shop .row button.on{background:#3a5a2a;border-color:#6aa84f}
+#pact .shop .row button{display:flex;flex-direction:column;align-items:center;gap:1px;text-align:center}
+.sect{font-size:12.5px;font-weight:800;margin-top:6px;color:var(--txt)}
+.li{display:flex;align-items:center;gap:6px;font-size:12.5px;background:#141f2a;border:1px solid var(--line);border-radius:8px;padding:6px 8px}
+.li img{width:20px;height:13px;border:1px solid #0008}
+.li b{margin-left:auto;font-variant-numeric:tabular-nums;color:var(--gold)}
+#pact .li button{padding:4px 8px;font-size:12px;margin-left:6px}
+#pact .tabs{flex-wrap:wrap}
+#pact .tabs button{flex:1 1 30%;font-size:12px}
+.rk-tabs{margin:0 0 8px}
+.modal .rk-tabs button{flex:1;text-align:center;padding:7px 4px;font-size:12.5px;border:0;background:transparent;color:var(--mut);font-weight:700}
+.modal .rk-tabs button.on{background:#243446;color:var(--txt)}
 @keyframes pop{from{transform:scale(.9);opacity:0}to{transform:none;opacity:1}}
 .modal{position:fixed;inset:0;background:#000a;display:none;align-items:center;justify-content:center;z-index:20}
 .modal .box{background:#111a24;border:1px solid var(--line);border-radius:14px;padding:22px;max-width:460px;width:90%;text-align:center}
@@ -541,6 +553,7 @@ function makeCountries(list) {
     recruitCD: 0, allyCD: 0, aidCD: 0,
     econ: d.econ || 1, money: cnt[i] * 60 * (d.econ || 1) + 3000, net: 0,
     tech: { atk: 0, def: 0, eco: 0, log: 0, nav: 0, air: 0 }, clickLv: 0, clickTotal: 0, raidReady: 0,
+    mil: { base: 0, trn: 0 }, loans: [], trades: [], tax: 1, boom: null, tradeCD: 0, loanCD: 0,
   }));
   computeLabels();
   for (const c of C) {
@@ -561,7 +574,7 @@ function makeCountries(list) {
 }
 
 // ---------- utilidades de diplomacia ----------
-const maxT = c => c.cells * CFG.MAX_PER_CELL * c.mult + 2000;
+const maxT = c => c.cells * CFG.MAX_PER_CELL * c.mult * (1 + .15 * (c.mil ? c.mil.base : 0)) + 2000;
 const isAllied = (a, b) => !!allied[a * N + b];
 const warOf = (a, b) => { const i = warMat[a * N + b]; return i >= 0 ? wars[i] : null; };
 function rebuildWarMat() {
@@ -584,7 +597,7 @@ const modeName = m => m === 'morte' ? 'Até a morte' : 'Ataque';
 
 function sideStrength(w, side) {
   const T = C[side].tech;
-  let s = C[side].troops * (1 + .1 * T.atk) * (1 + .07 * T.def) * (1 + .05 * T.air) + C[side].cells * 15;
+  let s = milPower(C[side]) + C[side].cells * 15;
   for (const x of wars) if (x.parent === w.id && x.helpFor === side && C[x.a].alive) s += (C[x.a].troops + C[x.a].cells * 40) * .5;
   return s;
 }
@@ -615,6 +628,7 @@ function declareWar(a, b, mode, parent = 0, helpFor = -1) {
   const w = { id: warSeq++, a, b, mode, start: day, parent, helpFor, casA: 0, casB: 0,
     a0: C[a].cells, b0: C[b].cells, fa: [], fb: [], fs: [], aid: 0, peaceCD: 0 };
   wars.push(w); setRel(a, b, -100); rebuildWarMat();
+  if (hasTrade(a, b)) { setTrade(a, b, false); if (a === P || b === P) toast(`📦 O acordo comercial com ${C[a === P ? b : a].name} foi cancelado pela guerra.`, 'bad'); }
   if ((a === P || b === P) && (!parent || $('vs').hidden)) showVs(w);
   const tagM = mode === 'morte' ? ' ☠ ATÉ A MORTE' : '';
   if (a === P) toast(parent ? `⚔ Você entrou na guerra contra ${C[b].name}${tagM}` : `⚔ Você declarou guerra a ${C[b].name}${tagM}`, 'bad');
@@ -721,7 +735,7 @@ function battle(w, ca, cb, sea) {
   if (bomb[ca] && day - bomb[ca] < CFG.BOMB_DAYS) ba *= .6;
   if (bomb[cb] && day - bomb[cb] < CFG.BOMB_DAYS) bb *= .6;
   if (rad[cb] && day - rad[cb] < CFG.RAD_DAYS) bb *= .45;
-  const sa = (da + 4) * (.55 + R() * .9) * ba * (1 + .1 * A.tech.atk), sb = (db + 4) * (.55 + R() * .9) * bb * (1 + .1 * B.tech.atk);
+  const sa = (da + 4) * (.55 + R() * .9) * ba * (1 + .1 * A.tech.atk) * (1 + .06 * A.mil.trn), sb = (db + 4) * (.55 + R() * .9) * bb * (1 + .1 * B.tech.atk) * (1 + .06 * B.mil.trn);
   const base = (da + db) * .09 * (.5 + R()) + 4;
   const aWins = sa > sb;
   let la = base * (aWins ? .6 : 1.3) / (1 + .1 * A.tech.def), lb = base * (aWins ? 1.3 : .6) / (1 + .1 * B.tech.def);
@@ -747,7 +761,7 @@ function amphibious(w) {
 }
 function tick() {
   day++;
-  for (const c of C) if (c.alive) c.troops = Math.max(0, c.troops + c.cells * CFG.REGEN * c.mult * (1 + .15 * c.tech.log) * (1 - c.troops / maxT(c)));
+  for (const c of C) if (c.alive) c.troops = Math.max(0, c.troops + c.cells * CFG.REGEN * c.mult * (1 + .15 * c.tech.log) * (1 + .1 * c.mil.base) * TAX[c.tax].regen * (1 - c.troops / maxT(c)));
   scanBorders();
   for (const w of wars.slice()) {
     if (!wars.includes(w) || !C[w.a].alive || !C[w.b].alive) continue;
@@ -798,10 +812,14 @@ function tick() {
   const atWar = new Uint8Array(N); for (const w of wars) { atWar[w.a] = 1; atWar[w.b] = 1; }
   for (const c of C) {
     if (!c.alive) continue;
+    payLoans(c);
+    if (R() < 1 / 110) randomEvent(c);
     c.inc = income(c); c.up = c.troops * CFG.UPKEEP * Math.max(.4, 1 - .06 * c.tech.log); c.net = c.inc - c.up;
     if (c.id !== P && day % 30 === c.id % 30) {
       const k = atWar[c.id] ? (R() < .5 ? 'atk' : 'def') : TECH[ri(0, TECH.length - 1)].k;
       if (c.tech[k] < TECH_MAX && c.money > techCost(c, k) * 1.5) { c.money -= techCost(c, k); c.tech[k]++; }
+      const mk = R() < .5 ? 'base' : 'trn';
+      if (c.mil[mk] < TECH_MAX && c.money > milCost(c, mk) * 2) { c.money -= milCost(c, mk); c.mil[mk]++; }
     }
     c.money += c.net;
     if (c.money < 0) { c.money = 0; c.troops *= .996; if (c.id === P && day % 20 === 0) toast('💸 Sem dinheiro! Soldados estão desertando. Reduza o exército ou conquiste mais terras.', 'bad'); }
@@ -831,6 +849,16 @@ function tick() {
   }
 }
 function aiThink(c) {
+  if (P >= 0 && C[P].alive && c.id !== P && c.money < 1500 && warsOf(c.id).length && warMat[c.id * N + P] < 0 && rel[c.id * N + P] > 5 && C[P].money > 20000 && R() < .08 && !hasReq('loan' + c.id) && c.loans.length < 2) {
+    const amt = Math.round(Math.min(C[P].money * .2, 50000) / 1000) * 1000, rate = clamp(.12 + R() * .12, .05, .3);
+    addReq(`🏦 ${c.name} pede ${fmtM(amt)} emprestados e devolve ${fmtM(amt * (1 + rate))} em ${LOAN_DAYS} dias (${Math.round(rate * 100)}% de juros).`, 'loan' + c.id,
+      () => { if (C[P].money >= amt && c.alive) { C[P].money -= amt; c.money += amt; c.loans.push({ lender: P, total: Math.round(amt * (1 + rate)), remaining: amt * (1 + rate), daily: amt * (1 + rate) / LOAN_DAYS, missed: 0, rate, start: day }); relAdd(P, c.id, 10); toast(`🏦 Você emprestou ${fmtM(amt)} a ${c.name}.`, 'good'); } },
+      () => relAdd(P, c.id, -4));
+  }
+  if (R() < .05 && c.trades.length < 4) {
+    const o = ri(0, N - 1);
+    if (o !== c.id && o !== P && C[o].alive && warMat[c.id * N + o] < 0 && rel[c.id * N + o] > 15 && !hasTrade(c.id, o)) setTrade(c.id, o, true);
+  }
   const id = c.id, my = warsOf(id);
   for (const w of my) {
     if (w.mode !== 'ataque' || (w.parent && w.a === id)) continue;
@@ -932,7 +960,103 @@ function computeLabels() {
 }
 
 // ---------- ações do jogador ----------
-function income(c) { return (c.cells * 2.2 + 40) * c.econ * (1 + .12 * c.tech.eco) * (warsOf(c.id).length ? .9 : 1); }
+const TAX = [{ n: 'Baixos', inc: .8, regen: 1.15, d: '−20% de renda, +15% de recrutamento (povo feliz)' },
+  { n: 'Normais', inc: 1, regen: 1, d: 'Sem efeito' },
+  { n: 'Altos', inc: 1.25, regen: .82, d: '+25% de renda, −18% de recrutamento (povo insatisfeito)' }];
+const baseIncome = c => (c.cells * 2.2 + 40) * c.econ;
+const tradeGain = o => 30 + .04 * baseIncome(C[o]);
+function income(c) {
+  let v = baseIncome(c) * (1 + .12 * c.tech.eco) * (warsOf(c.id).length ? .9 : 1) * TAX[c.tax].inc * (c.boom && day < c.boom.until ? c.boom.m : 1);
+  for (const o of c.trades) if (C[o].alive && warMat[c.id * N + o] < 0) v += tradeGain(o);
+  return v;
+}
+// poder militar: tropas × tecnologia × treinamento (+10% para potências nucleares)
+function milPower(c) {
+  const T = c.tech;
+  return c.troops * (1 + .1 * T.atk) * (1 + .07 * T.def) * (1 + .05 * T.air) * (1 + .03 * T.nav) * (1 + .06 * c.mil.trn) * (c.nuclear ? 1.1 : 1);
+}
+const MIL = [
+  { k: 'base', i: '🏰', n: 'Bases militares', d: '+15% de capacidade de tropas e +10% de recrutamento', base: 10000 },
+  { k: 'trn', i: '🎖', n: 'Treinamento', d: '+6% de força em combate (soldados de elite)', base: 9000 },
+];
+const milCost = (c, k) => Math.round(MIL.find(t => t.k === k).base * 1.6 ** c.mil[k] / 100) * 100;
+function actMil(k) {
+  const c = C[P]; if (c.mil[k] >= TECH_MAX) return;
+  const cost = milCost(c, k); if (c.money < cost) { toast('💸 Dinheiro insuficiente.', 'bad'); return; }
+  c.money -= cost; c.mil[k]++;
+  const t = MIL.find(t => t.k === k); toast(`${t.i} ${t.n} nível ${c.mil[k]}!`, 'good');
+}
+// ---------- acordos comerciais ----------
+function hasTrade(a, b) { return C[a].trades.includes(b); }
+function setTrade(a, b, on) {
+  if (on) { if (!hasTrade(a, b)) { C[a].trades.push(b); C[b].trades.push(a); } }
+  else { C[a].trades = C[a].trades.filter(x => x !== b); C[b].trades = C[b].trades.filter(x => x !== a); }
+}
+function actTrade(o) {
+  const c = C[o]; if (day < c.tradeCD || warMat[P * N + o] >= 0 || hasTrade(P, o)) return;
+  if (R() < clamp((rel[P * N + o] + 35) / 80, .05, .92)) { setTrade(P, o, true); relAdd(P, o, 6); toast(`📦 Acordo comercial com ${c.name}: +${fmtM(tradeGain(o))}/dia para você.`, 'good'); }
+  else { c.tradeCD = day + 30; toast(`${c.name} recusou o acordo comercial.`, 'bad'); }
+}
+// ---------- empréstimos ----------
+const LOAN_DAYS = 100;
+const loanRate = (lender, borrower) => clamp(.25 - rel[lender * N + borrower] / 400 - (isAllied(lender, borrower) ? .08 : 0), .03, .35);
+const loanOptions = o => [.1, .25, .5].map(f => Math.max(1000, Math.round(C[o].money * f / 1000) * 1000));
+const debtOf = c => c.loans.reduce((s, l) => s + l.remaining, 0);
+function makeLoan(lender, borrower, amount) {
+  const rate = loanRate(lender, borrower), total = amount * (1 + rate);
+  C[lender].money -= amount; C[borrower].money += amount;
+  C[borrower].loans.push({ lender, total: Math.round(total), remaining: total, daily: total / LOAN_DAYS, missed: 0, rate, start: day });
+  return rate;
+}
+function actLoan(o, amount) {
+  const L = C[o];
+  if (day < L.loanCD || warMat[P * N + o] >= 0) return;
+  if (C[P].loans.length >= 3) { toast('🏦 Você já tem 3 empréstimos. Pague um antes de pedir outro.', 'bad'); return; }
+  if (L.money < amount * 1.2) { toast(`🏦 ${L.name} não tem dinheiro suficiente para emprestar isso.`, 'bad'); return; }
+  const p = clamp(.45 + rel[P * N + o] / 100 + (isAllied(P, o) ? .25 : 0) - debtOf(C[P]) / Math.max(1, baseIncome(C[P]) * 60), .05, .95);
+  if (R() < p) { const rate = makeLoan(o, P, amount); toast(`🏦 ${L.name} emprestou ${fmtM(amount)} a ${Math.round(rate * 100)}% de juros (pague em ${LOAN_DAYS} dias).`, 'good'); }
+  else { L.loanCD = day + 20; toast(`🏦 ${L.name} recusou o empréstimo.`, 'bad'); }
+  loanOpen = -1;
+}
+function actPayLoan(i) {
+  const l = C[P].loans[i]; if (!l) return;
+  if (C[P].money < l.remaining) { toast('💸 Dinheiro insuficiente para quitar.', 'bad'); return; }
+  C[P].money -= l.remaining; if (C[l.lender].alive) C[l.lender].money += l.remaining;
+  C[P].loans.splice(i, 1); relAdd(P, l.lender, 8); toast(`🏦 Dívida com ${C[l.lender].name} quitada!`, 'good');
+}
+function payLoans(c) {
+  for (const l of c.loans.slice()) {
+    const L = C[l.lender];
+    if (!L.alive || l.remaining <= .5) { c.loans.splice(c.loans.indexOf(l), 1); if (L.alive && c.id === P) toast(`🏦 Empréstimo com ${L.name} pago.`, 'good'); continue; }
+    if (warMat[c.id * N + l.lender] >= 0) continue;   // em guerra, a dívida fica congelada
+    const pay = Math.min(l.daily, l.remaining);
+    if (c.money >= pay) { c.money -= pay; L.money += pay; l.remaining -= pay; }
+    else {
+      l.missed++; relAdd(c.id, l.lender, -2);
+      if (c.id === P && l.missed % 10 === 1) toast(`🏦 Parcela atrasada com ${L.name}! A relação está piorando.`, 'bad');
+      if (l.missed > 25) {
+        c.loans.splice(c.loans.indexOf(l), 1); relAdd(c.id, l.lender, -60);
+        if (c.id === P) toast(`🏦 Você deu calote em ${L.name}!`, 'bad');
+        if (l.lender !== P && R() < .4) declareWar(l.lender, c.id, 'ataque');
+      }
+    }
+  }
+}
+// ---------- eventos aleatórios ----------
+const EVENTS = [
+  { t: '📈 Boom econômico! +25% de renda por 40 dias.', good: 1, f: c => { c.boom = { m: 1.25, until: day + 40 }; } },
+  { t: '📉 Crise econômica: −20% de renda por 40 dias.', good: 0, f: c => { c.boom = { m: .8, until: day + 40 }; } },
+  { t: '🛢 Descobriram petróleo! +$ de 25 dias de renda.', good: 1, f: c => { c.money += income(c) * 25; } },
+  { t: '🙋 Onda de voluntários: +8% de tropas.', good: 1, f: c => { c.troops += maxT(c) * .08; } },
+  { t: '🦠 Epidemia no exército: −6% de tropas.', good: 0, f: c => { c.troops *= .94; } },
+  { t: '🔬 Cientistas fizeram uma descoberta: +1 nível de tecnologia!', good: 1, f: c => { const ks = TECH.map(t => t.k).filter(k => c.tech[k] < TECH_MAX); if (ks.length) c.tech[ks[ri(0, ks.length - 1)]]++; } },
+  { t: '🌪 Desastre natural: −$ de 10 dias de renda.', good: 0, f: c => { c.money = Math.max(0, c.money - income(c) * 10); } },
+];
+function randomEvent(c) {
+  const e = EVENTS[ri(0, EVENTS.length - 1)]; e.f(c);
+  if (c.id === P) toast(e.t, e.good ? 'good' : 'bad');
+}
+let loanOpen = -1, rankTab = 'mil';
 function actTech(k) {
   const c = C[P]; if (c.tech[k] >= TECH_MAX) return;
   const cost = techCost(c, k); if (c.money < cost) { toast('💸 Dinheiro insuficiente.', 'bad'); return; }
@@ -1506,7 +1630,33 @@ function actionsHTML() {
   const cd = (t, label) => day < t ? `${label} (${t - day}d)` : label;
   if (sel === P) {
     const me = C[P], full = me.troops >= buyCap(me);
-    const tabs = `<div class="tabs">${[['army', '🪖 Exército'], ['tech', '🔬 Tecnologia'], ['click', '👆 Clique']].map(([t, l]) => `<button data-act="tab" data-t="${t}" class="${ptab === t ? 'on' : ''}">${l}</button>`).join('')}</div>`;
+    const tabs = `<div class="tabs">${[['army', '🪖 Exército'], ['mil', '🎖 Militar'], ['tech', '🔬 Tec.'], ['eco', '💼 Economia'], ['click', '👆 Clique']].map(([t, l]) => `<button data-act="tab" data-t="${t}" class="${ptab === t ? 'on' : ''}">${l}</button>`).join('')}</div>`;
+    if (ptab === 'mil') {
+      const rank = C.filter(c => c.alive).sort((a, b) => milPower(b) - milPower(a)).indexOf(me) + 1;
+      return tabs + `<div class="clk"><div class="clk-v">${fmt(milPower(me))}<small>poder militar · ${rank}º do mundo</small></div>
+        <div class="econ"><span>Tropas <b>${fmt(me.troops)}</b></span><span>Capacidade <b>${fmt(maxT(me))}</b></span></div></div>`
+        + MIL.map(t => {
+          const lv = me.mil[t.k], maxed = lv >= TECH_MAX, cost = milCost(me, t.k);
+          return `<button class="tech" data-act="mil" data-k="${t.k}"${maxed || me.money < cost ? ' disabled' : ''}>
+            <span class="ti">${t.i}</span><span class="tb"><b>${t.n}</b> <span class="lv">Nv ${lv}/${TECH_MAX}</span><small>${t.d}</small>
+            <span class="pips">${'<i class="on"></i>'.repeat(lv)}${'<i></i>'.repeat(TECH_MAX - lv)}</span></span>
+            <span class="tc">${maxed ? 'MÁX' : fmtM(cost)}</span></button>`;
+        }).join('') + `<div class="hint">O poder militar soma tropas, tecnologia, treinamento e armas nucleares. Veja o top no 🏆 Ranking.</div>`;
+    }
+    if (ptab === 'eco') {
+      const parts = me.trades.filter(o => C[o].alive);
+      const credits = C.flatMap(c => c.alive ? c.loans.filter(l => l.lender === P).map(l => ({ c, l })) : []);
+      return tabs + `<div class="shop"><div class="shop-h">🏛 Impostos</div><div class="row">${TAX.map((t, i) => `<button data-act="tax" data-i="${i}" class="${me.tax === i ? 'on' : ''}">${t.n}<small>${['−20% renda', 'normal', '+25% renda'][i]}</small></button>`).join('')}</div>
+        <div class="hint">${TAX[me.tax].d}</div></div>
+        <div class="econ"><span>Renda <b>+${fmtM(me.inc || income(me))}</b></span><span>Saldo <b style="color:${me.net >= 0 ? '#5fd39a' : '#ff7a7a'}">${me.net >= 0 ? '+' : ''}${fmtM(me.net)}/dia</b></span></div>
+        ${me.boom && day < me.boom.until ? `<div class="hint">${me.boom.m > 1 ? '📈 Boom econômico' : '📉 Crise econômica'}: ${me.boom.m > 1 ? '+' : ''}${Math.round((me.boom.m - 1) * 100)}% de renda por mais ${me.boom.until - day} dias.</div>` : ''}
+        <div class="sect">📦 Acordos comerciais (${parts.length})</div>
+        ${parts.length ? parts.map(o => `<div class="li"><img src="${C[o].flagURL}" alt=""> ${esc(C[o].name)}<b>+${fmtM(tradeGain(o))}/dia</b></div>`).join('') : '<div class="hint">Nenhum. Toque em outro país e proponha um acordo comercial.</div>'}
+        <div class="sect">🏦 Suas dívidas (${fmtM(debtOf(me))})</div>
+        ${me.loans.length ? me.loans.map((l, i) => `<div class="li"><img src="${C[l.lender].flagURL}" alt=""> ${esc(C[l.lender].name)}<b>${fmtM(l.remaining)}</b><button data-act="payloan" data-i="${i}"${me.money < l.remaining ? ' disabled' : ''}>Quitar</button></div><div class="hint">${Math.round(l.rate * 100)}% de juros · parcela ${fmtM(l.daily)}/dia${l.missed ? ` · ${l.missed} atrasadas` : ''}</div>`).join('') : '<div class="hint">Nenhuma. Toque em outro país para pedir um empréstimo.</div>'}
+        <div class="sect">💰 Quem te deve</div>
+        ${credits.length ? credits.map(({ c, l }) => `<div class="li"><img src="${c.flagURL}" alt=""> ${esc(c.name)}<b>${fmtM(l.remaining)}</b></div>`).join('') : '<div class="hint">Ninguém. Países em guerra podem pedir dinheiro emprestado a você.</div>'}`;
+    }
     if (ptab === 'tech') {
       return tabs + TECH.map(t => {
         const lv = me.tech[t.k], maxed = lv >= TECH_MAX, cost = techCost(me, t.k);
@@ -1560,6 +1710,7 @@ function actionsHTML() {
     }
     h += `<button data-act="aid"${day < C[sel].aidCD ? ' disabled' : ''}>🎁 ${cd(C[sel].aidCD, 'Enviar tropas de presente (melhora relação)')}</button>`;
     h += `<button data-act="gift"${day < C[sel].aidCD || C[P].money < CFG.GIFT ? ' disabled' : ''}>💸 ${cd(C[sel].aidCD, `Enviar ${fmtM(CFG.GIFT)} (melhora relação)`)}</button>`;
+    h += ecoButtons();
     h += `<button class="danger" data-act="break">💔 Romper aliança</button>`;
     h += `<div class="hint">Para atacar um aliado, rompa a aliança primeiro.</div>`;
     return h;
@@ -1569,6 +1720,16 @@ function actionsHTML() {
   h += `<button data-act="ally"${day < C[sel].allyCD ? ' disabled' : ''}>🤝 ${cd(C[sel].allyCD, 'Propor aliança')}</button>`;
   h += `<button data-act="aid"${day < C[sel].aidCD ? ' disabled' : ''}>🎁 ${cd(C[sel].aidCD, 'Enviar tropas de presente (melhora relação)')}</button>`;
   h += `<button data-act="gift"${day < C[sel].aidCD || C[P].money < CFG.GIFT ? ' disabled' : ''}>💸 ${cd(C[sel].aidCD, `Enviar ${fmtM(CFG.GIFT)} (melhora relação)`)}</button>`;
+    h += ecoButtons();
+  return h;
+}
+function ecoButtons() {
+  const o = sel, c = C[o], cd = (t, label) => day < t ? `${label} (${t - day}d)` : label;
+  let h = hasTrade(P, o)
+    ? `<button data-act="untrade">✂ Cancelar acordo comercial (+${fmtM(tradeGain(o))}/dia)</button>`
+    : `<button data-act="trade"${day < c.tradeCD ? ' disabled' : ''}>📦 ${cd(c.tradeCD, `Acordo comercial (+${fmtM(tradeGain(o))}/dia para você)`)}</button>`;
+  h += `<button data-act="loanopen"${day < c.loanCD ? ' disabled' : ''}>🏦 ${cd(c.loanCD, `Pedir empréstimo (${Math.round(loanRate(o, P) * 100)}% de juros)`)}</button>`;
+  if (loanOpen === o && day >= c.loanCD) h += `<div class="row">${loanOptions(o).map(v => `<button data-act="loan" data-n="${v}">${fmtM(v)}</button>`).join('')}</div><div class="hint">Você devolve o valor + juros em parcelas diárias por ${LOAN_DAYS} dias. Atrasar piora a relação; calote pode virar guerra.</div>`;
   return h;
 }
 const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
@@ -1639,7 +1800,7 @@ $('panel').addEventListener('click', e => {
   const act = b.dataset.act;
   if (act === 'play') { P = sel; phase = 'game'; lastAuto = performance.now(); showIntro(C[P].name); if (VW < 760 || worldMode === 'real') { cam.z = worldMode === 'real' ? Math.max(cam.fit * 2.6, 6) : cam.fit * 2.2; cam.x = VW / 2 - (C[P].lx + .5) * cam.z; cam.y = VH * .3 - (C[P].ly + .5) * cam.z; } toast(`Você governa ${C[P].name}. Boa sorte!`, 'good'); }
   else if (act === 'newmap') newWorld();
-  else if (act === 'continue') { loadGame('auto'); return; }
+  else if (act === 'continue') { loadGame(latestSlot || 'auto'); return; }
   else if (act === 'split') { const o = C[sel].orig, lx = C[sel].lx, ly = C[sel].ly; regenKeepCam(o); cam.z = Math.max(cam.z, cam.fit * 3); cam.x = VW / 2 - (lx + .5) * cam.z; cam.y = VH * (VW < 760 ? .3 : .5) - (ly + .5) * cam.z; }
   else if (act === 'unsplit') regenKeepCam(-1);
   else if (act === 'war') declareWar(P, sel, 'ataque');
@@ -1656,6 +1817,13 @@ $('panel').addEventListener('click', e => {
   else if (act === 'help') actHelp(+b.dataset.a, +b.dataset.e);
   else if (act === 'recruit') actRecruit();
   else if (act === 'tab') ptab = b.dataset.t;
+  else if (act === 'mil') actMil(b.dataset.k);
+  else if (act === 'tax') { C[P].tax = +b.dataset.i; toast(`🏛 Impostos ${TAX[C[P].tax].n.toLowerCase()}.`); }
+  else if (act === 'payloan') actPayLoan(+b.dataset.i);
+  else if (act === 'trade') actTrade(sel);
+  else if (act === 'untrade') { setTrade(P, sel, false); relAdd(P, sel, -10); toast(`📦 Acordo com ${C[sel].name} cancelado.`); }
+  else if (act === 'loanopen') loanOpen = loanOpen === sel ? -1 : sel;
+  else if (act === 'loan') actLoan(sel, +b.dataset.n);
   else if (act === 'tech') actTech(b.dataset.k);
   else if (act === 'clickup') actClickUp();
   dirty = true; updateUI();
@@ -1681,17 +1849,25 @@ document.querySelectorAll('[data-spd]').forEach(b => b.addEventListener('click',
 }));
 $('vs').addEventListener('click', () => { $('vs').hidden = true; });
 $('money').addEventListener('click', () => { sel = P; $('panel').classList.remove('min'); dirty = true; updateUI(); });
-$('rank').addEventListener('click', () => {
-  showModal('Ranking mundial', '', [['Fechar', () => {}]]);
-  const alive = C.filter(c => c.alive).sort((a, b) => b.cells - a.cells);
-  const rows = alive.slice(0, 12);
+function renderRank() {
+  const alive = C.filter(c => c.alive);
+  const key = { mil: milPower, terr: c => c.cells, eco: c => c.inc || income(c) }[rankTab];
+  alive.sort((a, b) => key(b) - key(a));
+  const rows = alive.slice(0, 15);
   if (P >= 0 && C[P].alive && !rows.includes(C[P])) rows.push(C[P]);
   const atWar = wars.filter(w => !w.parent).length;
-  $('mtext').innerHTML = `<div class="rk-sum"><span><b>${alive.length}</b> países vivos</span><span><b>${fmtM(alive.reduce((s, c) => s + (c.inc || 0), 0))}</b>/dia de PIB mundial</span><span><b>${atWar}</b> guerras</span><span><b>${fmt(C.reduce((s, c) => s + c.casualties, 0))}</b> baixas no mundo</span></div>
-  <div class="rk-wrap"><table class="rk"><thead><tr><th>#</th><th>País</th><th>Prov.</th><th>Tropas</th><th>Dinheiro</th><th>Tec.</th><th>Baixas</th></tr></thead><tbody>
-  ${rows.map(c => `<tr class="${c.id === P ? 'me' : ''}"><td>${alive.indexOf(c) + 1}</td><td><img src="${c.flagURL}" alt=""> ${esc(c.name)}${c.nuclear ? ' ☢' : ''}</td><td>${fmt(c.cells)}</td><td>${fmt(c.troops)}</td><td>${fmtM(c.money)}</td><td>${Object.values(c.tech).reduce((a, b) => a + b, 0)}</td><td>${fmt(c.casualties)}</td></tr>`).join('')}
+  const head = { mil: '<th>Poder</th><th>Tropas</th><th>Tec.</th>', terr: '<th>Prov.</th><th>Tropas</th><th>Baixas</th>', eco: '<th>Renda/dia</th><th>Dinheiro</th><th>Dívida</th>' }[rankTab];
+  const cells = c => ({ mil: `<td>${fmt(milPower(c))}</td><td>${fmt(c.troops)}</td><td>${Object.values(c.tech).reduce((a, b) => a + b, 0) + c.mil.base + c.mil.trn}</td>`,
+    terr: `<td>${fmt(c.cells)}</td><td>${fmt(c.troops)}</td><td>${fmt(c.casualties)}</td>`,
+    eco: `<td>${fmtM(c.inc || income(c))}</td><td>${fmtM(c.money)}</td><td>${fmtM(debtOf(c))}</td>` }[rankTab]);
+  $('mtext').innerHTML = `<div class="rk-sum"><span><b>${alive.length}</b> países vivos</span><span><b>${atWar}</b> guerras</span><span><b>${fmt(C.reduce((s, c) => s + c.casualties, 0))}</b> baixas</span></div>
+  <div class="tabs rk-tabs">${[['mil', '⚔ Poder militar'], ['terr', '🗺 Território'], ['eco', '💰 Economia']].map(([t, l]) => `<button data-rk="${t}" class="${rankTab === t ? 'on' : ''}">${l}</button>`).join('')}</div>
+  <div class="rk-wrap"><table class="rk"><thead><tr><th>#</th><th>País</th>${head}</tr></thead><tbody>
+  ${rows.map(c => `<tr class="${c.id === P ? 'me' : ''}"><td>${alive.indexOf(c) + 1}</td><td><img src="${c.flagURL}" alt=""> ${esc(c.name)}${c.nuclear ? ' ☢' : ''}</td>${cells(c)}</tr>`).join('')}
   </tbody></table></div>`;
-});
+}
+$('rank').addEventListener('click', () => { showModal('Ranking mundial', '', [['Fechar', () => {}]]); renderRank(); });
+$('mtext').addEventListener('click', e => { const b = e.target.closest('button[data-rk]'); if (b) { rankTab = b.dataset.rk; renderRank(); } });
 $('cfg').addEventListener('click', () => {
   showModal('Configurações', '', [['Fechar', () => {}]]);
   $('mtext').innerHTML = `<div class="opt"><b>Animação de guerra</b>
@@ -1804,7 +1980,15 @@ function actShip(e) {
 // Na página publicada os saves ficam no banco privado de cada pessoa (data/users/<id>);
 // fora dela (arquivo local), no armazenamento do navegador.
 const store = { db: null, uid: null };
-let autoMeta = null, lastAuto = 0;
+const SLOTS = [['auto', 'Salvamento automático'], ['1', 'Espaço 1'], ['2', 'Espaço 2'], ['3', 'Espaço 3']];
+let autoMeta = null, latestSlot = null, lastAuto = 0;
+async function refreshLatest() {
+  autoMeta = null; latestSlot = null;
+  for (const [k] of SLOTS) { const m = await readMeta(k); if (m && (!autoMeta || m.savedAt > autoMeta.savedAt)) { autoMeta = m; latestSlot = k; } }
+}
+function autoSaveNow() { if (phase === 'game' && P >= 0 && C[P] && C[P].alive && !ended) { lastAuto = performance.now(); saveGame('auto', true); } }
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') autoSaveNow(); });
+addEventListener('pagehide', autoSaveNow);
 (async () => {
   try {
     if (window.claude && claude.use) {
@@ -1812,7 +1996,7 @@ let autoMeta = null, lastAuto = 0;
       if (db && user) { const id = await user.id(); if (id) { store.db = db; store.uid = id; } }
     }
   } catch (e) {}
-  autoMeta = await readMeta('auto'); last.act = ''; updateUI();
+  await refreshLatest(); last.act = ''; updateUI();
 })();
 function rle(arr) { const out = []; let cur = arr[0], n = 0; for (let i = 0; i < arr.length; i++) { if (arr[i] === cur) n++; else { out.push(cur, n); cur = arr[i]; n = 1; } } out.push(cur, n); return out; }
 function unrle(r, arr) { let k = 0; for (let i = 0; i < r.length; i += 2) for (let j = 0; j < r[i + 1]; j++) arr[k++] = r[i]; }
@@ -1835,7 +2019,8 @@ function snapshotGame() {
     C: C.map(c => ({ n: c.name, col: c.col.map(v => Math.round(v)), fo: c.flag.img ? c.orig : -1, band: !!c.flag.band, fl: c.flag.img ? null : c.flag,
       alive: c.alive, cells: c.cells, mult: c.mult, nuclear: c.nuclear, troops: Math.round(c.troops), cas: Math.round(c.casualties), cap: c.cap, aggr: c.aggr,
       lx: c.lx, ly: c.ly, rcd: c.recruitCD, acd: c.allyCD, dcd: c.aidCD, econ: c.econ, money: Math.round(c.money), tech: c.tech,
-      clv: c.clickLv, ctot: Math.round(c.clickTotal), rr: c.raidReady, orig: c.orig, st: c.isState, par: c.parent })),
+      clv: c.clickLv, ctot: Math.round(c.clickTotal), rr: c.raidReady, orig: c.orig, st: c.isState, par: c.parent,
+      mil: c.mil, loans: c.loans, trades: c.trades, tax: c.tax, boom: c.boom, tcd: c.tradeCD, lcd: c.loanCD })),
     rel: Array.from(rel, v => Math.round(v)), allied: rle(allied),
     wars: wars.map(w => ({ id: w.id, a: w.a, b: w.b, mode: w.mode, start: w.start, parent: w.parent, helpFor: w.helpFor, casA: Math.round(w.casA), casB: Math.round(w.casB),
       a0: w.a0, b0: w.b0, peaceCD: w.peaceCD, shipCD: w.shipCD || 0, mom: w.mom || 0, hist: w.hist || [] })),
@@ -1854,6 +2039,7 @@ function restoreGame(sv) {
     alive: d.alive, cells: d.cells, mult: d.mult, nuclear: d.nuclear, nukeReady: 0, troops: d.troops, casualties: d.cas, cap: d.cap, aggr: d.aggr,
     lx: d.lx, ly: d.ly, recruitCD: d.rcd, allyCD: d.acd, aidCD: d.dcd, econ: d.econ, money: d.money, net: 0,
     tech: { atk: 0, def: 0, eco: 0, log: 0, nav: 0, air: 0, ...d.tech }, clickLv: d.clv || 0, clickTotal: d.ctot || 0, raidReady: d.rr || 0,
+    mil: { base: 0, trn: 0, ...(d.mil || {}) }, loans: d.loans || [], trades: d.trades || [], tax: d.tax ?? 1, boom: d.boom || null, tradeCD: d.tcd || 0, loanCD: d.lcd || 0,
     orig: d.orig, isState: d.st, parent: d.par || '',
   }));
   for (const c of C) {
@@ -1882,7 +2068,7 @@ async function saveGame(k, quiet = false) {
   try {
     const doc = { meta: { country: C[P].name, flag: C[P].flagURL.length < 4000 ? C[P].flagURL : '', date: fmtDateBig(day), savedAt: Date.now(), mode: worldMode }, ...(await packSave(snapshotGame())) };
     if (store.db) await slotRef(k).set(doc); else localStorage.setItem('gg-save-' + k, JSON.stringify(doc));
-    if (k === 'auto') autoMeta = doc.meta;
+    if (!latestSlot || !autoMeta || doc.meta.savedAt >= autoMeta.savedAt) { autoMeta = doc.meta; latestSlot = k; }
     if (!quiet) toast(`💾 Jogo salvo (${C[P].name}, ${fmtDateBig(day)}).`, 'good');
     return true;
   } catch (e) {
@@ -1899,7 +2085,6 @@ async function loadGame(k) {
 async function deleteSlot(k) {
   try { if (store.db) await slotRef(k).delete(); else localStorage.removeItem('gg-save-' + k); } catch (e) {}
 }
-const SLOTS = [['auto', 'Salvamento automático'], ['1', 'Espaço 1'], ['2', 'Espaço 2'], ['3', 'Espaço 3']];
 const ago = t => { const m = Math.round((Date.now() - t) / 60000); return m < 1 ? 'agora' : m < 60 ? `há ${m} min` : m < 1440 ? `há ${Math.round(m / 60)} h` : `há ${Math.round(m / 1440)} d`; };
 async function openSaves() {
   showModal('Salvar e carregar', '', [['Fechar', () => {}]]);
@@ -1911,7 +2096,7 @@ async function openSaves() {
       <div class="svb">${r.k !== 'auto' ? `<button data-sv="save" data-k="${r.k}"${canSave ? '' : ' disabled'}>Salvar</button>` : ''}
       <button data-sv="load" data-k="${r.k}"${r.m ? '' : ' disabled'}>Carregar</button>
       ${r.m && r.k !== 'auto' ? `<button data-sv="del" data-k="${r.k}" class="del">Apagar</button>` : ''}</div></div>`).join('')}</div>
-    <div class="hint">${store.db ? 'Os saves ficam na sua conta: só você vê e dá pra continuar em outro aparelho.' : 'Os saves ficam neste navegador.'} O jogo salva sozinho a cada 2 minutos.${canSave ? '' : ' Comece uma partida para salvar.'}</div>`;
+    <div class="hint">${store.db ? 'Os saves ficam na sua conta: só você vê e dá pra continuar em outro aparelho.' : 'Os saves ficam neste navegador.'} O jogo salva sozinho a cada 30 segundos e quando você sai da página. “Continuar” abre o save mais recente.${canSave ? '' : ' Comece uma partida para salvar.'}</div>`;
 }
 $('mtext').addEventListener('click', async e => {
   const b = e.target.closest('button[data-sv]'); if (!b || b.disabled) return;
@@ -2210,7 +2395,7 @@ function frame(t) {
     acc += dt * CFG.TPS * speed / 1000; while (acc >= 1) { tick(); acc -= 1; }
   }
   if (dirty && t - lastRO > 60) { renderOff(); dirty = false; lastRO = t; }
-  if (phase === 'game' && P >= 0 && C[P].alive && !ended && t - lastAuto > 120000) { lastAuto = t; if (lastAuto > 1000) saveGame('auto', true); }
+  if (phase === 'game' && P >= 0 && C[P].alive && !ended && t - lastAuto > 30000) { lastAuto = t; saveGame('auto', true); }
   updateNukes(t); updateRaids(t);
   draw();
   uiT += dt; if (uiT > 250) { uiT = 0; updateUI(); nukeButton(); airButton(); }
