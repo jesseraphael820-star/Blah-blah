@@ -180,6 +180,8 @@ html,body{margin:0;height:100%;overflow:hidden;background:#08131c;color:var(--tx
 .mk-h{display:flex;justify-content:space-between;gap:6px;font-size:12.5px;font-variant-numeric:tabular-nums}
 .mk .row button{padding:6px 2px;font-size:12px;text-align:center}
 .up{color:#5fd39a}.dn{color:#ff7a7a}
+.tag.emp{background:linear-gradient(#f7d55a,#c8961a);color:#3a2600}
+#intro .iflag{width:min(46vw,260px);aspect-ratio:3/2;border:3px solid #d4a017;box-shadow:0 0 30px #f2c23088;margin-bottom:6px;max-width:100%}
 @keyframes pop{from{transform:scale(.9);opacity:0}to{transform:none;opacity:1}}
 .modal{position:fixed;inset:0;background:#000a;display:none;align-items:center;justify-content:center;z-index:20}
 .modal .box{background:#111a24;border:1px solid var(--line);border-radius:14px;padding:22px;max-width:460px;width:90%;text-align:center}
@@ -305,7 +307,7 @@ let reqs = [], logs = [], anims = [];
 let dirty = true, ended = false, nCount = 20, worldMode = 'real';
 let nukes = [], nukeArmed = false, nukeReady = 0, units = [];
 // opções visuais (salvas só neste navegador)
-const opts = { fxLevel: 'poucos', fx: 'soldados', stripes: true, smooth: true, soldiers: true, flags: true, divs: true, frontNums: true, hud: true, map: 'cor' };
+const opts = { fxLevel: 'poucos', fx: 'soldados', stripes: true, smooth: true, soldiers: true, flags: true, divs: true, frontNums: true, hud: true, map: 'cor', empFlag: true };
 // tecnologias: custo = base × 1,7^nível, até o nível 10
 const TECH = [
   { k: 'atk', i: '⚔', n: 'Armamento', d: '+7% de força em combate e mais chance de tomar províncias', base: 8000 },
@@ -572,10 +574,12 @@ function makeCountries(list) {
   for (const c of C) {
     if (c.cap < 0 || owner[c.cap] !== c.id) { c.cap = c.ly * GW + c.lx; if (owner[c.cap] !== c.id) relocateCapital(c.id, c.cap); }
     if (c.flag.band) c.flag.band = c.col;
+    c.baseName = c.name; c.cells0 = Math.max(1, c.cells); c.empire = false;
     if (c.flag.url) c.flagURL = c.flag.url;
     else { const fc = document.createElement('canvas'); fc.width = 36; fc.height = 24; drawFlag(fc.getContext('2d'), c.flag, 0, 0, 36, 24); c.flagURL = fc.toDataURL(); }
   }
   core.set(owner); units = []; initMarket();
+  for (const c of C) { c.flagBase = c.flag; c.flagBaseURL = c.flagURL; }
   rel = new Float32Array(N * N); allied = new Uint8Array(N * N); adj = new Uint16Array(N * N);
   for (let a = 0; a < N; a++) for (let b = a + 1; b < N; b++) { const v = -15 + R() * 50; rel[a * N + b] = rel[b * N + a] = v; }
   wars = []; rebuildWarMat();
@@ -748,7 +752,7 @@ function battle(w, ca, cb, sea) {
   if (bomb[ca] && day - bomb[ca] < CFG.BOMB_DAYS) ba *= .6;
   if (bomb[cb] && day - bomb[cb] < CFG.BOMB_DAYS) bb *= .6;
   if (rad[cb] && day - rad[cb] < CFG.RAD_DAYS) bb *= .45;
-  const sa = (da + 4) * (.55 + R() * .9) * ba * (1 + .1 * A.tech.atk) * (1 + .06 * A.mil.trn), sb = (db + 4) * (.55 + R() * .9) * bb * (1 + .1 * B.tech.atk) * (1 + .06 * B.mil.trn);
+  const sa = (da + 4) * (.55 + R() * .9) * ba * (1 + .1 * A.tech.atk) * (1 + .06 * A.mil.trn) * (A.empire ? 1.1 : 1), sb = (db + 4) * (.55 + R() * .9) * bb * (1 + .1 * B.tech.atk) * (1 + .06 * B.mil.trn) * (B.empire ? 1.1 : 1);
   const base = (da + db) * .09 * (.5 + R()) + 4;
   const aWins = sa > sb;
   let la = base * (aWins ? .6 : 1.3) / (1 + .1 * A.tech.def), lb = base * (aWins ? 1.3 : .6) / (1 + .1 * B.tech.def);
@@ -939,9 +943,10 @@ function computeLabels() {
   let id = 0;
   for (let i = 0; i < NC; i++) {
     const o = owner[i]; if (o < 0 || comp[i] >= 0) continue;
-    let k = 0, sx = 0, sy = 0; stack.push(i); comp[i] = id; buf.length = 0;
+    let k = 0, sx = 0, sy = 0, bx0 = 1e9, by0 = 1e9, bx1 = -1, by1 = -1; stack.push(i); comp[i] = id; buf.length = 0;
     while (stack.length) {
       const c = stack.pop(), x = c % GW, y = (c / GW) | 0; k++; sx += x; sy += y; buf.push(c);
+      if (x < bx0) bx0 = x; if (x > bx1) bx1 = x; if (y < by0) by0 = y; if (y > by1) by1 = y;
       if (x > 0 && comp[c - 1] < 0 && owner[c - 1] === o) { comp[c - 1] = id; stack.push(c - 1); }
       if (x < GW - 1 && comp[c + 1] < 0 && owner[c + 1] === o) { comp[c + 1] = id; stack.push(c + 1); }
       if (y > 0 && comp[c - GW] < 0 && owner[c - GW] === o) { comp[c - GW] = id; stack.push(c - GW); }
@@ -949,7 +954,7 @@ function computeLabels() {
     }
     n[o] += k;
     if (k <= 12) small.push({ o, id, cells: buf.slice() });
-    if (k > best[o]) { best[o] = k; bestId[o] = id; mx[o] = sx / k; my[o] = sy / k; }
+    if (k > best[o]) { best[o] = k; bestId[o] = id; mx[o] = sx / k; my[o] = sy / k; C[o].ebb = [bx0, by0, bx1, by1]; }
     id++;
   }
   const bd = new Float64Array(N).fill(1e18), bc = new Int32Array(N).fill(-1);
@@ -960,6 +965,7 @@ function computeLabels() {
   }
   for (const c of C) { c.cells = n[c.id]; if (bc[c.id] >= 0) { c.lx = bc[c.id] % GW; c.ly = (bc[c.id] / GW) | 0; } }
   if (phase !== 'game') return;
+  checkEmpires();
   for (const sm of small) {
     if (bestId[sm.o] === sm.id) continue;
     const around = new Set();
@@ -983,14 +989,14 @@ const TAX = [{ n: 'Baixos', inc: .8, regen: 1.15, d: '−20% de renda, +15% de r
 const baseIncome = c => (c.cells * 2.2 + 40) * c.econ;
 const tradeGain = o => 30 + .04 * baseIncome(C[o]);
 function income(c) {
-  let v = baseIncome(c) * (1 + .12 * c.tech.eco) * (1 + .08 * c.proj.usina) * (warsOf(c.id).length ? .9 : 1) * TAX[c.tax].inc * (c.boom && day < c.boom.until ? c.boom.m : 1);
+  let v = baseIncome(c) * (1 + .12 * c.tech.eco) * (1 + .08 * c.proj.usina) * (warsOf(c.id).length ? .9 : 1) * TAX[c.tax].inc * (c.boom && day < c.boom.until ? c.boom.m : 1) * (c.empire ? 1.1 : 1);
   for (const o of c.trades) if (C[o].alive && warMat[c.id * N + o] < 0) v += tradeGain(o) * (1 + .3 * c.proj.porto);
   return v;
 }
 // poder militar: tropas × tecnologia × treinamento (+10% para potências nucleares)
 function milPower(c) {
   const T = c.tech;
-  return c.troops * (1 + .1 * T.atk) * (1 + .07 * T.def) * (1 + .05 * T.air) * (1 + .03 * T.nav) * (1 + .06 * c.mil.trn) * (c.nuclear ? 1.1 : 1);
+  return c.troops * (1 + .1 * T.atk) * (1 + .07 * T.def) * (1 + .05 * T.air) * (1 + .03 * T.nav) * (1 + .06 * c.mil.trn) * (c.nuclear ? 1.1 : 1) * (c.empire ? 1.1 : 1);
 }
 const MIL = [
   { k: 'base', i: '🏰', n: 'Bases militares', d: '+15% de capacidade de tropas e +10% de recrutamento', base: 10000 },
@@ -1270,6 +1276,16 @@ function renderOff() {
       if (rad[c] && day - rad[c] < CFG.RAD_DAYS) { const t = (1 - (day - rad[c]) / CFG.RAD_DAYS) * .6; r += (64 - r) * t; g += (78 - g) * t; b += (34 - b) * t; }
       const f = day - flash[c];
       if (flash[c] > 0 && f < 10) { const t = (1 - f / 10) * .22; r += (255 - r) * t; g += (255 - g) * t; b += (255 - b) * t; }
+      const E = C[o];
+      if (E.empire && E.empPix && E.ebb && opts.empFlag) {
+        const bb = E.ebb, w0 = (bb[2] - bb[0] + 1) * S, h0 = (bb[3] - bb[1] + 1) * S, pix = E.empPix, fw = E.empW, fh = E.empH;
+        const k2 = (s / shade[c]) * (.9 + (shade[c] - .9) * .35), hi = o === sel ? 22 : 0, base = y * S * W + x * S;
+        for (let dy = 0; dy < S; dy++) for (let dx = 0; dx < S; dx++) {
+          const u = clamp(((x - bb[0]) * S + dx) / w0, 0, .999) * fw | 0, v = clamp(((y - bb[1]) * S + dy) / h0, 0, .999) * fh | 0, q = (v * fw + u) * 4;
+          u32[base + dy * W + dx] = pack(pix[q] * k2 + hi, pix[q + 1] * k2 + hi, pix[q + 2] * k2 + hi);
+        }
+        continue;
+      }
       col = pack(r, g, b);
       const co = core[c];
       if (opts.stripes && opts.fx !== 'listras' && co !== o && co >= 0 && C[co].alive && warMat[o * N + co] >= 0) {
@@ -1675,6 +1691,7 @@ function infoHTML() {
   else if (phase === 'game' && P >= 0 && warMat[P * N + sel] >= 0) tag = `<span class="tag war">${warOf(P, sel).mode === 'morte' ? '☠ ATÉ A MORTE' : 'EM GUERRA'}</span>`;
   else if (phase === 'game' && P >= 0 && isAllied(P, sel)) tag = '<span class="tag ally">ALIADO</span>';
   if (c.nuclear) tag += ' <span class="tag nuc" title="Potência nuclear">☢</span>';
+  if (c.empire) tag += ' <span class="tag emp" title="Império: +10% de renda e de força">👑 IMPÉRIO</span>';
   let h = `<h2><img src="${c.flagURL}" alt="">${esc(c.name)} ${tag}</h2>${c.isState ? `<div class="small mut">Estado de ${esc(c.parent)}</div>` : ''}
   <div class="stats">
     <span class="mut">Território</span><b>${fmt(c.cells)} prov.</b>
@@ -1985,6 +2002,8 @@ $('cfg').addEventListener('click', () => {
     <div class="opt"><b>Efeitos visuais</b>
     <label><input type="radio" name="fxl" value="poucos"${opts.fxLevel !== 'normal' ? ' checked' : ''}> Poucos (tela limpa: sem divisões, números na frente, título da guerra, tremida e avisos do resto do mundo)</label>
     <label><input type="radio" name="fxl" value="normal"${opts.fxLevel === 'normal' ? ' checked' : ''}> Todos os detalhes</label></div>
+    <div class="opt"><b>Impérios</b>
+    <label><input type="checkbox" id="o-emp"${opts.empFlag ? ' checked' : ''}> Pintar a bandeira imperial no território do império</label></div>
     <div class="opt"><b>Mapa</b>
     <label><input type="radio" name="map" value="cor"${opts.map === 'cor' ? ' checked' : ''}> Colorido (todos os países pintados)</label>
     <label><input type="radio" name="map" value="sat"${opts.map === 'sat' ? ' checked' : ''}> Satélite (só países em guerra pintados)</label></div>
@@ -2006,6 +2025,7 @@ $('mtext').addEventListener('change', e => {
   else if (e.target.id === 'o-soldiers') opts.soldiers = e.target.checked;
   else if (e.target.id === 'o-flags') opts.flags = e.target.checked;
   else if (e.target.name === 'map') opts.map = e.target.value;
+  else if (e.target.id === 'o-emp') opts.empFlag = e.target.checked;
   else if (e.target.name === 'fxl') { opts.fxLevel = e.target.value; updateUI(); }
   else if (e.target.id === 'o-divs') opts.divs = e.target.checked;
   else if (e.target.id === 'o-fnums') opts.frontNums = e.target.checked;
@@ -2127,7 +2147,7 @@ function snapshotGame() {
   return {
     v: 1, market, mode: worldMode, split: splitOrig, gw: GW, gh: GH, s: S, nCount, day, P, warSeq,
     land: worldMode === 'real' ? null : rle(land), owner: rle(owner), core: rle(core),
-    C: C.map(c => ({ n: c.name, col: c.col.map(v => Math.round(v)), fo: c.flag.img ? c.orig : -1, band: !!c.flag.band, fl: c.flag.img ? null : c.flag,
+    C: C.map(c => ({ n: c.baseName || c.name, col: c.col.map(v => Math.round(v)), fo: (c.flagBase || c.flag).img ? c.orig : -1, band: !!(c.flagBase || c.flag).band, fl: (c.flagBase || c.flag).img ? null : (c.flagBase || c.flag), emp: !!c.empire, c0: c.cells0,
       alive: c.alive, cells: c.cells, mult: c.mult, nuclear: c.nuclear, troops: Math.round(c.troops), cas: Math.round(c.casualties), cap: c.cap, aggr: c.aggr,
       lx: c.lx, ly: c.ly, rcd: c.recruitCD, acd: c.allyCD, dcd: c.aidCD, econ: c.econ, money: Math.round(c.money), tech: c.tech,
       clv: c.clickLv, ctot: Math.round(c.clickTotal), rr: c.raidReady, orig: c.orig, st: c.isState, par: c.parent,
@@ -2158,6 +2178,8 @@ function restoreGame(sv) {
   for (const c of C) {
     if (c.flag.url) c.flagURL = c.flag.url;
     else { const fc = document.createElement('canvas'); fc.width = 36; fc.height = 24; drawFlag(fc.getContext('2d'), c.flag, 0, 0, 36, 24); c.flagURL = fc.toDataURL(); }
+    const d = sv.C[c.id];
+    c.baseName = c.name; c.flagBase = c.flag; c.flagBaseURL = c.flagURL; c.cells0 = d.c0 || Math.max(1, c.cells); c.empire = false;
   }
   rel = Float32Array.from(sv.rel); allied = new Uint8Array(N * N); unrle(sv.allied, allied); adj = new Uint16Array(N * N);
   wars = sv.wars.map(w => ({ ...w, fa: [], fb: [], fs: [], aid: 0 })); warSeq = sv.warSeq; rebuildWarMat();
@@ -2165,7 +2187,9 @@ function restoreGame(sv) {
   if (sv.market) market = sv.market; else initMarket();
   anims = []; nukes = []; raids = []; reqs = []; focus = null; nukeArmed = false; airArmed = false; nukeReady = 0;
   day = sv.day; P = sv.P; sel = P; phase = 'game'; ended = false;
-  scanBorders(); computeLabels(); updateDivs(); fillSearch();
+  sv.C.forEach((d, i) => { if (d.emp && C[i].alive) makeEmpire(C[i], true); });
+  scanBorders(); computeLabels(); updateDivs();
+  fillSearch();
   if (C[P]) { cam.z = Math.max(cam.fit * 2.6, 6); cam.x = VW / 2 - (C[P].lx + .5) * cam.z; cam.y = VH * (VW < 760 ? .3 : .5) - (C[P].ly + .5) * cam.z; }
   dirty = true; reqsChanged = true; last.act = ''; updateUI();
 }
@@ -2224,6 +2248,140 @@ $('mtext').addEventListener('click', async e => {
   else if (act === 'del') { await deleteSlot(k); openSaves(); }
 });
 $('save').addEventListener('click', openSaves);
+
+// ---------- impérios ----------
+// Um país vira império quando passa de 1,6× o território inicial (mín. 60 províncias).
+// Cai de volta a país se encolher abaixo de 1,25× o território inicial.
+const EMP_UP = 1.6, EMP_DOWN = 1.25, EMP_MIN = 60;
+const DOS = ['Estados Unidos', 'Países Baixos', 'Emirados Árabes Unidos'];
+const DE = ['Portugal', 'Israel', 'Cuba', 'Angola', 'Moçambique', 'Madagascar', 'Taiwan', 'Timor-Leste', 'Mianmar', 'Omã', 'Catar', 'Singapura', 'Malta', 'Chipre', 'Andorra', 'Mônaco', 'Luxemburgo', 'Cabo Verde', 'São Tomé e Príncipe', 'Israel', 'Kosovo', 'Barein', 'Bahrein', 'Djibouti', 'Belize', 'Brunei', 'Fiji', 'Samoa', 'Tonga', 'Nauru', 'Kuwait'];
+function empName(n) {
+  if (DOS.includes(n)) return `Império dos ${n}`;
+  if (n.startsWith('Ilhas')) return `Império das ${n}`;
+  if (DE.includes(n)) return `Império de ${n}`;
+  if (/^(Rep\.|República)/.test(n) || /a$/.test(n)) return `Império da ${n}`;
+  return `Império do ${n}`;
+}
+function crown(g, cx, cy, w) {
+  const h = w * .8;
+  g.save(); g.translate(cx, cy); g.lineJoin = 'round';
+  g.fillStyle = '#b3122a'; g.beginPath(); g.ellipse(0, -h * .32, w * .4, h * .45, 0, Math.PI, 0); g.fill();
+  g.strokeStyle = '#5a3c00'; g.lineWidth = w * .11; g.beginPath();
+  for (const ax of [-.44, -.16, .16, .44]) { g.moveTo(ax * w, 0); g.quadraticCurveTo(ax * w * .55, -h * .9, 0, -h * .86); }
+  g.stroke(); g.strokeStyle = '#f2c230'; g.lineWidth = w * .07; g.stroke();
+  g.fillStyle = '#f2c230'; g.strokeStyle = '#5a3c00'; g.lineWidth = Math.max(1, w * .035);
+  g.beginPath(); g.rect(-w * .52, -h * .04, w * 1.04, h * .22); g.fill(); g.stroke();
+  g.fillStyle = '#1d4fa8'; for (const jx of [-.32, 0, .32]) { g.beginPath(); g.arc(jx * w, h * .07, w * .05, 0, 7); g.fill(); }
+  g.fillStyle = '#c8102e'; for (const jx of [-.16, .16]) { g.beginPath(); g.arc(jx * w, h * .07, w * .035, 0, 7); g.fill(); }
+  g.fillStyle = '#f2c230'; g.beginPath(); g.arc(0, -h * .92, w * .08, 0, 7); g.fill(); g.stroke();
+  g.fillRect(-w * .025, -h * 1.15, w * .05, h * .2); g.fillRect(-w * .08, -h * 1.08, w * .16, h * .045);
+  g.restore();
+}
+function bands(g, W, H, cols, vertical) {
+  cols.forEach((c, i) => { g.fillStyle = c; vertical ? g.fillRect(W * i / cols.length, 0, W / cols.length + 1, H) : g.fillRect(0, H * i / cols.length, W, H / cols.length + 1); });
+}
+function flagBRImperial(g, W, H) {
+  g.fillStyle = '#009b3a'; g.fillRect(0, 0, W, H);
+  g.fillStyle = '#fedf00'; g.beginPath(); g.moveTo(W * .05, H * .5); g.lineTo(W * .5, H * .07); g.lineTo(W * .95, H * .5); g.lineTo(W * .5, H * .93); g.closePath(); g.fill();
+  const cx = W * .5, cy = H * .54;
+  // ramos: café (frutos vermelhos) à esquerda, tabaco (flores rosa) à direita
+  for (const side of [-1, 1]) {
+    const p0 = [cx + side * W * .02, cy + H * .3], p1 = [cx + side * W * .27, cy + H * .12], p2 = [cx + side * W * .17, cy - H * .3];
+    g.strokeStyle = '#2b5f1c'; g.lineWidth = W * .01; g.beginPath(); g.moveTo(...p0); g.quadraticCurveTo(...p1, ...p2); g.stroke();
+    for (let i = 1; i <= 8; i++) {
+      const t = i / 9, x = (1 - t) ** 2 * p0[0] + 2 * (1 - t) * t * p1[0] + t * t * p2[0], y = (1 - t) ** 2 * p0[1] + 2 * (1 - t) * t * p1[1] + t * t * p2[1];
+      g.fillStyle = '#3c8a26';
+      g.beginPath(); g.ellipse(x - W * .022, y, W * .024, H * .017, -.7, 0, 7); g.fill();
+      g.beginPath(); g.ellipse(x + W * .022, y - H * .006, W * .024, H * .017, .7, 0, 7); g.fill();
+      if (i % 2) { g.fillStyle = side < 0 ? '#c8102e' : '#e07aa8'; g.beginPath(); g.arc(x + side * W * .012, y + H * .018, W * (side < 0 ? .007 : .01), 0, 7); g.fill(); }
+    }
+  }
+  g.strokeStyle = '#2b5f1c'; g.lineWidth = W * .012; g.beginPath(); g.moveTo(cx - W * .04, cy + H * .3); g.lineTo(cx + W * .04, cy + H * .3); g.stroke();
+  // escudo verde com a esfera armilar
+  const sw = W * .24, sh = H * .36;
+  g.fillStyle = '#00843d'; g.strokeStyle = '#f2c230'; g.lineWidth = W * .008;
+  g.beginPath(); g.moveTo(cx - sw / 2, cy - sh / 2); g.lineTo(cx + sw / 2, cy - sh / 2); g.lineTo(cx + sw / 2, cy + sh * .25); g.quadraticCurveTo(cx + sw / 2, cy + sh / 2, cx, cy + sh / 2); g.quadraticCurveTo(cx - sw / 2, cy + sh / 2, cx - sw / 2, cy + sh * .25); g.closePath(); g.fill(); g.stroke();
+  const r = sw * .4, ey = cy - sh * .03;
+  g.fillStyle = '#1d3f9e'; g.beginPath(); g.arc(cx, ey, r, 0, 7); g.fill();
+  g.fillStyle = '#fff'; for (let i = 0; i < 19; i++) { const a = i / 19 * Math.PI * 2; g.beginPath(); g.arc(cx + Math.cos(a) * r * .84, ey + Math.sin(a) * r * .84, r * .055, 0, 7); g.fill(); }
+  g.fillStyle = '#00843d'; g.beginPath(); g.arc(cx, ey, r * .68, 0, 7); g.fill();
+  g.strokeStyle = '#f2c230'; g.lineWidth = r * .07;
+  g.beginPath(); g.arc(cx, ey, r * .6, 0, 7); g.stroke();
+  g.beginPath(); g.ellipse(cx, ey, r * .6, r * .2, .4, 0, 7); g.stroke();
+  g.beginPath(); g.ellipse(cx, ey, r * .2, r * .6, 0, 0, 7); g.stroke();
+  g.strokeStyle = '#f2c230'; g.lineWidth = r * .2; g.beginPath(); g.moveTo(cx - r * .48, ey - r * .48); g.lineTo(cx + r * .48, ey + r * .48); g.moveTo(cx + r * .48, ey - r * .48); g.lineTo(cx - r * .48, ey + r * .48); g.stroke();
+  g.strokeStyle = '#c8102e'; g.lineWidth = r * .1; g.stroke();
+  crown(g, cx, cy - sh * .55, sw * .72);
+}
+function rays(g, W, H, cx, cy, n, col) {
+  g.fillStyle = col; const R0 = Math.hypot(W, H);
+  for (let i = 0; i < n; i++) { const a0 = i / n * Math.PI * 2, a1 = a0 + Math.PI / n; g.beginPath(); g.moveTo(cx, cy); g.lineTo(cx + Math.cos(a0) * R0, cy + Math.sin(a0) * R0); g.lineTo(cx + Math.cos(a1) * R0, cy + Math.sin(a1) * R0); g.closePath(); g.fill(); }
+}
+function drawImperialFlag(g, W, H, c) {
+  const a2 = !c.isState && c.orig >= 0 && typeof WORLD !== 'undefined' && WORLD.countries[c.orig] ? WORLD.countries[c.orig].a : '';
+  switch (a2) {
+    case 'BR': flagBRImperial(g, W, H); return;
+    case 'RU': bands(g, W, H, ['#111', '#f2c230', '#f4f4f4']); crown(g, W * .5, H * .5, W * .2); return;
+    case 'DE': bands(g, W, H, ['#111', '#f4f4f4', '#d0021b']); crown(g, W * .5, H * .53, W * .18); return;
+    case 'AT': bands(g, W, H, ['#111', '#f2c230']); crown(g, W * .5, H * .52, W * .2); return;
+    case 'JP': g.fillStyle = '#fff'; g.fillRect(0, 0, W, H); rays(g, W, H, W * .44, H * .5, 16, '#c8102e'); g.fillStyle = '#c8102e'; g.beginPath(); g.arc(W * .44, H * .5, H * .26, 0, 7); g.fill(); return;
+    case 'CN': {
+      g.fillStyle = '#f6cf3a'; g.fillRect(0, 0, W, H);
+      g.strokeStyle = '#1d3f9e'; g.lineWidth = H * .09; g.lineCap = 'round';
+      g.beginPath(); g.moveTo(W * .82, H * .78); g.bezierCurveTo(W * .55, H * .95, W * .62, H * .35, W * .4, H * .5); g.bezierCurveTo(W * .25, H * .62, W * .2, H * .4, W * .3, H * .3); g.stroke();
+      g.fillStyle = '#1d3f9e'; g.beginPath(); g.ellipse(W * .3, H * .28, W * .07, H * .09, -.5, 0, 7); g.fill();
+      g.fillStyle = '#c8102e'; g.beginPath(); g.arc(W * .14, H * .18, H * .07, 0, 7); g.fill(); return;
+    }
+    case 'FR': bands(g, W, H, ['#002395', '#f4f4f4', '#ed2939'], true);
+      g.strokeStyle = '#d4a017'; g.lineWidth = H * .045; g.beginPath(); g.arc(W * .5, H * .5, H * .27, Math.PI * .6, Math.PI * 2.4); g.stroke();
+      g.fillStyle = '#d4a017'; g.font = `900 ${H * .38}px Georgia,serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('N', W * .5, H * .52);
+      crown(g, W * .5, H * .2, W * .13); return;
+    case 'IR': bands(g, W, H, ['#239f40', '#f4f4f4', '#da0000']);
+      g.save(); g.beginPath(); g.arc(W * .5, H * .5, H * .2, 0, 7); g.clip(); rays(g, W, H, W * .5, H * .5, 14, '#f2c230'); g.restore();
+      g.fillStyle = '#e0a800'; g.beginPath(); g.arc(W * .5, H * .5, H * .11, 0, 7); g.fill(); crown(g, W * .5, H * .26, W * .1); return;
+    case 'ET': bands(g, W, H, ['#078930', '#fcdd09', '#da121a']); g.fillStyle = '#d4a017'; g.beginPath(); g.arc(W * .5, H * .53, H * .18, 0, 7); g.fill(); crown(g, W * .5, H * .4, W * .14); return;
+    case 'PT': g.fillStyle = '#1d3f9e'; g.fillRect(0, 0, W * .5, H); g.fillStyle = '#f4f4f4'; g.fillRect(W * .5, 0, W * .5, H);
+      g.fillStyle = '#f4f4f4'; g.strokeStyle = '#c8102e'; g.lineWidth = W * .02; g.beginPath(); g.rect(W * .4, H * .38, W * .2, H * .36); g.fill(); g.stroke();
+      g.fillStyle = '#1d3f9e'; for (const [x, y] of [[.5, .48], [.45, .56], [.55, .56], [.5, .64]]) { g.beginPath(); g.arc(W * x, H * y, W * .018, 0, 7); g.fill(); }
+      crown(g, W * .5, H * .32, W * .17); return;
+  }
+  // genérica: a bandeira do país com coroa e moldura dourada
+  drawFlag(g, c.flagBase || c.flag, 0, 0, W, H);
+  g.fillStyle = 'rgba(0,0,0,.18)'; g.beginPath(); g.arc(W * .5, H * .52, H * .26, 0, 7); g.fill();
+  crown(g, W * .5, H * .56, W * .24);
+  g.strokeStyle = '#d4a017'; g.lineWidth = W * .035; g.strokeRect(0, 0, W, H);
+}
+function makeEmpire(c, silent = false) {
+  if (!c.flagBase) { c.flagBase = c.flag; c.flagBaseURL = c.flagURL; }
+  const cv = document.createElement('canvas'); cv.width = 150; cv.height = 100; const g = cv.getContext('2d');
+  drawImperialFlag(g, 150, 100, c);
+  const url = cv.toDataURL(), im = new Image(); im.onload = () => { dirty = true; }; im.src = url;
+  c.empire = true; c.flag = { img: im, url, imperial: true }; c.flagURL = url;
+  c.empPix = g.getImageData(0, 0, 150, 100).data; c.empW = 150; c.empH = 100;
+  c.name = empName(c.baseName || c.name);
+  dirty = true; last.info = '';
+  if (silent) return;
+  if (c.id === P) showEmpireBanner(c);
+  else toast(`👑 Nasceu o ${c.name}!`, P >= 0 && (adj[c.id * N + P] || warMat[P * N + c.id] >= 0 || isAllied(P, c.id)) ? 'bad' : 'g');
+}
+function endEmpire(c) {
+  c.empire = false; c.flag = c.flagBase; c.flagURL = c.flagBaseURL; c.empPix = null; c.name = c.baseName;
+  dirty = true; last.info = '';
+  toast(c.id === P ? `👑 Seu império caiu. Voltou a ser ${c.name}.` : `👑 O império caiu: voltou a ser ${c.name}.`, c.id === P ? 'bad' : 'g');
+}
+function checkEmpires() {
+  for (const c of C) {
+    if (!c.alive || !c.cells0) continue;
+    if (!c.empire && day > 20 && c.cells >= Math.max(EMP_MIN, c.cells0 * EMP_UP)) makeEmpire(c);
+    else if (c.empire && c.cells < c.cells0 * EMP_DOWN) endEmpire(c);
+  }
+}
+function showEmpireBanner(c) {
+  const el = $('intro');
+  el.innerHTML = `<img class="iflag" src="${c.flagURL}" alt=""><div class="i1">👑 NASCE UM IMPÉRIO</div><div class="i2">${esc(c.name.toUpperCase())}</div><div class="i3">+10% de renda e de força · ${fmtDateLong(day)}</div>`;
+  el.hidden = false; el.classList.remove('go'); void el.offsetWidth; el.classList.add('go');
+  clearTimeout(introT); introT = setTimeout(() => { el.hidden = true; }, 3600);
+}
 
 // ---------- bomba nuclear ----------
 function launchNuke(from, cell) {
