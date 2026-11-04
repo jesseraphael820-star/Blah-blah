@@ -33,6 +33,7 @@ from PIL import Image, ImageDraw, ImageFont
 #   padrão:     S=2, R=2 -> 1280x720
 #   --youtube:  S=3, R=2 -> 1920x1080 (+ tela final, miniatura, legendas, descrição)
 YOUTUBE = "--youtube" in sys.argv
+SHORTS = "--shorts" in sys.argv   # vertical 1080x1920, até 60 s
 W, H = 1280, 720
 S = 3 if YOUTUBE else 2
 R = 2
@@ -41,7 +42,14 @@ FPS = 30
 SR = 44100
 AQUI = os.path.dirname(os.path.abspath(__file__))
 PASTA_YT = os.path.join(AQUI, "youtube")
-SAIDA = os.path.join(PASTA_YT, "piramides_youtube_1080p.mp4") if YOUTUBE else os.path.join(AQUI, "piramides.mp4")
+PASTA_SH = os.path.join(AQUI, "shorts")
+if SHORTS:
+    SAIDA = os.path.join(PASTA_SH, "piramides_shorts.mp4")
+    OUT_W, OUT_H = 1080, 1920
+elif YOUTUBE:
+    SAIDA = os.path.join(PASTA_YT, "piramides_youtube_1080p.mp4")
+else:
+    SAIDA = os.path.join(AQUI, "piramides.mp4")
 CACHE = os.path.join(AQUI, ".cache_vozes")
 KOKORO_DIR = os.environ.get("KOKORO_DIR", os.path.join(AQUI, "modelos"))
 
@@ -415,7 +423,8 @@ POS = {"H": 120, "F": 1160}
 PE = 712
 
 
-def camada_personagens(img, cena, lt, forcar=None):
+def camada_personagens(img, cena, lt, forcar=None, pos=None, pe=PE, e=0.85):
+    pos = pos or POS
     d = ImageDraw.Draw(img, "RGBA")
     f = cena.ativa(lt)
     uc = cena.ultimo_carimbo(lt)
@@ -426,7 +435,7 @@ def camada_personagens(img, cena, lt, forcar=None):
         expr = forcar(lt) or expr
     topos = {}
     for quem in ("H", "F"):
-        x = POS[quem]
+        x = pos[quem]
         if quem in cena.entrada:
             k = cena.prog(cena.entrada[quem], lt, 1.2)
             fora = -140 if quem == "H" else W + 140
@@ -441,7 +450,7 @@ def camada_personagens(img, cena, lt, forcar=None):
         ex = expr if not falando else ("neutro" if expr != "feliz" else "feliz")
         if falando and ex == "feliz":
             ex = "neutro"
-        topos[quem] = boneco(d, x, PE, quem, lt, amp, falando, ex, olhar=1 if quem == "H" else -1)
+        topos[quem] = boneco(d, x, pe, quem, lt, amp, falando, ex, olhar=1 if quem == "H" else -1, e=e)
     return img, topos
 
 
@@ -1157,13 +1166,155 @@ FALAS_TELA_FINAL = [
 ]
 
 
+# ======================================================================= Shorts (vertical)
+def d_gancho(lt, c):
+    img = ceu("aurora")
+    d = ImageDraw.Draw(img, "RGBA")
+    sol(d, 640, lerp(520, 300, ease(lt / 4)), 70)
+    chao(d, 540)
+    for cx, lg, al, atr in ((330, 360, 210, 0.3), (640, 560, 330, 0.0), (930, 300, 170, 0.6)):
+        piramide(d, cx, 540, lg, al * ease((lt - atr) / 1.8), cor=(130, 90, 70), sombra=(90, 60, 50))
+    return img
+
+
+ROTEIRO_SHORTS = [
+    ("", d_gancho, [
+        ("H", "Construir uma pirâmide gigante, sem nenhuma máquina? Fácil!", "b", 0.2),
+        ("F", "Fácil nada. Olha só!", "hem", 0.1),
+    ]),
+    ("1 • Arrastar o bloco", d_transporte, [
+        ("F", "Põe o bloco numa carroça com rodas!", "try", 0.5),
+        ("N", "As rodas afundam na areia.", "fail", 0.4, "ERRO"),
+        ("H", "Então, um trenó de madeira!", "fix1", 0.6),
+        ("F", "Ainda tá pesado demais!", "fail2", 0.3, "QUASE"),
+        ("H", "Joga água na areia!", "fix2", 0.7, "CERTO"),
+        ("N", "Areia molhada corta o esforço pela metade.", "fact", 0.2),
+    ]),
+    ("2 • Subir os blocos", d_rampa, [
+        ("H", "Agora, uma rampa reta até o topo!", "try", 0.3),
+        ("N", "Ela teria um quilômetro e meio!", "fail", 0.4, "ERRO"),
+        ("F", "Então em zigue-zague, colada na pirâmide.", "fix", 0.9, "CERTO"),
+        ("N", "Acharam uma rampa assim, com degraus e postes.", "fact", 0.2),
+    ]),
+    ("3 • Quem construiu?", d_pessoas, [
+        ("F", "E a gente usa escravos?", "try", 0.2),
+        ("N", "Mito!", "fail", 0.3, "MITO"),
+        ("H", "Trabalhadores pagos, com pão, cerveja e médico!", "fix", 0.2, "CERTO"),
+        ("F", "E equipes como os Amigos de Quéops!", "fix2", 0.2),
+        ("N", "Uns vinte a trinta mil.", "fact", 0.2),
+    ]),
+    ("", d_final, [
+        ("N", "Vinte anos depois: a Grande Pirâmide!", "b", 0.2),
+        ("H", "Errar fez parte do projeto!", "h", 0.2),
+        ("N", "Segue o canal pra mais!", "end", 0.2),
+    ]),
+]
+
+SH_CENA_Y = 330          # onde a cena 16:9 entra no quadro vertical (espaço 1080x1920)
+SH_POS = {"H": 250, "F": 660}
+SH_PE = 1720
+SH_E = 1.75
+_FUNDO_SH = None
+
+
+def fundo_shorts():
+    global _FUNDO_SH
+    if _FUNDO_SH is None:
+        a = np.linspace(0, 1, 1920 * S)[:, None, None]
+        g = np.array((28, 20, 40))[None, None, :] * (1 - a) + np.array((222, 184, 120))[None, None, :] * a
+        _FUNDO_SH = Image.fromarray(np.repeat(g, 1080 * S, axis=1).astype(np.uint8), "RGB").convert("RGBA")
+        d = ImageDraw.Draw(_FUNDO_SH, "RGBA")
+        d.rectangle(P(0, SH_PE - 20, 1080, 1920), fill=AREIA)
+        d.rectangle(P(0, SH_PE - 26, 1080, SH_PE - 20), fill=AREIA_ESC)
+    return _FUNDO_SH.copy()
+
+
+def fala_vertical(img, cena, lt, topos):
+    f = cena.ativa(lt)
+    if f is None:
+        return img
+    k = (lt - f.ini) / max(f.dur, 0.1)
+    a = ease((lt - f.ini) / 0.15) * ease((f.ini + f.dur + 0.2 - lt) / 0.15)
+    ov = Image.new("RGBA", img.size, (0, 0, 0, 0))
+    d = ImageDraw.Draw(ov)
+    fnt = fonte(46 * S)
+    x0, x1 = 50, 900          # evita os botões do Shorts à direita
+    linhas = quebrar(d, f.texto, fnt, x1 - x0 - 60)
+    alt = 80 + 60 * len(linhas)
+    y0 = 975
+    narr = f.quem == "N"
+    fundo = (20, 14, 8, int(215 * a)) if narr else (255, 252, 244, int(245 * a))
+    d.rounded_rectangle(P(x0, y0, x1, y0 + alt), radius=28 * S, fill=fundo,
+                        outline=None if narr else TINTA + (int(255 * a),), width=5 * S)
+    if not narr and f.quem in topos:
+        tx, ty = (v / S for v in topos[f.quem])
+        bx = min(max(tx, x0 + 60), x1 - 60)
+        d.polygon(T([(bx - 26, y0 + alt - 4), (bx + 26, y0 + alt - 4), (tx, ty - 8)]), fill=fundo)
+        d.line(P(bx - 26, y0 + alt, tx, ty - 8, bx + 26, y0 + alt), fill=TINTA + (int(255 * a),), width=5 * S)
+    cor_nome = OURO if narr else ((180, 120, 20) if f.quem == "H" else VERMELHO)
+    d.text(P(x0 + 30, y0 + 16), NOMES[f.quem], font=fonte(26 * S), fill=cor_nome + (int(255 * a),))
+    cor = (255, 248, 235) if narr else TINTA
+    total = sum(len(l) for l in linhas)
+    mostrar = int(total * clamp(k * 1.25))
+    for i, ln in enumerate(linhas):
+        d.text(P(x0 + 30, y0 + 56 + 60 * i), ln[:max(0, mostrar)], font=fnt, fill=cor + (int(255 * a),))
+        mostrar -= len(ln)
+    return Image.alpha_composite(img, ov)
+
+
+def quadro_vertical(c, lt, t_global, dur_total):
+    cena = c.desenho(lt, c)
+    cena = camada_titulo(cena, c.titulo, lt)
+    cena = camada_carimbo(cena, c, lt)
+    cena = cena.convert("RGB").resize((1080 * S, 608 * S), Image.LANCZOS)
+    img = fundo_shorts()
+    img.paste(cena, (0, SH_CENA_Y * S))
+    d = ImageDraw.Draw(img, "RGBA")
+    # título fixo no topo + barra de progresso
+    texto_centro(d, "COMO FIZERAM", 110, 78, cx=540)
+    texto_centro(d, "AS PIRÂMIDES?", 200, 78, cor=OURO, cx=540)
+    d.rectangle(P(0, SH_CENA_Y + 608, 1080 * t_global / dur_total, SH_CENA_Y + 616), fill=OURO)
+    forcar = None
+    if c.desenho is d_final:
+        forcar = feliz_final(c)
+    img, topos = camada_personagens(img, c, lt, forcar, pos=SH_POS, pe=SH_PE, e=SH_E)
+    img = fala_vertical(img, c, lt, topos)
+    return img.convert("RGB").reduce(R)
+
+
+def descricao_shorts(cenas, caminho):
+    dur = sum(c.dur for c in cenas)
+    txt = f"""TÍTULO:
+Como fizeram as Pirâmides? (eles erraram MUITO) #Shorts
+
+TÍTULOS ALTERNATIVOS:
+- Rodas na areia? ERRO! Como as Pirâmides foram feitas #Shorts
+- Os egípcios erraram até acertar as Pirâmides #Shorts
+
+DESCRIÇÃO:
+Rodas afundam, rampa reta não dá... como os egípcios resolveram cada problema para construir a \
+Grande Pirâmide? Versão completa no canal!
+Hemiunu foi o arquiteto real da Grande Pirâmide; Neferet é personagem fictícia.
+
+#Shorts #piramides #egito #historia #curiosidades
+
+DURAÇÃO: {dur:.1f} s  (vertical 1080x1920)
+DICA: no YouTube Studio, use "Vídeo relacionado" para ligar este Short ao vídeo completo.
+"""
+    with open(caminho, "w", encoding="utf-8") as fh:
+        fh.write(txt)
+
+
 # ======================================================================= render
 def montar_cenas():
     cenas = []
-    for item in ROTEIRO:
+    for item in (ROTEIRO_SHORTS if SHORTS else ROTEIRO):
         titulo, desenho, falas = item[:3]
         entrada = item[3] if len(item) > 3 else None
-        cenas.append(Cena(titulo, desenho, falas, entrada=entrada))
+        if SHORTS:
+            cenas.append(Cena(titulo, desenho, falas, entrada=entrada, cabeca=0.3, cauda=0.5))
+        else:
+            cenas.append(Cena(titulo, desenho, falas, entrada=entrada))
     if YOUTUBE:
         cenas.append(Cena("", d_tela_final, FALAS_TELA_FINAL, cauda=4.0))
     return cenas
@@ -1184,14 +1335,19 @@ def quadro(c, lt):
 
 
 _CENAS = None
+_INICIOS = None
 
 
 def _render(job):
     ci, i = job
     c = _CENAS[ci]
     lt = i / FPS
-    arr = np.asarray(quadro(c, lt))
-    a = min(1.0, lt / 0.35, (c.dur - lt) / 0.35)
+    if SHORTS:
+        arr = np.asarray(quadro_vertical(c, lt, _INICIOS[ci] + lt, _INICIOS[-1]))
+    else:
+        arr = np.asarray(quadro(c, lt))
+    fade = 0.12 if SHORTS else 0.35
+    a = min(1.0, lt / fade, (c.dur - lt) / fade)
     if a < 1:
         arr = (arr.astype(np.float32) * max(a, 0)).astype(np.uint8)
     return arr.tobytes()
@@ -1316,14 +1472,24 @@ def miniatura(caminho):
 
 
 def main():
-    global _CENAS
+    global _CENAS, _INICIOS
     print("gerando vozes...", flush=True)
     cenas = montar_cenas()
     _CENAS = cenas
+    _INICIOS = list(np.cumsum([0.0] + [c.dur for c in cenas]))
     os.makedirs(os.path.dirname(SAIDA), exist_ok=True)
     audio = os.path.join(AQUI, "_audio.wav")
     dur = mixar(cenas, audio)
     print(f"duração: {dur:.1f} s  •  {OUT_W}x{OUT_H}", flush=True)
+    if SHORTS and dur > 59.5:
+        sys.exit(f"Short passou de 60 s ({dur:.1f} s): encurte o ROTEIRO_SHORTS")
+    if SHORTS:
+        descricao_shorts(cenas, os.path.join(PASTA_SH, "descricao_shorts.txt"))
+    if YOUTUBE or SHORTS:
+        venc = ["-c:v", "libx264", "-preset", "slow", "-crf", "18", "-profile:v", "high",
+                "-bf", "2", "-g", str(FPS // 2), "-pix_fmt", "yuv420p",
+                "-af", "loudnorm=I=-14:TP=-1.5:LRA=11", "-c:a", "aac", "-b:a", "192k",
+                "-ar", "48000", "-ac", "2"]
     if YOUTUBE:
         legendas_srt(cenas, os.path.join(PASTA_YT, "legendas_pt-BR.srt"))
         descricao(cenas, os.path.join(PASTA_YT, "descricao.txt"))
@@ -1334,7 +1500,7 @@ def main():
                 "-bf", "2", "-g", str(FPS // 2), "-pix_fmt", "yuv420p",
                 "-af", "loudnorm=I=-14:TP=-1.5:LRA=11", "-c:a", "aac", "-b:a", "192k",
                 "-ar", "48000", "-ac", "2"]
-    else:
+    elif not SHORTS:
         venc = ["-c:v", "libx264", "-preset", "medium", "-crf", "23", "-pix_fmt", "yuv420p",
                 "-c:a", "aac", "-b:a", "128k"]
     cmd = ["ffmpeg", "-y", "-loglevel", "error",

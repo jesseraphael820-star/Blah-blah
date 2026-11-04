@@ -24,6 +24,9 @@ KOKORO_DIR=/pasta/dos/modelos python3 gerar_video.py  # ~3,5 min de vídeo
 - **Versão YouTube**: `python3 gerar_video.py --youtube` gera em `youtube/`:
   `piramides_youtube_1080p.mp4` (1920x1080, áudio normalizado em -14 LUFS e tela final),
   `miniatura.jpg`, `legendas_pt-BR.srt` e `descricao.txt` (título, descrição, capítulos e tags).
+- **Versão Shorts**: `python3 gerar_video.py --shorts` gera `shorts/piramides_shorts.mp4`
+  (vertical 1080x1920, ~50 s, roteiro enxuto em `ROTEIRO_SHORTS`) e `shorts/descricao_shorts.txt`.
+  O script recusa gerar se passar de 60 s.
 - Para vertical (Reels/TikTok/Shorts), mude `W, H = 1080, 1920` e reposicione os elementos.
 
 ## A estrutura "erro → correção" (copie para qualquer tema)
