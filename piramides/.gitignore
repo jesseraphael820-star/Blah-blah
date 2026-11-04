@@ -1,0 +1,4 @@
+.cache_vozes/
+modelos/
+_audio.wav
+__pycache__/

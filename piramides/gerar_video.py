@@ -1,14 +1,23 @@
 #!/usr/bin/env python3
 """
-Gera o vídeo animado "Como construíram as Pirâmides do Egito?" (.mp4)
+"Como construíram as Pirâmides?" — vídeo animado com narração e bonecos.
 
-Tudo é desenhado por código (Pillow + NumPy) e codificado com o ffmpeg.
-A trilha sonora também é sintetizada aqui (drone + melodia na escala Hijaz).
+Formato "tentativa e erro": os personagens tentam uma ideia, ela dá ERRADO,
+e eles corrigem até chegar na solução que os egípcios (provavelmente) usaram.
+
+Tudo é gerado por código:
+  * imagens: Pillow + NumPy (desenhado em 2x e reduzido -> antialias)
+  * vozes:   Kokoro TTS (offline, vozes pt-BR)
+  * trilha e efeitos sonoros: sintetizados com NumPy
+  * vídeo:   ffmpeg (H.264 + AAC)
 
 Uso:
-    python3 gerar_video.py            # gera piramides.mp4 nesta pasta
-Requisitos: python3, pillow, numpy, ffmpeg no PATH.
+    pip install pillow numpy kokoro-onnx soundfile
+    # baixe kokoro-v1.0.onnx e voices-v1.0.bin de
+    # https://github.com/thewh1teagle/kokoro-onnx/releases/tag/model-files-v1.0
+    KOKORO_DIR=/pasta/dos/modelos python3 gerar_video.py
 """
+import hashlib
 import math
 import os
 import subprocess
@@ -17,43 +26,53 @@ import wave
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
-# ---------------------------------------------------------------- config
-W, H = 1280, 720          # resolução final
-S = 2                     # supersampling (desenha em 2x e reduz -> antialias)
+# ======================================================================= config
+W, H = 1280, 720
+S = 2
 FPS = 30
+SR = 44100
 AQUI = os.path.dirname(os.path.abspath(__file__))
 SAIDA = os.path.join(AQUI, "piramides.mp4")
-AUDIO = os.path.join(AQUI, "_trilha.wav")
+CACHE = os.path.join(AQUI, ".cache_vozes")
+KOKORO_DIR = os.environ.get("KOKORO_DIR", os.path.join(AQUI, "modelos"))
+
+VOZES = {"N": "pm_alex", "H": "pm_santa", "F": "pf_dora"}
+NOMES = {"N": "NARRADOR", "H": "HEMIUNU", "F": "NEFERET"}
+VELOCIDADE = {"N": 1.05, "H": 1.0, "F": 1.05}
 
 FONTE_B = "/usr/share/fonts/opentype/inter/InterDisplay-Bold.otf"
 FONTE_R = "/usr/share/fonts/opentype/inter/Inter-Medium.otf"
 if not os.path.exists(FONTE_B):
     FONTE_B = FONTE_R = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
-
 _fontes = {}
 
 
 def fonte(tam, negrito=True):
     k = (tam, negrito)
     if k not in _fontes:
-        _fontes[k] = ImageFont.truetype(FONTE_B if negrito else FONTE_R, tam)
+        _fontes[k] = ImageFont.truetype(FONTE_B if negrito else FONTE_R, int(tam))
     return _fontes[k]
 
 
-# paleta
 AREIA = (222, 184, 120)
 AREIA_ESC = (190, 148, 88)
 AREIA_MOLHADA = (150, 110, 62)
 PEDRA = (214, 190, 146)
+PEDRA2 = (205, 180, 136)
 PEDRA_ESC = (168, 140, 98)
 CALCARIO = (246, 240, 226)
 OURO = (240, 196, 60)
 NILO = (52, 118, 160)
-PELE = (120, 72, 40)
+PELE = (150, 92, 52)
+PELE_F = (176, 112, 66)
 TINTA = (40, 28, 20)
+VERMELHO = (215, 55, 45)
+VERDE = (60, 170, 80)
+LARANJA = (235, 140, 30)
+BRANCO = (250, 247, 240)
 
 
-# ---------------------------------------------------------------- utilidades
+# ======================================================================= util
 def clamp(x, a=0.0, b=1.0):
     return max(a, min(b, x))
 
@@ -72,15 +91,22 @@ def lerpc(c1, c2, t):
 
 
 def P(*xy):
-    """converte coordenadas de 1280x720 para a tela supersampled"""
     return [v * S for v in xy]
+
+
+def T(pts):
+    return [(x * S, y * S) for x, y in pts]
+
+
+def rot(pts, cx, cy, ang):
+    c, s = math.cos(ang), math.sin(ang)
+    return [(cx + (x - cx) * c - (y - cy) * s, cy + (x - cx) * s + (y - cy) * c) for x, y in pts]
 
 
 def gradiente(topo, base):
     a = np.linspace(0, 1, H * S)[:, None, None]
-    g = (np.array(topo)[None, None, :] * (1 - a) + np.array(base)[None, None, :] * a)
-    g = np.repeat(g, W * S, axis=1).astype(np.uint8)
-    return Image.fromarray(g, "RGB")
+    g = np.array(topo)[None, None, :] * (1 - a) + np.array(base)[None, None, :] * a
+    return Image.fromarray(np.repeat(g, W * S, axis=1).astype(np.uint8), "RGB")
 
 
 CEUS = {
@@ -88,53 +114,60 @@ CEUS = {
     "dia": gradiente((90, 160, 220), (240, 220, 180)),
     "tarde": gradiente((230, 140, 70), (250, 215, 150)),
     "noite": gradiente((12, 14, 36), (70, 50, 90)),
+    "papiro": gradiente((236, 214, 168), (214, 184, 132)),
 }
+
+
+def ceu(nome):
+    return CEUS[nome].copy().convert("RGBA")
 
 
 def chao(d, y, cor=AREIA, cor2=AREIA_ESC):
     d.rectangle(P(0, y, W, H), fill=cor)
-    # dunas suaves ao fundo
-    pts = [(0, y)]
-    for x in range(0, W + 40, 40):
-        pts.append((x, y - 12 - 10 * math.sin(x / 140.0)))
-    pts.append((W, y))
-    d.polygon([tuple(P(*p)) for p in pts], fill=cor2)
+    pts = [(0, y)] + [(x, y - 12 - 10 * math.sin(x / 140.0)) for x in range(0, W + 40, 40)] + [(W, y)]
+    d.polygon(T(pts), fill=cor2)
 
 
 def sol(d, x, y, r, cor=(255, 224, 140)):
     for i, a in enumerate((60, 35, 18)):
         rr = r + 18 * (3 - i)
-        c = lerpc(cor, (255, 255, 255), 0)
-        d.ellipse(P(x - rr, y - rr, x + rr, y + rr), fill=c + (a,))
+        d.ellipse(P(x - rr, y - rr, x + rr, y + rr), fill=cor + (a,))
     d.ellipse(P(x - r, y - r, x + r, y + r), fill=cor)
 
 
-def piramide(d, cx, base_y, larg, alt, cor=PEDRA, sombra=PEDRA_ESC, prog=1.0):
-    """pirâmide em perfil com face iluminada e face em sombra"""
+def piramide(d, cx, base_y, larg, alt, cor=PEDRA, sombra=PEDRA_ESC):
     topo = (cx, base_y - alt)
-    d.polygon([tuple(P(cx - larg / 2, base_y)), tuple(P(*topo)), tuple(P(cx, base_y))], fill=cor)
-    d.polygon([tuple(P(cx, base_y)), tuple(P(*topo)), tuple(P(cx + larg / 2, base_y))], fill=sombra)
+    d.polygon(T([(cx - larg / 2, base_y), topo, (cx, base_y)]), fill=cor)
+    d.polygon(T([(cx, base_y), topo, (cx + larg / 2, base_y)]), fill=sombra)
+
+
+def piramide_camadas(d, cx, base_y, larg, alt, camadas, n):
+    hc = alt / camadas
+    for i in range(n):
+        y1, y2 = base_y - i * hc, base_y - (i + 1) * hc
+        w1, w2 = larg * (1 - i / camadas), larg * (1 - (i + 1) / camadas)
+        d.polygon(T([(cx - w1 / 2, y1), (cx + w1 / 2, y1), (cx + w2 / 2, y2), (cx - w2 / 2, y2)]),
+                  fill=PEDRA if i % 2 == 0 else PEDRA2)
+        nb = max(1, int(w1 / 48))
+        for b in range(1, nb):
+            bx = cx - w1 / 2 + b * w1 / nb
+            d.line(P(bx, y1, bx, y2), fill=PEDRA_ESC, width=S)
+        d.line(P(cx - w1 / 2, y1, cx + w1 / 2, y1), fill=PEDRA_ESC, width=S)
+    return base_y - n * hc, larg * (1 - n / camadas)
 
 
 def trabalhador(d, x, y, fase=0.0, escala=1.0, pose="andar", cor=PELE, braco=None):
-    """boneco simples estilo hieróglifo; y = pés"""
     e = escala
     sw = max(2, int(4 * e)) * S
-    perna = 22 * e
-    corpo = 26 * e
-    cabeca = 8 * e
-    quadril = (x, y - perna)
-    ombro = (x, y - perna - corpo)
+    perna, corpo, cab = 22 * e, 26 * e, 8 * e
+    quadril, ombro = (x, y - perna), (x, y - perna - corpo)
     a = math.sin(fase) * 0.5 if pose == "andar" else 0.0
     for s in (1, -1):
-        px = x + math.sin(a * s) * perna
-        d.line(P(*quadril, px, y), fill=cor, width=sw)
+        d.line(P(*quadril, x + math.sin(a * s) * perna, y), fill=cor, width=sw)
     d.line(P(*quadril, *ombro), fill=cor, width=sw)
-    # saiote branco
-    d.polygon([tuple(P(x - 7 * e, y - perna + 2 * e)), tuple(P(x + 7 * e, y - perna + 2 * e)),
-               tuple(P(x + 4 * e, y - perna - 9 * e)), tuple(P(x - 4 * e, y - perna - 9 * e))],
-              fill=(245, 240, 225))
-    d.ellipse(P(ombro[0] - cabeca, ombro[1] - 2 * cabeca, ombro[0] + cabeca, ombro[1]), fill=cor)
+    d.polygon(T([(x - 7 * e, y - perna + 2 * e), (x + 7 * e, y - perna + 2 * e),
+                 (x + 4 * e, y - perna - 9 * e), (x - 4 * e, y - perna - 9 * e)]), fill=BRANCO)
+    d.ellipse(P(ombro[0] - cab, ombro[1] - 2 * cab, ombro[0] + cab, ombro[1]), fill=cor)
     if braco is None:
         braco = (x + 18 * e * math.cos(a), ombro[1] + 14 * e)
     d.line(P(*ombro, *braco), fill=cor, width=sw)
@@ -146,444 +179,999 @@ def bloco(d, x, y, w, h, cor=PEDRA, borda=PEDRA_ESC):
     d.line(P(x + 4, y + 4, x + w - 4, y + 4), fill=lerpc(cor, (255, 255, 255), 0.35), width=S)
 
 
-def texto_centro(d, txt, y, tam, cor=(255, 255, 255), negrito=True, alfa=255, sombra=True):
+def bloco_rot(d, cx, cy, w, h, ang, cor=PEDRA, borda=PEDRA_ESC):
+    pts = rot([(cx - w / 2, cy - h / 2), (cx + w / 2, cy - h / 2), (cx + w / 2, cy + h / 2),
+               (cx - w / 2, cy + h / 2)], cx, cy, ang)
+    d.polygon(T(pts), fill=cor, outline=borda, width=2 * S)
+
+
+def texto_centro(d, txt, y, tam, cor=(255, 255, 255), negrito=True, alfa=255, sombra=True, cx=W / 2):
     f = fonte(tam * S, negrito)
     l, t, r, b = d.textbbox((0, 0), txt, font=f)
-    x = (W * S - (r - l)) / 2
+    x = cx * S - (r - l) / 2
     if sombra:
         d.text((x + 3 * S, y * S + 3 * S), txt, font=f, fill=(0, 0, 0, int(alfa * 0.5)))
-    d.text((x, y * S), txt, font=f, fill=cor[:3] + (alfa,))
+    d.text((x, y * S), txt, font=f, fill=tuple(cor[:3]) + (int(alfa),))
 
 
-def legenda(img, titulo, linhas, lt, dur):
-    """faixa inferior com título do capítulo + texto explicativo, com fade"""
-    a = ease(lt / 0.5) * ease((dur - lt) / 0.4)
-    if a <= 0:
+def quebrar(d, txt, f, larg):
+    linhas, atual = [], ""
+    for p in txt.split():
+        teste = (atual + " " + p).strip()
+        if d.textlength(teste, font=f) <= larg * S:
+            atual = teste
+        else:
+            linhas.append(atual)
+            atual = p
+    if atual:
+        linhas.append(atual)
+    return linhas
+
+
+def painel(d, x0, y0, x1, y1, a=1.0):
+    d.rounded_rectangle(P(x0, y0, x1, y1), radius=14 * S, fill=(20, 14, 8, int(175 * a)))
+
+
+# ======================================================================= vozes
+_kokoro = None
+
+
+def sintetizar(quem, texto):
+    """retorna (amostras float32 @ SR) — com cache em disco"""
+    global _kokoro
+    os.makedirs(CACHE, exist_ok=True)
+    h = hashlib.md5(f"{VOZES[quem]}|{VELOCIDADE[quem]}|{texto}".encode()).hexdigest()[:16]
+    arq = os.path.join(CACHE, h + ".npy")
+    if os.path.exists(arq):
+        return np.load(arq)
+    if _kokoro is None:
+        from kokoro_onnx import Kokoro
+        _kokoro = Kokoro(os.path.join(KOKORO_DIR, "kokoro-v1.0.onnx"),
+                         os.path.join(KOKORO_DIR, "voices-v1.0.bin"))
+    amostras, sr = _kokoro.create(texto, voice=VOZES[quem], speed=VELOCIDADE[quem], lang="pt-br")
+    amostras = np.asarray(amostras, dtype=np.float32)
+    # reamostra para SR
+    n = int(len(amostras) * SR / sr)
+    amostras = np.interp(np.linspace(0, len(amostras) - 1, n), np.arange(len(amostras)), amostras)
+    amostras = amostras.astype(np.float32)
+    np.save(arq, amostras)
+    return amostras
+
+
+def envelope(amostras):
+    """volume por quadro de vídeo (0..1) para animar a boca"""
+    por_q = SR // FPS
+    nq = int(math.ceil(len(amostras) / por_q))
+    env = np.array([np.sqrt(np.mean(amostras[i * por_q:(i + 1) * por_q] ** 2) + 1e-12) for i in range(nq)])
+    env = env / (np.percentile(env, 95) + 1e-9)
+    return np.clip(env, 0, 1)
+
+
+# ======================================================================= linha do tempo
+class Fala:
+    def __init__(self, quem, texto, tag, pausa, carimbo=None):
+        self.quem, self.texto, self.tag, self.pausa, self.carimbo = quem, texto, tag, pausa, carimbo
+        self.audio = sintetizar(quem, texto)
+        self.dur = len(self.audio) / SR
+        self.env = envelope(self.audio)
+        self.ini = 0.0
+
+
+class Cena:
+    def __init__(self, titulo, desenho, falas, cabeca=0.8, cauda=1.2, entrada=None, fundo_musica=1.0):
+        self.titulo, self.desenho, self.entrada = titulo, desenho, entrada or {}
+        self.falas = [Fala(*f) if len(f) > 4 else Fala(*f, None) if len(f) == 4 else Fala(*f, 0.45)
+                      for f in falas]
+        t = cabeca
+        for f in self.falas:
+            f.ini = t
+            t += f.dur + f.pausa
+        self.dur = t - self.falas[-1].pausa + cauda
+        self.tags = {f.tag: f for f in self.falas}
+        self.carimbos = [(f.ini, f.carimbo) for f in self.falas if f.carimbo]
+
+    def t(self, tag):
+        return self.tags[tag].ini
+
+    def desde(self, tag, lt):
+        return lt - self.tags[tag].ini
+
+    def prog(self, tag, lt, dur=1.0, atraso=0.0):
+        return ease((self.desde(tag, lt) - atraso) / dur)
+
+    def ativa(self, lt):
+        for f in self.falas:
+            if f.ini <= lt < f.ini + f.dur:
+                return f
+        return None
+
+    def ultimo_carimbo(self, lt):
+        ult = None
+        for ini, tipo in self.carimbos:
+            if ini <= lt:
+                ult = (ini, tipo)
+        return ult
+
+
+# ======================================================================= bonecos
+def boneco(d, x, pe, quem, t, amp=0.0, falando=False, expr="neutro", olhar=1, e=0.85):
+    """personagem cartoon de frente. quem: 'H' (Hemiunu) ou 'F' (Neferet)"""
+    bob = 2.0 * math.sin(t * 2.2 + (0 if quem == "H" else 1.3))
+    if expr == "feliz":
+        bob -= abs(6 * math.sin(t * 8))
+
+    def Q(px, py):
+        return (x * S + px * e * S, (pe + bob * (py / -230)) * S + py * e * S)
+
+    def L(pts, cor, w):
+        d.line([Q(*p) for p in pts], fill=cor, width=int(w * e * S), joint="curve")
+
+    def E(cx, cy, rx, ry, **kw):
+        a, b = Q(cx - rx, cy - ry), Q(cx + rx, cy + ry)
+        d.ellipse([a[0], a[1], b[0], b[1]], **kw)
+
+    pele = PELE if quem == "H" else PELE_F
+    gordo = 1.18 if quem == "H" else 1.0
+    lado = olhar  # braço que gesticula aponta para o centro
+    # pernas
+    for s in (-1, 1):
+        L([(s * 12, -70), (s * 14, -4)], pele, 13)
+        E(s * 17, -3, 11, 6, fill=(120, 80, 45))
+    # corpo
+    if quem == "H":
+        corpo = [(-36, -152), (36, -152), (54, -95), (50, -48), (-50, -48), (-54, -95)]
+        d.polygon([Q(*p) for p in corpo], fill=BRANCO, outline=TINTA, width=int(2 * S))
+        L([(-30, -148), (34, -70)], OURO, 9)
+    else:
+        corpo = [(-27, -152), (27, -152), (36, -34), (-36, -34)]
+        d.polygon([Q(*p) for p in corpo], fill=BRANCO, outline=TINTA, width=int(2 * S))
+        d.polygon([Q(-29, -112), Q(29, -112), Q(30, -100), Q(-30, -100)], fill=VERMELHO)
+    # colar largo (usekh)
+    for i, c in enumerate(((40, 90, 170), OURO, VERMELHO, (40, 140, 120))):
+        r = 40 - i * 6
+        a, b = Q(-r * gordo * 0.9, -168 - r * 0.55), Q(r * gordo * 0.9, -168 + r * 0.55)
+        d.chord([a[0], a[1], b[0], b[1]], 0, 180, fill=c)
+    # braços
+    ombros = {-1: (-32 * gordo, -146), 1: (32 * gordo, -146)}
+    maos = {}
+    for s in (-1, 1):
+        if expr == "surpreso":
+            maos[s] = (s * 44, -212)
+        elif expr == "feliz":
+            maos[s] = (s * (60 + 6 * math.sin(t * 10 + s)), -236)
+        elif falando and s == lado:
+            maos[s] = (s * 64, -150 - 22 * abs(math.sin(t * 5)) - 18 * amp)
+        else:
+            maos[s] = (s * 46 * gordo, -86)
+        mx, my = maos[s]
+        L([ombros[s], ((ombros[s][0] + mx) / 2 + s * 8, (ombros[s][1] + my) / 2), (mx, my)], pele, 11)
+        E(mx, my, 7.5, 7.5, fill=pele)
+    if quem == "H" and expr not in ("surpreso", "feliz"):
+        mx, my = maos[-lado]
+        d.rectangle([*Q(mx - 5, my - 28), *Q(mx + 5, my + 10)], fill=(236, 214, 160), outline=TINTA,
+                    width=int(1.5 * S))
+    # cabeça
+    cy = -194
+    r = 37 if quem == "H" else 34
+    if quem == "F":  # parte de trás da peruca
+        d.rounded_rectangle([*Q(-44, cy - 42), *Q(44, cy + 46)], radius=int(16 * e * S), fill=(20, 18, 24))
+        for yy in (cy + 10, cy + 26, cy + 40):
+            L([(-43, yy), (-34, yy)], (40, 90, 170), 3)
+            L([(34, yy), (43, yy)], (40, 90, 170), 3)
+    else:  # orelhas
+        E(-r, cy + 2, 7, 10, fill=pele)
+        E(r, cy + 2, 7, 10, fill=pele)
+    E(0, cy, r, r, fill=pele)
+    if quem == "F":
+        a, b = Q(-37, cy - 44), Q(37, cy + 24)
+        d.chord([a[0], a[1], b[0], b[1]], 180, 360, fill=(20, 18, 24))
+        E(-20, cy + 16, 7, 4, fill=(220, 120, 110, 120))
+        E(20, cy + 16, 7, 4, fill=(220, 120, 110, 120))
+    else:
+        E(-12, cy - 26, 10, 5, fill=(255, 255, 255, 70))
+    # olhos
+    piscar = (t + (0.0 if quem == "H" else 1.7)) % 3.7 < 0.12
+    ry = 9.5 if expr == "surpreso" else 6.5
+    for s in (-1, 1):
+        ex, ey = s * 13, cy - 2
+        if piscar:
+            L([(ex - 8, ey), (ex + 8, ey)], TINTA, 2.5)
+        else:
+            E(ex, ey, 8.5, ry, fill=(255, 255, 255), outline=TINTA, width=int(2 * S))
+            E(ex + olhar * 2.5, ey + 0.5, 4, 4, fill=TINTA)
+        L([(ex + s * 8, ey), (ex + s * 15, ey - 3)], TINTA, 2.5)  # delineado (kohl)
+        sob = 6 if expr == "surpreso" else 0
+        L([(ex - 8, ey - 12 - sob), (ex + 8, ey - 13 - sob + (2 if expr == "feliz" else 0))], TINTA, 3)
+    # boca
+    my = cy + 17
+    if falando:
+        hm = 2 + 11 * amp
+        E(0, my, 8 + 2 * amp, hm, fill=(110, 30, 30), outline=TINTA, width=int(1.5 * S))
+    elif expr == "surpreso":
+        E(0, my + 2, 6, 8, fill=(110, 30, 30), outline=TINTA, width=int(1.5 * S))
+    elif expr == "feliz":
+        a, b = Q(-14, my - 12), Q(14, my + 8)
+        d.chord([a[0], a[1], b[0], b[1]], 0, 180, fill=(110, 30, 30), outline=TINTA, width=int(1.5 * S))
+    else:
+        a, b = Q(-9, my - 8), Q(9, my + 3)
+        d.arc([a[0], a[1], b[0], b[1]], 20, 160, fill=TINTA, width=int(2.5 * S))
+    if expr == "surpreso":  # gota de suor
+        gx, gy = -olhar * (r + 6), cy - 20
+        d.polygon([Q(gx, gy - 12), Q(gx - 6, gy + 2), Q(gx + 6, gy + 2)], fill=(90, 170, 240))
+        E(gx, gy + 3, 6, 6, fill=(90, 170, 240))
+    return Q(0, cy - r)  # topo da cabeça (coords 2x)
+
+
+POS = {"H": 120, "F": 1160}
+PE = 712
+
+
+def camada_personagens(img, cena, lt, forcar=None):
+    d = ImageDraw.Draw(img, "RGBA")
+    f = cena.ativa(lt)
+    uc = cena.ultimo_carimbo(lt)
+    expr = "neutro"
+    if uc and lt - uc[0] < 2.6:
+        expr = "feliz" if uc[1] == "CERTO" else "surpreso"
+    if forcar:
+        expr = forcar(lt) or expr
+    topos = {}
+    for quem in ("H", "F"):
+        x = POS[quem]
+        if quem in cena.entrada:
+            k = cena.prog(cena.entrada[quem], lt, 1.2)
+            fora = -140 if quem == "H" else W + 140
+            x = lerp(fora, x, k)
+            if k <= 0:
+                continue
+        falando = f is not None and f.quem == quem
+        amp = 0.0
+        if falando:
+            i = int((lt - f.ini) * FPS)
+            amp = float(f.env[min(i, len(f.env) - 1)])
+        ex = expr if not falando else ("neutro" if expr != "feliz" else "feliz")
+        if falando and ex == "feliz":
+            ex = "neutro"
+        topos[quem] = boneco(d, x, PE, quem, lt, amp, falando, ex, olhar=1 if quem == "H" else -1)
+    return img, topos
+
+
+def camada_fala(img, cena, lt, topos):
+    f = cena.ativa(lt)
+    if f is None:
         return img
+    k = (lt - f.ini) / max(f.dur, 0.1)
+    a = ease((lt - f.ini) / 0.2) * ease((f.ini + f.dur + 0.25 - lt) / 0.2)
     ov = Image.new("RGBA", img.size, (0, 0, 0, 0))
     d = ImageDraw.Draw(ov)
-    alt = 46 + 34 * len(linhas)
-    y0 = H - alt - 18
-    d.rounded_rectangle(P(40, y0, W - 40, H - 18), radius=18 * S, fill=(20, 14, 8, int(185 * a)))
-    d.rectangle(P(40, y0 + 12, 48, H - 30), fill=OURO + (int(255 * a),))
-    d.text(P(66, y0 + 12), titulo, font=fonte(26 * S), fill=OURO + (int(255 * a),))
+    fnt = fonte(22 * S, False)
+    if f.quem == "N":
+        larg = 700
+        linhas = quebrar(d, f.texto, fnt, larg)
+        alt = 40 + 29 * len(linhas)
+        x0, y1 = (W - larg - 40) / 2, H - 14
+        y0 = y1 - alt
+        d.rounded_rectangle(P(x0, y0, x0 + larg + 40, y1), radius=14 * S, fill=(20, 14, 8, int(200 * a)))
+        d.text(P(x0 + 20, y0 + 8), NOMES["N"], font=fonte(15 * S), fill=OURO + (int(255 * a),))
+        cor = (255, 248, 235)
+    else:
+        larg = 380
+        linhas = quebrar(d, f.texto, fnt, larg)
+        alt = 44 + 29 * len(linhas)
+        tx, ty = (v / S for v in topos.get(f.quem, (POS[f.quem] * S, 480 * S)))
+        y1 = ty - 22
+        y0 = y1 - alt
+        x0 = 24 if f.quem == "H" else W - 24 - larg - 36
+        x1 = x0 + larg + 36
+        d.rounded_rectangle(P(x0, y0, x1, y1), radius=18 * S, fill=(255, 252, 244, int(245 * a)),
+                            outline=TINTA + (int(255 * a),), width=3 * S)
+        bx = tx + (30 if f.quem == "H" else -30)
+        d.polygon(T([(bx - 14, y1 - 3), (bx + 14, y1 - 3), (tx, ty - 4)]),
+                  fill=(255, 252, 244, int(245 * a)))
+        d.line(P(bx - 14, y1, tx, ty - 4, bx + 14, y1), fill=TINTA + (int(255 * a),), width=3 * S)
+        d.text(P(x0 + 18, y0 + 8), NOMES[f.quem], font=fonte(15 * S),
+               fill=((180, 120, 20) if f.quem == "H" else VERMELHO) + (int(255 * a),))
+        cor = TINTA
+    total = sum(len(l) for l in linhas)
+    mostrar = int(total * clamp(k * 1.15))
     for i, ln in enumerate(linhas):
-        # efeito "máquina de escrever" suave por linha
-        k = clamp((lt - 0.4 - i * 0.5) / 0.9)
-        n = int(len(ln) * k)
-        d.text(P(66, y0 + 50 + 34 * i), ln[:n], font=fonte(24 * S, False),
-               fill=(255, 248, 235, int(255 * a)))
+        parte = ln[:max(0, mostrar)]
+        mostrar -= len(ln)
+        d.text(P(x0 + 18 if f.quem != "N" else x0 + 20, y0 + 30 + 29 * i), parte, font=fnt,
+               fill=cor + (int(255 * a),))
     return Image.alpha_composite(img, ov)
 
 
-def capitulo(img, num, lt):
-    """número do capítulo no canto superior"""
+def camada_carimbo(img, cena, lt):
+    uc = cena.ultimo_carimbo(lt)
+    if not uc:
+        return img
+    dt = lt - uc[0]
+    if dt > 2.6:
+        return img
+    tipo = uc[1]
+    cor = {"ERRO": VERMELHO, "CERTO": VERDE, "MITO": VERMELHO, "QUASE": LARANJA}[tipo]
+    rotulo = {"ERRO": "ERRO!", "CERTO": "DEU CERTO!", "MITO": "MITO!", "QUASE": "QUASE..."}[tipo]
+    pop = 1.6 - 0.6 * ease(dt / 0.22)
+    a = ease((2.6 - dt) / 0.4)
+    ov = Image.new("RGBA", img.size, (0, 0, 0, 0))
+    d = ImageDraw.Draw(ov)
+    fnt = fonte(60 * S * pop)
+    l, t_, r, b = d.textbbox((0, 0), rotulo, font=fnt)
+    wt, ht = r - l, b - t_
+    ic = 70 * S * pop
+    cx, cy = W * S / 2, 255 * S
+    larg = wt + ic + 70 * S
+    x0, y0 = cx - larg / 2, cy - ht / 2 - 26 * S
+    d.rounded_rectangle([x0, y0, x0 + larg, y0 + ht + 52 * S], radius=int(20 * S), fill=(255, 255, 255, int(235 * a)),
+                        outline=cor + (int(255 * a),), width=int(7 * S))
+    ix, iy = x0 + 28 * S, cy - ic / 2
+    if tipo in ("CERTO",):
+        d.line([(ix, iy + ic * 0.55), (ix + ic * 0.38, iy + ic * 0.9), (ix + ic, iy + ic * 0.1)],
+               fill=cor + (int(255 * a),), width=int(12 * S * pop), joint="curve")
+    elif tipo == "QUASE":
+        d.text((ix + ic * 0.25, iy - ic * 0.15), "!", font=fonte(ic * 1.1), fill=cor + (int(255 * a),))
+    else:
+        w_ = int(12 * S * pop)
+        d.line([(ix, iy), (ix + ic, iy + ic)], fill=cor + (int(255 * a),), width=w_)
+        d.line([(ix + ic, iy), (ix, iy + ic)], fill=cor + (int(255 * a),), width=w_)
+    d.text((ix + ic + 24 * S, cy - ht / 2 - t_), rotulo, font=fnt, fill=cor + (int(255 * a),))
+    return Image.alpha_composite(img, ov)
+
+
+def camada_titulo(img, titulo, lt):
+    if not titulo:
+        return img
     a = ease(lt / 0.5)
     ov = Image.new("RGBA", img.size, (0, 0, 0, 0))
     d = ImageDraw.Draw(ov)
-    d.rounded_rectangle(P(40, 30, 150, 74), radius=12 * S, fill=(20, 14, 8, int(150 * a)))
-    d.text(P(58, 36), f"{num:02d}/06", font=fonte(26 * S), fill=OURO + (int(255 * a),))
+    fnt = fonte(22 * S)
+    wt = d.textlength(titulo, font=fnt)
+    x0 = (W * S - wt) / 2 - 20 * S
+    d.rounded_rectangle([x0, 16 * S, x0 + wt + 40 * S, 56 * S], radius=int(12 * S), fill=(20, 14, 8, int(170 * a)))
+    d.text((x0 + 20 * S, 24 * S), titulo, font=fnt, fill=OURO + (int(255 * a),))
     return Image.alpha_composite(img, ov)
 
 
-# ---------------------------------------------------------------- cenas
-# cada cena: função (lt, dur) -> Image RGBA em 2x
-
-
-def cena_titulo(lt, dur):
-    img = CEUS["aurora"].copy().convert("RGBA")
+# ======================================================================= cenas
+def d_abertura(lt, c):
+    img = ceu("aurora")
     d = ImageDraw.Draw(img, "RGBA")
-    sy = lerp(520, 300, ease(lt / 5))
-    sol(d, 640, sy, 70)
+    sol(d, 640, lerp(520, 330, ease(lt / 6)), 70)
     chao(d, 540)
-    # três pirâmides de Gizé surgindo
-    for cx, lg, al, atraso in ((330, 360, 210, 0.4), (640, 560, 330, 0.0), (930, 300, 170, 0.8)):
-        k = ease((lt - atraso) / 2.2)
-        piramide(d, cx, 540, lg, al * k, cor=(130, 90, 70), sombra=(90, 60, 50))
-    a = int(255 * ease((lt - 1.2) / 1.0))
-    texto_centro(d, "Como construíram", 90, 64, alfa=a)
-    texto_centro(d, "as Pirâmides do Egito?", 165, 64, cor=OURO, alfa=a)
-    a2 = int(255 * ease((lt - 2.6) / 1.0))
-    texto_centro(d, "Gizé • c. 2560 a.C. • 2,3 milhões de blocos", 600, 28, negrito=False, alfa=a2)
+    for cx, lg, al, atr in ((330, 360, 210, 0.4), (640, 560, 330, 0.0), (930, 300, 170, 0.8)):
+        piramide(d, cx, 540, lg, al * ease((lt - atr) / 2.5), cor=(130, 90, 70), sombra=(90, 60, 50))
+    a = 255 * ease((lt - 0.6) / 1.0) * (1 - c.prog("hem", lt, 0.8) * 0.0)
+    texto_centro(d, "Como construíram", 80, 60, alfa=a)
+    texto_centro(d, "as Pirâmides do Egito?", 150, 60, cor=OURO, alfa=a)
+    a2 = 255 * ease((c.desde("b", lt)) / 0.8)
+    texto_centro(d, "sem guindastes • sem máquinas • sem ferro", 232, 26, negrito=False, alfa=a2)
     return img
 
 
-def cena_pedreira(lt, dur):
-    img = CEUS["dia"].copy().convert("RGBA")
+SHARDS = [((-40, -10), (-70, 30), 0.5), ((10, -20), (30, -40), -0.7), ((50, 5), (90, 50), 1.1),
+          ((-10, 20), (-20, 70), -0.3), ((30, 25), (40, 75), 0.9), ((-55, 15), (-110, 60), 1.4)]
+
+
+def d_pedreira(lt, c):
+    img = ceu("dia")
     d = ImageDraw.Draw(img, "RGBA")
-    sol(d, 1100, 110, 45)
+    sol(d, 1040, 120, 42)
+    chao(d, 540)
+    d.polygon(T([(150, 540), (150, 260), (420, 260), (420, 340), (1130, 340), (1130, 540)]), fill=(200, 168, 116))
+    for y in (340, 440):
+        d.line(P(150, y, 1130, y), fill=PEDRA_ESC, width=2 * S)
+    bx, by, bw, bh = 560, 340, 170, 100   # bloco embutido na rocha
+    tf, tx1, tx2 = c.desde("fail", lt), c.desde("fix1", lt), c.desde("fix2", lt)
+    if tf < 0:
+        # tentativa: marretadas
+        d.rectangle(P(bx, by, bx + bw, by + bh), outline=PEDRA_ESC, width=S)
+        golpe = abs(math.sin(lt * 6))
+        mx, my = bx - 10, by - 40 + 30 * golpe
+        trabalhador(d, bx - 50, by, pose="parado", braco=(mx, my), escala=1.3)
+        d.rectangle(P(mx - 12, my - 16, mx + 14, my + 2), fill=(110, 110, 110))
+        k = clamp((c.desde("try", lt)) / 3.0)
+        for i in range(int(k * 5)):  # rachaduras aparecendo
+            x0 = bx + 20 + i * 30
+            d.line(P(x0, by, x0 + 15, by + 40, x0 - 5, by + 70), fill=TINTA, width=2 * S)
+    elif tx1 < 0:
+        # pedra estilhaçada
+        k = ease(tf / 0.6)
+        for (ox, oy), (vx, vy), ang in SHARDS:
+            cx, cy = bx + bw / 2 + ox + vx * k, by + bh / 2 + oy + vy * k
+            cy = min(cy, 528)
+            pts = rot([(cx - 22, cy - 14), (cx + 18, cy - 20), (cx + 26, cy + 10), (cx - 6, cy + 18)], cx, cy,
+                      ang * k * 2)
+            d.polygon(T(pts), fill=PEDRA, outline=PEDRA_ESC, width=2 * S)
+        trabalhador(d, bx - 50, by, pose="parado", braco=(bx - 30, by - 70), escala=1.3)
+    else:
+        # método certo: sulco + cunhas
+        sulco = ease(tx1 / 3.0)
+        d.rectangle(P(bx, by, bx + bw, by + bh), outline=PEDRA_ESC, width=S)
+        d.line(P(bx + bw, by, bx + bw, by + bh * sulco), fill=TINTA, width=5 * S)
+        d.line(P(bx, by, bx, by + bh * sulco), fill=TINTA, width=5 * S)
+        nc = int(clamp(tx2 / 2.0) * 5) if tx2 > 0 else 0
+        sai = ease((tx2 - 2.4) / 1.6) if tx2 > 0 else 0
+        if sai > 0:
+            d.rectangle(P(bx, by, bx + bw, by + bh), fill=(150, 122, 84))
+        bloco(d, bx + 320 * sai, by - 0 * sai, bw, bh)
+        for i in range(nc if sai == 0 else 0):
+            wx = bx + 15 + i * 32
+            d.polygon(T([(wx, by + bh - 4), (wx + 16, by + bh - 4), (wx + 8, by + bh + 14)]), fill=(120, 80, 40))
+        golpe = abs(math.sin(lt * 6))
+        mx, my = bx - 4, by - 36 + 26 * golpe
+        trabalhador(d, bx - 50, by, pose="parado", braco=(mx, my), escala=1.3)
+        d.line(P(mx, my, mx + 10, my + 30), fill=(200, 120, 60), width=4 * S)  # cinzel de cobre
+        if c.desde("fact", lt) > 0:
+            for i in range(int(clamp(c.desde("fact", lt) / 3) * 6)):
+                bloco(d, 860 + (i % 3) * 82, 470 - (i // 3) * 62, 78, 60)
+            a = 255 * c.prog("fact", lt, 0.6)
+            painel(d, 330, 80, 950, 150, a / 255)
+            texto_centro(d, "2.300.000 blocos • ~2,5 toneladas cada", 98, 30, cor=OURO, alfa=a, sombra=False)
+    return img
+
+
+def d_transporte(lt, c):
+    img = ceu("dia")
+    d = ImageDraw.Draw(img, "RGBA")
+    sol(d, 300, 120, 40)
     chao(d, 470)
-    # paredão da pedreira em degraus
-    d.polygon([tuple(P(*p)) for p in [(0, 470), (0, 250), (260, 250), (260, 330), (520, 330),
-                                       (520, 410), (760, 410), (760, 470)]], fill=(200, 168, 116))
-    for y in (250, 330, 410):
-        d.line(P(0, y, 760, y), fill=PEDRA_ESC, width=2 * S)
-    # sulcos e cunhas no bloco sendo separado
-    sep = ease((lt - 2.5) / 3.0)
-    bx = 560 + 120 * sep
-    bloco(d, bx, 410 - 60 + 60 * 0, 140, 60)
-    for i in range(4):
-        wx = 575 + i * 33
-        d.polygon([tuple(P(wx, 405)), tuple(P(wx + 10, 405)), tuple(P(wx + 5, 420))], fill=(120, 80, 40))
-    # trabalhadores com cinzel de cobre e malho
-    for i, (x, y) in enumerate(((330, 330), (420, 330), (840, 470), (950, 470))):
-        golpe = abs(math.sin(lt * 5 + i * 1.7))
-        mx = x + 26
-        my = y - 50 + 22 * golpe
-        trabalhador(d, x, y, pose="parado", braco=(mx, my))
-        d.rectangle(P(mx - 6, my - 10, mx + 8, my), fill=(110, 70, 40))  # malho
-        if golpe > 0.93:
-            for k in range(5):
-                ang = k * 1.2 + lt
-                d.ellipse(P(mx + 10 + 14 * math.cos(ang), my + 8 + 10 * math.sin(ang),
-                            mx + 14 + 14 * math.cos(ang), my + 12 + 10 * math.sin(ang)),
-                          fill=(255, 230, 160))
-    # blocos prontos empilhados
-    for i in range(3):
-        bloco(d, 980 + (i % 2) * 70, 410 - (i // 2) * 60, 66, 60)
-    img = capitulo(img, 1, lt)
-    return legenda(img, "1. A pedreira", [
-        "Calcário era cortado ali mesmo em Gizé, com cinzéis de cobre,",
-        "malhos de pedra e cunhas de madeira. Bloco médio: ~2,5 toneladas."], lt, dur)
+    piramide(d, 1000, 470, 260, 150, cor=(225, 195, 140), sombra=(200, 165, 115))
+    g = 560
+    tf, tx1 = c.desde("fail", lt), c.desde("fix1", lt)
+    if tx1 < 0:
+        # carroça com rodas
+        andou = min(c.desde("try", lt), c.t("fail") - c.t("try"))
+        k = clamp(andou / 4.0)
+        afunda = ease(tf / 0.8) if tf > 0 else 0
+        cx = 260 + 200 * k
+        if afunda > 0:
+            d.ellipse(P(cx - 30, g - 8 + 14 * afunda, cx + 250, g + 30), fill=(170, 130, 80))
+        ang = -0.12 * afunda
+        bloco_rot(d, cx + 110, g - 100 + 20 * afunda, 170, 80, ang)
+        d.polygon(T(rot([(cx, g - 58), (cx + 220, g - 58), (cx + 220, g - 48), (cx, g - 48)], cx + 110,
+                        g - 53, ang)), fill=(110, 70, 35))
+        for i, wx in enumerate((cx + 40, cx + 180)):
+            r = 34
+            wy = g - r + 22 * afunda
+            if i == 1 and afunda > 0:
+                wx += 220 * ease((tf - 0.5) / 1.5)
+                wy = g - r
+            gira = lt * 4 if tf < 0 else (lt * 6 if i == 1 else 0)
+            d.ellipse(P(wx - r, wy - r, wx + r, wy + r), outline=(110, 70, 35), width=6 * S)
+            for s in range(4):
+                a_ = gira + s * math.pi / 4
+                d.line(P(wx - r * math.cos(a_), wy - r * math.sin(a_), wx + r * math.cos(a_), wy + r * math.sin(a_)),
+                       fill=(110, 70, 35), width=3 * S)
+        for i in range(3):
+            px = cx + 280 + i * 50
+            trabalhador(d, px, g, fase=lt * 7 + i if tf < 0 else 0, braco=(px - 20, g - 40), escala=1.1)
+        d.line(P(cx + 220, g - 53, cx + 400, g - 45), fill=(170, 130, 70), width=3 * S)
+        return img
+    # trenó
+    tx2 = c.desde("fix2", lt)
+    molhar = ease(tx2 / 1.5) if tx2 > 0 else 0
+    vel = 12 if molhar < 0.5 else 40
+    base = 260 + 12 * tx1 if tx2 < 0 else 260 + 12 * (c.t("fix2") - c.t("fix1")) + 40 * tx2
+    sx = min(base, 420)
+    if molhar > 0:
+        d.rectangle(P(0, g - 4, W, g + 12), fill=lerpc(AREIA, AREIA_MOLHADA, molhar))
+    d.line(P(sx - 10, g, sx + 200, g), fill=(110, 70, 35), width=8 * S)
+    d.arc(P(sx + 170, g - 40, sx + 230, g + 2), 0, 90, fill=(110, 70, 35), width=8 * S)
+    bloco(d, sx + 10, g - 96, 170, 90)
+    cx0 = sx + 215
+    esforco = c.desde("fail2", lt) > 0 and molhar < 0.6
+    for i in range(6):
+        px = cx0 + 70 + i * 48
+        trabalhador(d, px, g, fase=lt * (4 if molhar < 0.5 else 9) + i, braco=(px - 20, g - 40), escala=1.1)
+        if esforco and int(lt * 4 + i) % 2 == 0:
+            d.ellipse(P(px + 6, g - 70, px + 12, g - 62), fill=(90, 170, 240))
+    d.line(P(cx0, g - 30, cx0 + 70 + 5 * 48, g - 44), fill=(170, 130, 70), width=3 * S)
+    if tx2 > 0:
+        ax = cx0 + 25
+        trabalhador(d, ax, g, pose="parado", braco=(ax + 24, g - 55), escala=1.1)
+        d.polygon(T([(ax + 20, g - 70), (ax + 42, g - 66), (ax + 36, g - 48), (ax + 22, g - 50)]), fill=(170, 90, 50))
+        for k in range(6):
+            yy = g - 48 + ((lt * 120 + k * 9) % 46)
+            d.ellipse(P(ax + 34, yy, ax + 40, yy + 7), fill=(80, 150, 220))
+    forca = lerp(1.0, 0.5, molhar)
+    painel(d, 440, 72, 840, 150)
+    d.text(P(460, 80), "Força para puxar", font=fonte(20 * S), fill=(255, 248, 235))
+    d.text(P(770, 80), f"{int(forca * 100)}%", font=fonte(20 * S), fill=OURO)
+    d.rounded_rectangle(P(460, 112, 820, 136), radius=8 * S, fill=(80, 60, 40))
+    d.rounded_rectangle(P(460, 112, 460 + 360 * forca, 136), radius=8 * S,
+                        fill=lerpc((220, 70, 50), (80, 190, 90), molhar))
+    return img
 
 
-def cena_nilo(lt, dur):
-    img = CEUS["tarde"].copy().convert("RGBA")
+def mapa(d, lt, c):
+    d.rectangle(P(0, 0, W, H), fill=(232, 208, 160))
+    for i in range(40):
+        x, y = (i * 389) % W, (i * 211) % 600
+        d.ellipse(P(x, y, x + 60, y + 18), fill=(222, 196, 146))
+    rio = [(330, 160), (360, 230), (420, 290), (470, 340), (560, 370), (650, 400), (720, 430), (800, 450),
+           (870, 470), (950, 500), (1000, 540)]
+    d.line(T(rio), fill=NILO, width=10 * S, joint="curve")
+    for (x, y), nome in (((330, 160), "Gizé"), ((1000, 540), "Assuã")):
+        d.ellipse(P(x - 10, y - 10, x + 10, y + 10), fill=VERMELHO, outline=TINTA, width=2 * S)
+        d.text(P(x + 16, y - 14), nome, font=fonte(26 * S), fill=TINTA)
+    d.text(P(560, 300), "~800 km", font=fonte(26 * S), fill=TINTA)
+    k = clamp(c.desde("try", lt) / 12.0)
+    i = k * (len(rio) - 1)
+    j = min(int(i), len(rio) - 2)
+    fx = lerp(rio[j][0], rio[j + 1][0], i - j)
+    fy = lerp(rio[j][1], rio[j + 1][1], i - j) + 40
+    # rastro do arrasto pelo deserto
+    d.line(P(1000, 580, fx, fy), fill=(150, 110, 70), width=3 * S)
+    bloco(d, fx - 14, fy - 12, 28, 18)
+    dias = int(c.desde("try", lt) * 47)
+    painel(d, 760, 90, 1120, 160)
+    d.text(P(780, 104), f"Arrastando... dia {max(0, dias)}", font=fonte(26 * S), fill=(255, 248, 235))
+
+
+def d_nilo(lt, c):
+    tx = c.desde("fix", lt)
+    if tx < 0:
+        img = ceu("papiro")
+        d = ImageDraw.Draw(img, "RGBA")
+        mapa(d, lt, c)
+        return img
+    img = ceu("tarde")
     d = ImageDraw.Draw(img, "RGBA")
     sol(d, 260, 170, 55)
-    # margem distante com palmeiras e pirâmide
     d.rectangle(P(0, 330, W, 380), fill=(200, 160, 100))
-    piramide(d, 1060, 340, 200, 110, cor=(200, 150, 100), sombra=(170, 120, 80))
+    canal = c.desde("fix2", lt) > 0
+    piramide(d, 1040, 340, 220, 130, cor=(200, 150, 100), sombra=(170, 120, 80))
     for px in (120, 180, 470, 720, 800):
         d.line(P(px, 340, px + 6, 290), fill=(110, 80, 50), width=4 * S)
         for a in range(5):
             ang = -2.6 + a * 0.6
-            d.line(P(px + 6, 290, px + 6 + 34 * math.cos(ang), 290 + 22 * math.sin(ang) + 10),
-                   fill=(60, 110, 50), width=5 * S)
-    # rio
-    d.rectangle(P(0, 380, W, 560), fill=NILO)
+            d.line(P(px + 6, 290, px + 6 + 34 * math.cos(ang), 300 + 22 * math.sin(ang)), fill=(60, 110, 50), width=5 * S)
+    d.rectangle(P(0, 380, W, 600), fill=NILO)
+    if canal:
+        k = c.prog("fix2", lt, 1.5)
+        d.polygon(T([(900, 380), (980, 380), (1000, 380 - 40 * k), (960, 380 - 40 * k)]), fill=NILO)
     for i in range(26):
-        y = 395 + (i % 6) * 28
-        x = ((i * 157 + lt * 40) % (W + 100)) - 50
+        y = 395 + (i % 7) * 28
+        x = ((i * 157 + lt * 60) % (W + 100)) - 50
         d.line(P(x, y, x + 40, y), fill=(120, 180, 210), width=2 * S)
-    d.rectangle(P(0, 560, W, H), fill=AREIA)
-    # barco com bloco de granito
-    bx = lerp(-260, 1350, lt / dur)
-    by = 470 + 4 * math.sin(lt * 2)
-    d.polygon([tuple(P(*p)) for p in [(bx - 150, by - 20), (bx + 150, by - 20), (bx + 110, by + 22),
-                                       (bx - 110, by + 22)]], fill=(130, 80, 40))
+    d.rectangle(P(0, 600, W, H), fill=AREIA)
+    bx = lerp(-200, 900, ease(tx / 7.0))
+    by = 480 + 4 * math.sin(lt * 2)
+    d.polygon(T([(bx - 150, by - 20), (bx + 150, by - 20), (bx + 110, by + 22), (bx - 110, by + 22)]), fill=(130, 80, 40))
     d.line(P(bx - 150, by - 20, bx - 175, by - 45), fill=(130, 80, 40), width=8 * S)
     d.line(P(bx + 150, by - 20, bx + 175, by - 45), fill=(130, 80, 40), width=8 * S)
-    bloco(d, bx - 55, by - 72, 110, 52, cor=(170, 90, 90), borda=(120, 60, 60))  # granito rosa
+    bloco(d, bx - 55, by - 72, 110, 52, cor=(175, 95, 95), borda=(120, 60, 60))
     d.line(P(bx + 20, by - 20, bx + 20, by - 200), fill=(100, 70, 40), width=5 * S)
-    d.polygon([tuple(P(bx + 24, by - 195)), tuple(P(bx + 120, by - 120)), tuple(P(bx + 24, by - 60))],
-              fill=(245, 235, 210))
+    d.polygon(T([(bx + 24, by - 195), (bx + 120, by - 120), (bx + 24, by - 60)]), fill=(245, 235, 210))
     for i in range(3):
         trabalhador(d, bx - 120 + i * 40, by - 20, pose="parado", escala=0.7,
                     braco=(bx - 100 + i * 40, by + 10 + 6 * math.sin(lt * 3 + i)))
-    img = capitulo(img, 2, lt)
-    return legenda(img, "2. Pelo rio Nilo", [
-        "Calcário fino veio de Tura e granito de Assuã (~800 km) em barcos.",
-        "O diário de Merer (papiros de Wadi al-Jarf) registra essas viagens."], lt, dur)
-
-
-def cena_treno(lt, dur):
-    img = CEUS["dia"].copy().convert("RGBA")
-    d = ImageDraw.Draw(img, "RGBA")
-    sol(d, 160, 100, 40)
-    chao(d, 430)
-    piramide(d, 1100, 430, 300, 170, cor=(225, 195, 140), sombra=(200, 165, 115))
-    ground = 540
-    # faixa de areia molhada (aparece após o aguadeiro passar)
-    molhar = ease((lt - 1.5) / 2.0)
-    sx = lerp(180, 520, ease(lt / dur))
-    if molhar > 0:
-        d.rectangle(P(0, ground - 4, W, ground + 10), fill=lerpc(AREIA, AREIA_MOLHADA, molhar) + (255,))
-    # trenó + bloco
-    d.line(P(sx - 10, ground, sx + 230, ground), fill=(110, 70, 35), width=8 * S)
-    d.arc(P(sx + 200, ground - 40, sx + 260, ground + 2), 0, 90, fill=(110, 70, 35), width=8 * S)
-    bloco(d, sx + 10, ground - 110, 190, 104)
-    # corda + puxadores
-    cx0 = sx + 245
-    for i in range(6):
-        px = cx0 + 60 + i * 55
-        trabalhador(d, px, ground, fase=lt * 7 + i, braco=(px - 20, ground - 40))
-    d.line(P(cx0, ground - 30, cx0 + 60 + 5 * 55, ground - 40), fill=(170, 130, 70), width=3 * S)
-    # aguadeiro despejando água na frente do trenó
-    ax = cx0 + 20
-    trabalhador(d, ax, ground, pose="parado", braco=(ax + 24, ground - 50))
-    d.polygon([tuple(P(ax + 20, ground - 64)), tuple(P(ax + 40, ground - 60)), tuple(P(ax + 34, ground - 44)),
-               tuple(P(ax + 22, ground - 46))], fill=(170, 90, 50))
-    for k in range(6):
-        yy = ground - 44 + ((lt * 120 + k * 9) % 44)
-        d.ellipse(P(ax + 34, yy, ax + 40, yy + 7), fill=(80, 150, 220))
-    # medidor de força
-    forca = lerp(1.0, 0.5, molhar)
-    d.rounded_rectangle(P(820, 40, 1240, 140), radius=14 * S, fill=(20, 14, 8, 170))
-    d.text(P(840, 50), "Força para puxar", font=fonte(22 * S), fill=(255, 248, 235))
-    d.rounded_rectangle(P(840, 90, 1220, 120), radius=8 * S, fill=(80, 60, 40))
-    cor = lerpc((220, 70, 50), (80, 190, 90), molhar)
-    d.rounded_rectangle(P(840, 90, 840 + 380 * forca, 120), radius=8 * S, fill=cor)
-    d.text(P(1150, 50), f"{int(forca * 100)}%", font=fonte(22 * S), fill=OURO)
-    img = capitulo(img, 3, lt)
-    return legenda(img, "3. Trenós e areia molhada", [
-        "Molhar a areia na frente do trenó reduz o atrito pela metade",
-        "(Univ. de Amsterdã, 2014) — cena pintada na tumba de Djehutihotep."], lt, dur)
-
-
-def cena_rampa(lt, dur):
-    img = CEUS["dia"].copy().convert("RGBA")
-    d = ImageDraw.Draw(img, "RGBA")
-    sol(d, 1150, 90, 38)
-    chao(d, 560)
-    base_y, cx, larg, alt = 560, 640, 760, 420
-    camadas = 14
-    fase1 = 6.0  # segundos construindo
-    prog = ease(lt / fase1)
-    n = int(prog * camadas) + 1
-    n = min(n, camadas)
-    hcam = alt / camadas
-    for i in range(n):
-        y1 = base_y - i * hcam
-        y2 = y1 - hcam
-        w1 = larg * (1 - i / camadas)
-        w2 = larg * (1 - (i + 1) / camadas)
-        tone = PEDRA if i % 2 == 0 else (205, 180, 136)
-        d.polygon([tuple(P(cx - w1 / 2, y1)), tuple(P(cx + w1 / 2, y1)),
-                   tuple(P(cx + w2 / 2, y2)), tuple(P(cx - w2 / 2, y2))], fill=tone)
-        nb = max(1, int(w1 / 50))
-        for b in range(1, nb):
-            bxx = cx - w1 / 2 + b * w1 / nb
-            d.line(P(bxx, y1, bxx, y2), fill=PEDRA_ESC, width=S)
-        d.line(P(cx - w1 / 2, y1, cx + w1 / 2, y1), fill=PEDRA_ESC, width=S)
-    # rampa reta de tijolos de barro até o topo atual
-    topo_y = base_y - n * hcam
-    w_topo = larg * (1 - n / camadas)
-    if n < camadas:
-        rx = cx - w_topo / 2
-        comp = (base_y - topo_y) * 2.2
-        d.polygon([tuple(P(rx - comp, base_y)), tuple(P(rx, topo_y)), tuple(P(rx, base_y))],
-                  fill=(160, 112, 72))
-        # bloco subindo a rampa
-        k = (lt * 0.6) % 1
-        bx = lerp(rx - comp, rx, k)
-        by = lerp(base_y, topo_y, k)
-        bloco(d, bx - 20, by - 26, 34, 24)
-    else:
-        # piramídio dourado no topo
-        d.polygon([tuple(P(cx - 30, base_y - alt + 30)), tuple(P(cx, base_y - alt - 4)),
-                   tuple(P(cx + 30, base_y - alt + 30))], fill=OURO)
-    # painel com as 4 teorias (segunda metade)
-    a = ease((lt - fase1 - 0.3) / 0.8)
-    if a > 0:
-        ov = Image.new("RGBA", img.size, (0, 0, 0, 0))
-        o = ImageDraw.Draw(ov)
-        o.rectangle(P(0, 0, W, H), fill=(20, 14, 8, int(200 * a)))
-        nomes = ["Reta", "Zigue-zague", "Espiral", "Interna"]
-        for j, nome in enumerate(nomes):
-            k = ease((lt - fase1 - 0.5 - j * 0.6) / 0.8) * a
-            ox = 70 + j * 290
-            oy = 120
-            o.rounded_rectangle(P(ox, oy, ox + 260, oy + 280), radius=16 * S,
-                                fill=(60, 44, 30, int(255 * k)))
-            pc = ox + 130
-            pb = oy + 220
-            o.polygon([tuple(P(pc - 90, pb)), tuple(P(pc, pb - 140)), tuple(P(pc + 90, pb))],
-                      fill=PEDRA + (int(255 * k),))
-            rc = (200, 90, 60, int(255 * k))
-            if j == 0:
-                o.line(P(pc - 120, pb, pc - 30, pb - 95), fill=rc, width=7 * S)
-            elif j == 1:
-                o.line(P(pc - 70, pb - 8, pc + 50, pb - 40, pc - 40, pb - 75, pc + 20, pb - 105,
-                         pc - 5, pb - 125), fill=rc, width=6 * S, joint="curve")
-            elif j == 2:
-                o.line(P(pc - 85, pb - 4, pc + 75, pb - 20, pc + 10, pb - 50, pc - 50, pb - 70,
-                         pc + 30, pb - 100, pc, pb - 130), fill=rc, width=6 * S, joint="curve")
-            else:
-                for q in range(0, 120, 12):
-                    o.line(P(pc - 70 + q * 0.55, pb - 20 - q * 0.9, pc - 64 + q * 0.55, pb - 28 - q * 0.9),
-                           fill=rc, width=5 * S)
-            f = fonte(26 * S)
-            l, t, r, b = o.textbbox((0, 0), nome, font=f)
-            o.text((pc * S - (r - l) / 2, (oy + 236) * S), nome, font=f, fill=OURO + (int(255 * k),))
-        texto_centro(o, "Qual rampa? Os arqueólogos ainda debatem", 50, 34, alfa=int(255 * a), sombra=False)
-        img = Image.alpha_composite(img, ov)
-    img = capitulo(img, 4, lt)
-    return legenda(img, "4. Rampas", [
-        "Rampas de tijolo de barro e entulho levavam os blocos para cima.",
-        "Em 2018, achou-se em Hatnub uma rampa com postes e degraus laterais."], lt, dur)
-
-
-def cena_alavancas(lt, dur):
-    img = CEUS["tarde"].copy().convert("RGBA")
-    d = ImageDraw.Draw(img, "RGBA")
-    # degraus próximos do topo, visão aproximada
-    for i in range(5):
-        y = 620 - i * 90
-        x0 = 80 + i * 120
-        d.rectangle(P(x0, y - 90, W, y), fill=PEDRA if i % 2 else (205, 180, 136), outline=PEDRA_ESC, width=S)
-    # bloco sendo alavancado (balança para cima)
-    sobe = (math.sin(lt * 2.5) + 1) / 2
-    bx, by = 470, 350 - 20 * sobe
-    ang = -0.15 * sobe
-    bloco(d, bx, by - 70, 130, 70)
-    # alavanca de madeira
-    px, py = bx - 10, 350
-    d.ellipse(P(px - 12, py - 8, px + 12, py + 8), fill=(110, 70, 40))
-    d.line(P(px + 40, py - 18 * sobe, px - 140, py + 60 * (1 - sobe) - 30), fill=(140, 90, 45), width=9 * S)
-    trabalhador(d, px - 150, 440, pose="parado", braco=(px - 130, py + 60 * (1 - sobe) - 30))
-    # revestimento branco polido aparecendo da direita
-    rev = ease((lt - 2.5) / 3.0)
-    if rev > 0:
-        d.polygon([tuple(P(*p)) for p in [(W - 420 * rev, 620), (W, 620), (W, 620 - 400 * rev)]],
-                  fill=CALCARIO)
-        for k in range(int(30 * rev)):
-            gx = W - (k * 37 % int(420 * rev + 1))
-            gy = 620 - (k * 53 % int(400 * rev + 1))
-            d.ellipse(P(gx, gy, gx + 4, gy + 4), fill=(255, 255, 255))
-    img = capitulo(img, 5, lt)
-    return legenda(img, "5. Alavancas e revestimento", [
-        "Alavancas de madeira faziam o ajuste fino de cada bloco.",
-        "Por fora, calcário branco polido: a pirâmide brilhava ao sol."], lt, dur)
-
-
-def cena_trabalhadores(lt, dur):
-    img = CEUS["aurora"].copy().convert("RGBA")
-    d = ImageDraw.Draw(img, "RGBA")
-    chao(d, 300)
-    # pontinhos = equipes surgindo
-    total = 30000
-    prog = ease(lt / (dur * 0.7))
-    cols, rows = 60, 20
-    vis = int(prog * cols * rows)
-    for idx in range(vis):
-        c, r = idx % cols, idx // cols
-        x = 90 + c * 18.5
-        y = 330 + r * 12
-        dy = 2 * math.sin(lt * 4 + idx)
-        cor = PELE if (idx // 40) % 2 == 0 else (140, 88, 50)
-        d.ellipse(P(x, y + dy, x + 7, y + 7 + dy), fill=cor)
-    num = int(prog * total)
-    texto_centro(d, f"~{num:,}".replace(",", "."), 110, 90, cor=OURO)
-    texto_centro(d, "trabalhadores em equipes que se revezavam", 225, 30, negrito=False)
-    img = capitulo(img, 6, lt)
-    return legenda(img, "6. Quem construiu?", [
-        "Não eram escravos: eram trabalhadores pagos com pão, cerveja e abrigo.",
-        "Suas tumbas e a vila onde viviam foram achadas ao lado das pirâmides."], lt, dur)
-
-
-def cena_final(lt, dur):
-    k = ease(lt / 3)
-    img = Image.blend(CEUS["tarde"], CEUS["noite"], k * 0.85).convert("RGBA")
-    d = ImageDraw.Draw(img, "RGBA")
-    for i in range(80):
-        sx = (i * 977) % W
-        sy = (i * 373) % 300
-        a = int(255 * k * (0.5 + 0.5 * math.sin(lt * 3 + i)))
-        d.ellipse(P(sx, sy, sx + 3, sy + 3), fill=(255, 255, 255, a))
-    sol(d, 640, lerp(300, 620, k), 60, cor=(255, 190, 110))
-    chao(d, 560, cor=lerpc(AREIA, (90, 70, 70), k), cor2=lerpc(AREIA_ESC, (70, 50, 55), k))
-    piramide(d, 640, 560, 620, 360, cor=lerpc(CALCARIO, (180, 160, 170), k),
-             sombra=lerpc((220, 205, 180), (120, 100, 120), k))
-    d.polygon([tuple(P(610, 235)), tuple(P(640, 200)), tuple(P(670, 235))], fill=OURO)
-    a = int(255 * ease((lt - 1) / 1))
-    texto_centro(d, "Grande Pirâmide de Quéops", 70, 50, alfa=a)
-    texto_centro(d, "146 m de altura • ~20 anos de obra • a mais alta do mundo por 3.800 anos",
-                 140, 24, negrito=False, alfa=a)
-    a2 = int(255 * ease((lt - 3.5) / 1))
-    texto_centro(d, "Engenharia, organização e muita gente — não mistério.", 610, 30, cor=OURO, alfa=a2)
+    tf = c.desde("fact", lt)
+    if tf > 0:
+        a = c.prog("fact", lt, 0.8)
+        larg = 520 * a
+        x0 = 640 - larg / 2
+        d.rectangle(P(x0, 90, x0 + larg, 200), fill=(236, 214, 160), outline=(150, 110, 60), width=2 * S)
+        for r in range(4):
+            for q in range(int(larg / 22)):
+                xx = x0 + 14 + q * 22
+                yy = 110 + r * 22 + 3 * math.sin(q * 1.7 + r)
+                d.arc(P(xx, yy, xx + 14, yy + 12), 180, 360 if (q + r) % 3 else 270, fill=TINTA, width=2 * S)
+        if a > 0.9:
+            texto_centro(d, "Diário de Merer • papiro de ~2560 a.C.", 212, 22, cor=BRANCO)
     return img
 
 
-CENAS = [
-    (cena_titulo, 6.0),
-    (cena_pedreira, 9.0),
-    (cena_nilo, 9.0),
-    (cena_treno, 9.5),
-    (cena_rampa, 12.0),
-    (cena_alavancas, 8.5),
-    (cena_trabalhadores, 8.5),
-    (cena_final, 8.0),
+def d_rampa(lt, c):
+    img = ceu("dia")
+    d = ImageDraw.Draw(img, "RGBA")
+    sol(d, 1150, 90, 38)
+    tx = c.desde("fix", lt)
+    if tx < 0:
+        # rampa reta: câmera afastando
+        k = ease(c.desde("try", lt) / (c.t("fix") - c.t("try") - 1.0))
+        z = lerp(1.0, 0.27, k)
+        g = 560
+        cx = lerp(820, 1040, k)
+        chao(d, g)
+        larg, alt = 700 * z, 420 * z
+        d.polygon(T([(cx - larg / 2, g), (cx, g - alt), (cx + larg / 2, g)]), outline=PEDRA_ESC, width=2 * S)
+        piramide_camadas(d, cx, g, larg, alt, 14, 8)
+        topo = g - alt * 8 / 14
+        rx = cx - larg / 2 * (1 - 8 / 14)
+        comp = alt * 8 / 14 * 7.5 * clamp(k * 1.3)
+        d.polygon(T([(rx - comp, g), (rx, topo), (rx, g)]), fill=(160, 112, 72))
+        km = 1.6 * clamp(k * 1.3)
+        painel(d, 380, 76, 900, 150)
+        texto_centro(d, f"Rampa reta: {km:.1f} km".replace(".", ","), 92, 34, cor=OURO, sombra=False)
+        return img
+    g = 560
+    chao(d, g)
+    cx, larg, alt = 640, 700, 420
+    k = ease(tx / 8.0)
+    n = max(2, min(14, int(2 + k * 12)))
+    topo_y, w_top = piramide_camadas(d, cx, g, larg, alt, 14, n)
+    # rampa em zigue-zague colada na face
+    pts = []
+    hc = alt / 14
+    for i in range(n + 1):
+        y = g - i * hc
+        wi = larg * (1 - i / 14)
+        lado = -1 if i % 2 == 0 else 1
+        pts.append((cx + lado * wi / 2 * 0.85, y))
+    d.line(T(pts), fill=(170, 100, 60), width=9 * S, joint="curve")
+    m = (lt * 0.5) % 1 * (len(pts) - 1)
+    j = min(int(m), len(pts) - 2)
+    bx, by = lerp(pts[j][0], pts[j + 1][0], m - j), lerp(pts[j][1], pts[j + 1][1], m - j)
+    bloco(d, bx - 12, by - 20, 24, 16)
+    if n >= 14:
+        d.polygon(T([(cx - 30, g - alt + 30), (cx, g - alt - 4), (cx + 30, g - alt + 30)]), fill=OURO)
+    tf = c.desde("fact", lt)
+    if tf > 0:
+        a = c.prog("fact", lt, 0.6)
+        ov = Image.new("RGBA", img.size, (0, 0, 0, 0))
+        o = ImageDraw.Draw(ov)
+        o.rounded_rectangle(P(330, 80, 950, 400), radius=18 * S, fill=(30, 22, 14, int(225 * a)))
+        texto_centro(o, "Hatnub, 2018: rampa com degraus e postes", 96, 26, cor=OURO, alfa=255 * a, sombra=False)
+        # rampa íngreme com escadas dos lados
+        A = int(255 * a)
+        o.polygon(T([(420, 370), (860, 370), (860, 160)]), fill=(160, 112, 72, A))
+        for q in range(12):
+            x = 440 + q * 36
+            y = 370 - (x - 420) / 440 * 210
+            o.line(P(x, y + 8, x + 30, y + 8), fill=(220, 190, 140, A), width=3 * S)
+        for q in range(3):
+            px = 560 + q * 110
+            py = 370 - (px - 420) / 440 * 210
+            o.rectangle(P(px - 5, py - 40, px + 5, py), fill=(110, 70, 35, A))
+        sx = 470 + 300 * ((lt * 0.15) % 1)
+        sy = 370 - (sx - 420) / 440 * 210
+        o.rectangle(P(sx - 20, sy - 30, sx + 20, sy), fill=PEDRA + (A,), outline=PEDRA_ESC + (A,), width=2 * S)
+        o.line(P(sx + 20, sy - 15, 870, 150), fill=(200, 160, 90, A), width=2 * S)
+        img = Image.alpha_composite(img, ov)
+    return img
+
+
+def d_alinhar(lt, c):
+    img = ceu("tarde")
+    d = ImageDraw.Draw(img, "RGBA")
+    tf, tx, tfa = c.desde("fail", lt), c.desde("fix", lt), c.desde("fact", lt)
+    if tf > 0 and tx < 0:
+        # exagero: erro na base vira erro no topo
+        chao(d, 560)
+        piramide(d, 640, 560, 700, 400, cor=(225, 200, 150), sombra=(200, 170, 120))
+        k = c.prog("fail", lt, 1.0)
+        d.line(P(290, 560, 640, 160), fill=VERDE, width=4 * S)
+        d.line(P(990 + 18, 560 - 30 * k, 640 + 90 * k, 160 + 10 * k), fill=VERMELHO, width=5 * S)
+        d.ellipse(P(640 + 90 * k - 26, 150 + 10 * k - 26, 640 + 90 * k + 26, 150 + 10 * k + 26),
+                  outline=VERMELHO, width=4 * S)
+        painel(d, 380, 76, 900, 140)
+        texto_centro(d, "2 cm na base → metros no topo", 88, 30, cor=OURO, sombra=False)
+        return img
+    for i in range(4):
+        y = 620 - i * 95
+        x0 = 210 + i * 110
+        d.rectangle(P(x0, y - 95, 1080, y), fill=PEDRA if i % 2 else PEDRA2, outline=PEDRA_ESC, width=S)
+    bx, by = 560, 335
+    if tx < 0:
+        ang = 0.18 + 0.02 * math.sin(lt * 3)
+        bloco_rot(d, bx + 70, by - 40, 140, 80, ang)
+        d.arc(P(bx - 10, by - 90, bx + 150, by + 10), -10, 12, fill=VERMELHO, width=4 * S)
+        d.text(P(bx + 160, by - 70), "torto!", font=fonte(30 * S), fill=VERMELHO)
+    else:
+        k = c.prog("fix", lt, 3.0)
+        sobe = (math.sin(lt * 5) + 1) / 2 * (1 - k)
+        ang = 0.18 * (1 - k) - 0.03 * sobe
+        bloco_rot(d, bx + 70, by - 40 - 6 * sobe, 140, 80, ang)
+        px, py = bx - 8, by - 6
+        d.ellipse(P(px - 12, py - 8, px + 12, py + 8), fill=(110, 70, 35))
+        d.line(P(px + 40, py - 14 * sobe, px - 150, py + 55 * (1 - sobe) - 30), fill=(140, 90, 45), width=9 * S)
+        trabalhador(d, px - 165, 430, pose="parado", braco=(px - 140, py + 55 * (1 - sobe) - 30), escala=1.2)
+    if tfa > 0:
+        a = c.prog("fact", lt, 0.6)
+        ov = Image.new("RGBA", img.size, (0, 0, 0, 0))
+        o = ImageDraw.Draw(ov)
+        A = int(255 * a)
+        o.rounded_rectangle(P(300, 80, 980, 330), radius=18 * S, fill=(30, 22, 14, int(225 * a)))
+        texto_centro(o, "Nível com água: menos de ~2 cm em 230 m", 96, 26, cor=OURO, alfa=A, sombra=False)
+        o.rectangle(P(340, 200, 940, 300), fill=(200, 160, 110, A))
+        for q in range(5):
+            x = 370 + q * 120
+            o.rectangle(P(x, 200, x + 60, 250), fill=(70, 140, 200, A))
+        o.line(P(340, 200, 940, 200), fill=(255, 255, 255, A), width=2 * S)
+        for q in range(0, 600, 30):
+            o.line(P(340 + q, 190, 355 + q, 190), fill=(255, 255, 255, A), width=2 * S)
+        img = Image.alpha_composite(img, ov)
+    return img
+
+
+def d_pessoas(lt, c):
+    img = ceu("aurora")
+    d = ImageDraw.Draw(img, "RGBA")
+    chao(d, 300)
+    tx = c.desde("fix", lt)
+    if tx < 0:
+        for i in range(60):
+            x = 300 + (i % 15) * 46
+            y = 360 + (i // 15) * 45
+            trabalhador(d, x, y + 30, pose="parado", escala=0.9,
+                        braco=(x + 14, y - 2 + 3 * math.sin(lt * 3 + i)))
+        if c.desde("fail", lt) < 0:
+            texto_centro(d, "?", 90, 150, cor=OURO)
+        return img
+    prog = ease(tx / 6.0)
+    cols, rows = 46, 16
+    vis = int(prog * cols * rows)
+    for idx in range(vis):
+        cc, r = idx % cols, idx // cols
+        x = 220 + cc * 18.5
+        y = 330 + r * 12
+        dy = 2 * math.sin(lt * 4 + idx)
+        d.ellipse(P(x, y + dy, x + 7, y + 7 + dy), fill=PELE if (idx // 40) % 2 == 0 else (175, 110, 60))
+    # ícones: pão, cerveja, casa, médico
+    icones = ["pão", "cerveja", "casa", "médico"]
+    some = 1 - c.prog("fact", lt, 0.5)
+    for j, nome in enumerate(icones):
+        a = 255 * ease((tx - 0.8 - j * 0.7) / 0.5) * some
+        if a <= 0:
+            continue
+        ix = 330 + j * 180
+        iy = 150
+        d.rounded_rectangle(P(ix - 60, iy - 60, ix + 60, iy + 70), radius=14 * S, fill=(30, 22, 14, int(a * 0.8)))
+        if j == 0:
+            d.ellipse(P(ix - 34, iy - 22, ix + 34, iy + 16), fill=(200, 140, 70, int(a)))
+            d.arc(P(ix - 20, iy - 18, ix + 20, iy + 6), 200, 340, fill=(140, 90, 40, int(a)), width=3 * S)
+        elif j == 1:
+            d.polygon(T([(ix - 16, iy - 34), (ix + 16, iy - 34), (ix + 24, iy + 4), (ix, iy + 24), (ix - 24, iy + 4)]),
+                      fill=(170, 100, 60, int(a)))
+        elif j == 2:
+            d.rectangle(P(ix - 30, iy - 10, ix + 30, iy + 22), fill=(210, 170, 110, int(a)))
+            d.rectangle(P(ix - 8, iy + 2, ix + 8, iy + 22), fill=(90, 60, 40, int(a)))
+            d.rectangle(P(ix - 34, iy - 18, ix + 34, iy - 10), fill=(150, 110, 70, int(a)))
+        else:
+            d.rectangle(P(ix - 8, iy - 30, ix + 8, iy + 20), fill=(255, 255, 255, int(a)))
+            d.rectangle(P(ix - 25, iy - 13, ix + 25, iy + 3), fill=(255, 255, 255, int(a)))
+        f = fonte(20 * S)
+        wt = d.textlength(nome, font=f)
+        d.text((ix * S - wt / 2, (iy + 34) * S), nome, font=f, fill=OURO + (int(a),))
+    if c.desde("fix2", lt) > 0:
+        a = 255 * c.prog("fix2", lt, 0.6)
+        d.rounded_rectangle(P(420, 268, 860, 316), radius=24 * S, fill=(245, 230, 190, int(a)),
+                            outline=(180, 120, 20, int(a)), width=3 * S)
+        texto_centro(d, "“Amigos de Quéops”", 274, 28, cor=(120, 70, 20), alfa=a, sombra=False)
+    if c.desde("fact", lt) > 0:
+        a = 255 * c.prog("fact", lt, 0.6)
+        texto_centro(d, "20 a 30 mil", 80, 80, cor=OURO, alfa=a)
+        texto_centro(d, "trabalhadores, em turnos", 180, 30, alfa=a)
+    return img
+
+
+def d_final(lt, c):
+    k = ease(c.desde("b", lt) / 4)
+    img = Image.blend(CEUS["tarde"], CEUS["noite"], k * 0.8).convert("RGBA")
+    d = ImageDraw.Draw(img, "RGBA")
+    for i in range(80):
+        sx, sy = (i * 977) % W, (i * 373) % 300
+        a = int(255 * k * (0.5 + 0.5 * math.sin(lt * 3 + i)))
+        d.ellipse(P(sx, sy, sx + 3, sy + 3), fill=(255, 255, 255, a))
+    sol(d, 640, lerp(300, 640, k), 60, cor=(255, 190, 110))
+    chao(d, 560, cor=lerpc(AREIA, (110, 85, 80), k), cor2=lerpc(AREIA_ESC, (85, 65, 65), k))
+    constr = ease(lt / 3.5)
+    n = int(constr * 14)
+    if n < 14:
+        piramide_camadas(d, 640, 560, 560, 290, 14, n)
+    else:
+        piramide(d, 640, 560, 560, 290, cor=lerpc(CALCARIO, (190, 170, 180), k),
+                 sombra=lerpc((220, 205, 180), (130, 110, 130), k))
+        d.polygon(T([(613, 284), (640, 269), (667, 284)]), fill=OURO)
+    a = 255 * ease(c.desde("b", lt) / 1)
+    texto_centro(d, "Grande Pirâmide de Quéops", 76, 46, alfa=a)
+    texto_centro(d, "146 m • ~20 anos de obra • a mais alta do mundo por ~3.800 anos", 140, 22,
+                 negrito=False, alfa=a)
+    a2 = 255 * ease(c.desde("end", lt) / 1)
+    texto_centro(d, "Tentativa, erro e muita gente trabalhando junto.", 188, 28, cor=OURO, alfa=a2)
+    a3 = 255 * ease((c.desde("end", lt) - 2.5) / 1)
+    texto_centro(d, "Hemiunu foi o arquiteto real da Grande Pirâmide • Neferet é personagem fictícia",
+                 230, 16, negrito=False, alfa=a3)
+    return img
+
+
+# ======================================================================= roteiro
+# (quem, texto, tag, pausa_depois, carimbo)
+ROTEIRO = [
+    ("", d_abertura, [
+        ("N", "Egito, dois mil quinhentos e sessenta antes de Cristo.", "a", 0.4),
+        ("N", "O faraó Quéops quer a maior pirâmide do mundo. Sem guindastes, sem máquinas e sem ferro.", "b", 0.5),
+        ("N", "Quem vai resolver isso é Hemiunu, o arquiteto...", "hem", 0.3),
+        ("N", "e Neferet, a chefe das equipes de trabalho.", "nef", 0.4),
+        ("H", "Fácil! O que pode dar errado?", "go", 0.3),
+        ("F", "Tudo, Hemiunu. Tudo.", "go2", 0.6),
+    ], {"H": "hem", "F": "nef"}),
+    ("1 • A pedra", d_pedreira, [
+        ("H", "Primeiro passo: pedra! Vamos quebrar a rocha na marretada.", "try", 0.6),
+        ("N", "Crack! O bloco racha todo torto. Pedra irregular não dá para empilhar.", "fail", 0.6, "ERRO"),
+        ("F", "Assim não dá. Primeiro a gente cava um sulco reto, com cinzéis de cobre e martelos de pedra.", "fix1", 0.4),
+        ("F", "Depois enfia cunhas de madeira e bate nelas. Aí a pedra se solta inteira!", "fix2", 1.2, "CERTO"),
+        ("N", "Foram uns dois milhões e trezentos mil blocos. Em média, duas toneladas e meia cada um.", "fact", 0.4),
+    ]),
+    ("2 • Arrastar o bloco", d_transporte, [
+        ("F", "Agora é só colocar o bloco numa carroça com rodas!", "try", 1.0),
+        ("N", "As rodas finas afundam na areia, e o eixo de madeira não aguenta o peso.", "fail", 0.6, "ERRO"),
+        ("H", "Nada de rodas. Um trenó de madeira desliza por cima da areia.", "fix1", 1.2),
+        ("F", "Desliza... mas olha o esforço! Vamos precisar do dobro de gente.", "fail2", 0.6, "QUASE"),
+        ("H", "Então joga água na areia, bem na frente do trenó.", "fix2", 1.4, "CERTO"),
+        ("N", "Areia molhada na medida certa corta pela metade a força necessária. Uma pintura egípcia de quatro mil anos mostra exatamente isso.", "fact", 0.4),
+    ]),
+    ("3 • Pedras de longe", d_nilo, [
+        ("F", "E o granito? Ele vem de Assuã, a oitocentos quilômetros daqui!", "try", 0.3),
+        ("F", "Arrastando pelo deserto, vai levar anos...", "try2", 0.4),
+        ("N", "Arrastar pedras de várias toneladas por oitocentos quilômetros de deserto? Impossível.", "fail", 0.6, "ERRO"),
+        ("H", "A gente não arrasta. O Nilo carrega! Os barcos descem o rio junto com a correnteza.", "fix", 0.4, "CERTO"),
+        ("H", "E na época da cheia, um canal leva os barcos até o pé da pirâmide.", "fix2", 0.5),
+        ("N", "O diário de um inspetor chamado Merer, um dos papiros mais antigos do mundo, registra essas viagens de barco.", "fact", 0.4),
+    ]),
+    ("4 • Subir os blocos", d_rampa, [
+        ("H", "Hora de subir. Uma rampa reta, direto até o topo!", "try", 0.5),
+        ("N", "Para chegar a cento e quarenta e seis metros sem ficar íngreme demais, essa rampa teria mais de um quilômetro e meio, e mais material do que a própria pirâmide!", "fail", 0.6, "ERRO"),
+        ("F", "Então a rampa abraça a pirâmide. Ela vai subindo em zigue-zague, colada nas paredes.", "fix", 2.0, "CERTO"),
+        ("N", "Até hoje ninguém sabe qual rampa foi usada. Mas em dois mil e dezoito, arqueólogos acharam numa pedreira uma rampa íngreme, com degraus e postes para puxar as cordas.", "fact", 0.4),
+    ]),
+    ("5 • Tudo no lugar", d_alinhar, [
+        ("F", "Ih, Hemiunu... esse bloco ficou torto!", "try", 0.5),
+        ("N", "E um errinho de poucos centímetros na base vira um erro de metros lá no topo. As faces não se encontram!", "fail", 0.6, "ERRO"),
+        ("H", "Alavancas de madeira! Com elas, a gente ajusta cada bloco no lugar certinho.", "fix", 1.0, "CERTO"),
+        ("H", "E para deixar o chão plano, usamos valas com água. A superfície da água é sempre reta.", "fact", 0.3),
+        ("N", "Resultado: a base da Grande Pirâmide tem só uns dois centímetros de desnível, em mais de duzentos e trinta metros.", "fact2", 0.4),
+    ]),
+    ("6 • Quem construiu?", d_pessoas, [
+        ("F", "Isso tudo precisa de muita gente. Vamos usar escravos?", "try", 0.4),
+        ("N", "Esse é um mito famoso, mas está errado.", "fail", 0.6, "MITO"),
+        ("H", "Nada disso! Trabalhadores pagos, com pão, cerveja, casa e até médico.", "fix", 0.4, "CERTO"),
+        ("F", "E as equipes tinham até nomes, como os Amigos de Quéops!", "fix2", 0.5),
+        ("N", "Arqueólogos acharam a vila e os túmulos desses trabalhadores, bem ao lado das pirâmides. Eram de vinte a trinta mil pessoas, trabalhando em turnos.", "fact", 0.4),
+    ]),
+    ("", d_final, [
+        ("N", "Uns vinte anos depois...", "a", 0.6),
+        ("N", "A Grande Pirâmide: cento e quarenta e seis metros. A construção mais alta do mundo por quase quatro mil anos.", "b", 0.5),
+        ("H", "Errar fez parte do projeto.", "h", 0.3),
+        ("F", "E cada erro virou uma solução!", "f", 0.4),
+        ("N", "Não foi magia. Foi tentativa, erro, e muita gente trabalhando junto.", "end", 0.3),
+    ]),
 ]
-FADE = 0.5  # transição em preto entre cenas
-DUR_TOTAL = sum(d for _, d in CENAS)
 
 
-# ---------------------------------------------------------------- áudio
-def gerar_trilha(caminho, dur, sr=44100):
-    t = np.arange(int(dur * sr)) / sr
-    # drone (Ré + Lá) com leve tremolo
+def feliz_final(cena):
+    def f(lt):
+        return "feliz" if cena.desde("h", lt) > 0 else None
+    return f
+
+
+# ======================================================================= áudio
+def tom(f, dur, decai=4.0, amp=0.3, onda="seno"):
+    t = np.arange(int(dur * SR)) / SR
+    if onda == "quadrada":
+        s = np.sign(np.sin(2 * np.pi * f * t))
+    else:
+        s = np.sin(2 * np.pi * f * t)
+    return (s * np.exp(-t * decai) * amp).astype(np.float32)
+
+
+def sfx(tipo):
+    if tipo in ("ERRO", "MITO"):
+        a = tom(150, 0.55, 2.5, 0.22, "quadrada")
+        b = tom(110, 0.55, 2.5, 0.22, "quadrada")
+        return np.concatenate([a[:int(0.25 * SR)], b])
+    if tipo == "QUASE":
+        return np.concatenate([tom(440, 0.18, 6, 0.25), tom(392, 0.35, 5, 0.25)])
+    if tipo == "CERTO":
+        return np.concatenate([tom(660, 0.12, 8, 0.25), tom(880, 0.12, 8, 0.25), tom(1320, 0.6, 4, 0.25)])
+    return np.zeros(1, np.float32)
+
+
+def musica(dur):
+    t = np.arange(int(dur * SR)) / SR
     drone = (0.18 * np.sin(2 * np.pi * 73.42 * t) + 0.10 * np.sin(2 * np.pi * 110.0 * t)
              + 0.05 * np.sin(2 * np.pi * 146.83 * t)) * (0.8 + 0.2 * np.sin(2 * np.pi * 0.15 * t))
-    # melodia dedilhada na escala Hijaz em Ré: D Eb F# G A Bb C D
     hijaz = [293.66, 311.13, 369.99, 392.00, 440.00, 466.16, 523.25, 587.33]
-    frase = [0, 1, 2, 3, 4, 3, 2, 1, 0, 2, 4, 5, 4, 3, 2, 1, 2, 3, 2, 1, 0, -1, 0, 0]
+    frase = [0, 1, 2, 3, 4, 3, 2, 1, 0, 2, 4, 5, 4, 3, 2, 1, 2, 3, 2, 1, 0, 0]
     mel = np.zeros_like(t)
-    passo = 0.75
-    rng = np.random.default_rng(7)
-    n = 0
-    tempo = 1.5
+    tempo, n = 1.0, 0
     while tempo < dur - 2:
-        g = frase[n % len(frase)]
-        f = hijaz[g] if g >= 0 else hijaz[6] / 2
-        i0 = int(tempo * sr)
-        L = int(1.6 * sr)
-        seg = np.arange(min(L, len(t) - i0)) / sr
-        env = np.exp(-seg * 3.2)
-        nota = (np.sin(2 * np.pi * f * seg) + 0.5 * np.sin(2 * np.pi * 2 * f * seg)
-                + 0.25 * np.sin(2 * np.pi * 3 * f * seg)) * env * 0.11
-        mel[i0:i0 + len(seg)] += nota
-        tempo += passo * (2 if n % 8 == 7 else 1) + rng.uniform(-0.02, 0.02)
+        f = hijaz[frase[n % len(frase)]]
+        i0 = int(tempo * SR)
+        seg = np.arange(min(int(1.6 * SR), len(t) - i0)) / SR
+        mel[i0:i0 + len(seg)] += (np.sin(2 * np.pi * f * seg) + 0.5 * np.sin(4 * np.pi * f * seg)) * np.exp(-seg * 3.2) * 0.1
+        tempo += 0.8 * (2 if n % 8 == 7 else 1)
         n += 1
-    # percussão grave (tambor) a cada 1,5 s
     tambor = np.zeros_like(t)
-    for bt in np.arange(0.0, dur, 1.5):
-        i0 = int(bt * sr)
-        seg = np.arange(min(int(0.4 * sr), len(t) - i0)) / sr
+    for bt in np.arange(0.0, dur, 1.6):
+        i0 = int(bt * SR)
+        seg = np.arange(min(int(0.4 * SR), len(t) - i0)) / SR
         tambor[i0:i0 + len(seg)] += np.sin(2 * np.pi * (60 + 40 * np.exp(-seg * 30)) * seg) * np.exp(-seg * 9) * 0.25
-    mix = drone + mel + tambor
-    fade = np.minimum(1, np.minimum(t / 2.0, (dur - t) / 3.0))
-    mix = mix * fade
-    mix = mix / (np.abs(mix).max() + 1e-9) * 0.8
-    pcm = (mix * 32767).astype(np.int16)
+    m = drone + mel + tambor
+    return (m / np.abs(m).max()).astype(np.float32)
+
+
+def mixar(cenas, caminho):
+    dur = sum(c.dur for c in cenas)
+    n = int(dur * SR) + SR
+    voz = np.zeros(n, np.float32)
+    efeitos = np.zeros(n, np.float32)
+    t0 = 0.0
+    for c in cenas:
+        for f in c.falas:
+            i = int((t0 + f.ini) * SR)
+            voz[i:i + len(f.audio)] += f.audio
+            if f.carimbo:
+                s = sfx(f.carimbo)
+                efeitos[i:i + len(s)] += s
+        t0 += c.dur
+    # "ducking": música abaixa quando alguém fala
+    m = musica(n / SR)
+    ativo = np.convolve((np.abs(voz) > 0.01).astype(np.float32), np.ones(SR // 4) / (SR // 4), mode="same")
+    ganho = 0.16 - 0.10 * np.clip(ativo * 3, 0, 1)
+    mix = voz * 0.95 + m * ganho + efeitos * 0.8
+    tt = np.arange(n) / SR
+    mix *= np.minimum(1, np.minimum(tt / 1.0, (n / SR - tt) / 2.0))
+    mix = mix / (np.abs(mix).max() + 1e-9) * 0.9
     with wave.open(caminho, "wb") as w:
         w.setnchannels(1)
         w.setsampwidth(2)
-        w.setframerate(sr)
-        w.writeframes(pcm.tobytes())
+        w.setframerate(SR)
+        w.writeframes((mix * 32767).astype(np.int16).tobytes())
+    return dur
 
 
-# ---------------------------------------------------------------- render
+# ======================================================================= render
+def montar_cenas():
+    cenas = []
+    for item in ROTEIRO:
+        titulo, desenho, falas = item[:3]
+        entrada = item[3] if len(item) > 3 else None
+        cenas.append(Cena(titulo, desenho, falas, entrada=entrada))
+    return cenas
+
+
+def quadro(c, lt):
+    img = c.desenho(lt, c)
+    forcar = feliz_final(c) if c.desenho is d_final else None
+    img, topos = camada_personagens(img, c, lt, forcar)
+    img = camada_titulo(img, c.titulo, lt)
+    img = camada_carimbo(img, c, lt)
+    img = camada_fala(img, c, lt, topos)
+    return img.convert("RGB").reduce(S)
+
+
 def main():
-    gerar_trilha(AUDIO, DUR_TOTAL)
+    print("gerando vozes...", flush=True)
+    cenas = montar_cenas()
+    audio = os.path.join(AQUI, "_audio.wav")
+    dur = mixar(cenas, audio)
+    print(f"duração: {dur:.1f} s", flush=True)
     cmd = ["ffmpeg", "-y", "-loglevel", "error",
            "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{W}x{H}", "-r", str(FPS), "-i", "-",
-           "-i", AUDIO,
-           "-c:v", "libx264", "-preset", "medium", "-crf", "23", "-pix_fmt", "yuv420p",
+           "-i", audio, "-c:v", "libx264", "-preset", "medium", "-crf", "23", "-pix_fmt", "yuv420p",
            "-c:a", "aac", "-b:a", "128k", "-shortest", "-movflags", "+faststart", SAIDA]
     proc = subprocess.Popen(cmd, stdin=subprocess.PIPE)
-    total = int(DUR_TOTAL * FPS)
-    inicio = 0.0
-    quadro = 0
-    for func, dur in CENAS:
-        nq = int(round(dur * FPS))
+    total = int(dur * FPS)
+    q = 0
+    for c in cenas:
+        nq = int(round(c.dur * FPS))
         for i in range(nq):
             lt = i / FPS
-            img = func(lt, dur).convert("RGB").reduce(S)
-            # fade de/para preto
-            a = min(1.0, lt / FADE, (dur - lt) / FADE)
+            img = quadro(c, lt)
+            a = min(1.0, lt / 0.35, (c.dur - lt) / 0.35)
+            arr = np.asarray(img)
             if a < 1:
-                arr = (np.asarray(img, dtype=np.float32) * max(a, 0)).astype(np.uint8)
-            else:
-                arr = np.asarray(img)
+                arr = (arr.astype(np.float32) * max(a, 0)).astype(np.uint8)
             proc.stdin.write(arr.tobytes())
-            quadro += 1
-            if quadro % 150 == 0:
-                print(f"  quadro {quadro}/{total}", flush=True)
-        inicio += dur
+            q += 1
+            if q % 300 == 0:
+                print(f"  quadro {q}/{total}", flush=True)
     proc.stdin.close()
     proc.wait()
-    os.remove(AUDIO)
+    os.remove(audio)
     print("pronto:", SAIDA)
 
 
