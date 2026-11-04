@@ -19,20 +19,29 @@ Uso:
 """
 import hashlib
 import math
+import multiprocessing as mp
 import os
 import subprocess
+import sys
 import wave
 
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
 # ======================================================================= config
+# Coordenadas sempre no espaço 1280x720. Desenha em S vezes e reduz por R.
+#   padrão:     S=2, R=2 -> 1280x720
+#   --youtube:  S=3, R=2 -> 1920x1080 (+ tela final, miniatura, legendas, descrição)
+YOUTUBE = "--youtube" in sys.argv
 W, H = 1280, 720
-S = 2
+S = 3 if YOUTUBE else 2
+R = 2
+OUT_W, OUT_H = W * S // R, H * S // R
 FPS = 30
 SR = 44100
 AQUI = os.path.dirname(os.path.abspath(__file__))
-SAIDA = os.path.join(AQUI, "piramides.mp4")
+PASTA_YT = os.path.join(AQUI, "youtube")
+SAIDA = os.path.join(PASTA_YT, "piramides_youtube_1080p.mp4") if YOUTUBE else os.path.join(AQUI, "piramides.mp4")
 CACHE = os.path.join(AQUI, ".cache_vozes")
 KOKORO_DIR = os.environ.get("KOKORO_DIR", os.path.join(AQUI, "modelos"))
 
@@ -1123,6 +1132,31 @@ def mixar(cenas, caminho):
     return dur
 
 
+# ======================================================================= tela final (YouTube)
+def d_tela_final(lt, c):
+    img = ceu("aurora")
+    d = ImageDraw.Draw(img, "RGBA")
+    chao(d, 560)
+    for cx, lg, al in ((330, 300, 170), (640, 460, 270), (930, 260, 150)):
+        piramide(d, cx, 560, lg, al, cor=(130, 90, 70, 120), sombra=(90, 60, 50, 120))
+    a = 255 * ease(lt / 0.8)
+    texto_centro(d, "Obrigado por assistir!", 70, 48, cor=OURO, alfa=a)
+    # áreas livres para os elementos de tela final do YouTube Studio
+    k = ease((lt - 0.5) / 0.8)
+    d.rounded_rectangle(P(250, 200, 730, 470), radius=16 * S, fill=(20, 14, 8, int(110 * k)),
+                        outline=(255, 255, 255, int(120 * k)), width=2 * S)
+    texto_centro(d, "▶ próximo vídeo", 320, 26, alfa=160 * k, sombra=False, cx=490)
+    d.ellipse(P(840, 230, 1060, 450), fill=(20, 14, 8, int(110 * k)), outline=(255, 255, 255, int(120 * k)),
+              width=2 * S)
+    texto_centro(d, "inscreva-se", 324, 24, alfa=160 * k, sombra=False, cx=950)
+    return img
+
+
+FALAS_TELA_FINAL = [
+    ("N", "Gostou? Então se inscreve no canal, e conta nos comentários: qual construção antiga a gente explica no próximo vídeo?", "cta", 0.3),
+]
+
+
 # ======================================================================= render
 def montar_cenas():
     cenas = []
@@ -1130,45 +1164,189 @@ def montar_cenas():
         titulo, desenho, falas = item[:3]
         entrada = item[3] if len(item) > 3 else None
         cenas.append(Cena(titulo, desenho, falas, entrada=entrada))
+    if YOUTUBE:
+        cenas.append(Cena("", d_tela_final, FALAS_TELA_FINAL, cauda=4.0))
     return cenas
 
 
 def quadro(c, lt):
     img = c.desenho(lt, c)
-    forcar = feliz_final(c) if c.desenho is d_final else None
+    forcar = None
+    if c.desenho is d_final:
+        forcar = feliz_final(c)
+    elif c.desenho is d_tela_final:
+        forcar = lambda _lt: "feliz"
     img, topos = camada_personagens(img, c, lt, forcar)
     img = camada_titulo(img, c.titulo, lt)
     img = camada_carimbo(img, c, lt)
     img = camada_fala(img, c, lt, topos)
-    return img.convert("RGB").reduce(S)
+    return img.convert("RGB").reduce(R)
+
+
+_CENAS = None
+
+
+def _render(job):
+    ci, i = job
+    c = _CENAS[ci]
+    lt = i / FPS
+    arr = np.asarray(quadro(c, lt))
+    a = min(1.0, lt / 0.35, (c.dur - lt) / 0.35)
+    if a < 1:
+        arr = (arr.astype(np.float32) * max(a, 0)).astype(np.uint8)
+    return arr.tobytes()
+
+
+def fmt_srt(t):
+    ms = int(round(t * 1000))
+    return f"{ms // 3600000:02d}:{ms // 60000 % 60:02d}:{ms // 1000 % 60:02d},{ms % 1000:03d}"
+
+
+def fmt_cap(t):
+    t = int(t)
+    return f"{t // 60}:{t % 60:02d}"
+
+
+def legendas_srt(cenas, caminho):
+    """legendas: falas longas são divididas em blocos de até 2 linhas de ~42 caracteres"""
+    blocos, t0 = [], 0.0
+    for c in cenas:
+        for f in c.falas:
+            palavras, partes, atual = f.texto.split(), [], ""
+            alvo = len(f.texto) / math.ceil(len(f.texto) / 84)  # blocos de tamanho parecido
+            for p in palavras:
+                if len(atual) + len(p) + 1 > alvo + 6 and atual:
+                    partes.append(atual)
+                    atual = p
+                else:
+                    atual = (atual + " " + p).strip()
+            partes.append(atual)
+            total = sum(len(x) for x in partes)
+            ini = t0 + f.ini
+            for x in partes:
+                fim = ini + f.dur * len(x) / total
+                meio = len(x) // 2
+                if len(x) > 42:
+                    corte = x.rfind(" ", 0, meio + 8)
+                    corte = corte if corte > 0 else meio
+                    x = x[:corte] + "\n" + x[corte + 1:]
+                blocos.append((ini, fim, x))
+                ini = fim
+        t0 += c.dur
+    with open(caminho, "w", encoding="utf-8") as fh:
+        for n, (a, b, x) in enumerate(blocos, 1):
+            fh.write(f"{n}\n{fmt_srt(a)} --> {fmt_srt(b)}\n{x}\n\n")
+
+
+def descricao(cenas, caminho):
+    caps, t0 = [], 0.0
+    nomes = ["Introdução"] + [c.titulo.split("• ")[-1] for c in cenas[1:]]
+    for c, nome in zip(cenas, nomes):
+        if c.desenho is d_final:
+            nome = "O resultado"
+        elif c.desenho is d_tela_final:
+            nome = "Encerramento"
+        caps.append(f"{fmt_cap(t0)} {nome}")
+        t0 += c.dur
+    txt = f"""TÍTULO (até 100 caracteres):
+Como construíram as Pirâmides do Egito? (sem guindastes, sem máquinas e sem ferro)
+
+TÍTULOS ALTERNATIVOS:
+- Eles erraram MUITO até construir as Pirâmides
+- Como as Pirâmides foram construídas, explicado com animação
+- 2,3 milhões de blocos sem máquinas: como fizeram as Pirâmides?
+
+DESCRIÇÃO:
+Como os egípcios construíram a Grande Pirâmide de Gizé há 4.500 anos, sem guindastes, sem rodas \
+e sem ferro? Acompanhe o arquiteto Hemiunu e a chefe de equipe Neferet tentando, errando e \
+corrigindo cada etapa da obra: da pedreira ao topo da pirâmide.
+
+Neste vídeo:
+🪨 como cortavam blocos de 2,5 toneladas
+🛷 por que molhar a areia reduzia o esforço pela metade
+⛵ como o granito viajou 800 km pelo Nilo
+📐 as teorias das rampas e a descoberta de Hatnub
+👷 quem eram os trabalhadores (spoiler: não eram escravos)
+
+CAPÍTULOS:
+{chr(10).join(caps)}
+
+Fontes e curiosidades:
+• Papiros de Wadi al-Jarf (Diário de Merer), descobertos em 2013
+• Fall et al., Physical Review Letters (2014): atrito de trenós em areia molhada
+• Rampa de Hatnub: IFAO / Universidade de Liverpool (2018)
+• Vila e túmulos dos trabalhadores de Gizé (escavações de Zahi Hawass e Mark Lehner)
+
+Hemiunu foi o arquiteto real da Grande Pirâmide. Neferet é uma personagem fictícia.
+Animação, vozes e trilha gerados por código.
+
+#piramides #egito #historia
+
+TAGS:
+pirâmides, pirâmides do egito, como construíram as pirâmides, grande pirâmide de gizé, quéops, \
+egito antigo, história, hemiunu, curiosidades históricas, arqueologia, animação, engenharia antiga
+
+CATEGORIA: Educação
+IDIOMA: Português (Brasil)
+LEGENDAS: enviar legendas_pt-BR.srt
+TELA FINAL: adicionar nos últimos ~{cenas[-1].dur:.0f} s (vídeo à esquerda, botão de inscrição à direita)
+"""
+    with open(caminho, "w", encoding="utf-8") as fh:
+        fh.write(txt)
+
+
+def miniatura(caminho):
+    img = ceu("tarde")
+    d = ImageDraw.Draw(img, "RGBA")
+    sol(d, 940, 300, 120, cor=(255, 230, 150))
+    chao(d, 560)
+    piramide(d, 900, 560, 700, 420, cor=(230, 200, 140), sombra=(190, 150, 100))
+    d.polygon(T([(430, 560), (700, 380), (700, 560)]), fill=(160, 112, 72))  # rampa
+    bloco_rot(d, 600, 430, 90, 60, -0.55)
+    boneco(d, 250, 760, "H", 1.0, expr="surpreso", olhar=1, e=1.75)
+    f = fonte(118 * S)
+    for i, (txt, cor) in enumerate((("COMO", BRANCO), ("FIZERAM?", OURO))):
+        x, y = 470 * S, (40 + i * 125) * S
+        d.text((x, y), txt, font=f, fill=cor, stroke_width=10 * S, stroke_fill=TINTA)
+    d.rounded_rectangle(P(860, 540, 1240, 680), radius=20 * S, fill=(255, 255, 255), outline=VERMELHO, width=9 * S)
+    d.line(P(890, 570, 960, 650), fill=VERMELHO, width=14 * S)
+    d.line(P(960, 570, 890, 650), fill=VERMELHO, width=14 * S)
+    d.text(P(985, 560), "ERRO!", font=fonte(78 * S), fill=VERMELHO)
+    img.convert("RGB").resize((1280, 720), Image.LANCZOS).save(caminho, quality=92)
 
 
 def main():
+    global _CENAS
     print("gerando vozes...", flush=True)
     cenas = montar_cenas()
+    _CENAS = cenas
+    os.makedirs(os.path.dirname(SAIDA), exist_ok=True)
     audio = os.path.join(AQUI, "_audio.wav")
     dur = mixar(cenas, audio)
-    print(f"duração: {dur:.1f} s", flush=True)
+    print(f"duração: {dur:.1f} s  •  {OUT_W}x{OUT_H}", flush=True)
+    if YOUTUBE:
+        legendas_srt(cenas, os.path.join(PASTA_YT, "legendas_pt-BR.srt"))
+        descricao(cenas, os.path.join(PASTA_YT, "descricao.txt"))
+        miniatura(os.path.join(PASTA_YT, "miniatura.jpg"))
+        # recomendações do YouTube: GOP fechado de meio segundo, 2 B-frames, áudio 48 kHz estéreo,
+        # volume normalizado em -14 LUFS
+        venc = ["-c:v", "libx264", "-preset", "slow", "-crf", "18", "-profile:v", "high",
+                "-bf", "2", "-g", str(FPS // 2), "-pix_fmt", "yuv420p",
+                "-af", "loudnorm=I=-14:TP=-1.5:LRA=11", "-c:a", "aac", "-b:a", "192k",
+                "-ar", "48000", "-ac", "2"]
+    else:
+        venc = ["-c:v", "libx264", "-preset", "medium", "-crf", "23", "-pix_fmt", "yuv420p",
+                "-c:a", "aac", "-b:a", "128k"]
     cmd = ["ffmpeg", "-y", "-loglevel", "error",
-           "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{W}x{H}", "-r", str(FPS), "-i", "-",
-           "-i", audio, "-c:v", "libx264", "-preset", "medium", "-crf", "23", "-pix_fmt", "yuv420p",
-           "-c:a", "aac", "-b:a", "128k", "-shortest", "-movflags", "+faststart", SAIDA]
+           "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{OUT_W}x{OUT_H}", "-r", str(FPS), "-i", "-",
+           "-i", audio, *venc, "-shortest", "-movflags", "+faststart", SAIDA]
     proc = subprocess.Popen(cmd, stdin=subprocess.PIPE)
-    total = int(dur * FPS)
-    q = 0
-    for c in cenas:
-        nq = int(round(c.dur * FPS))
-        for i in range(nq):
-            lt = i / FPS
-            img = quadro(c, lt)
-            a = min(1.0, lt / 0.35, (c.dur - lt) / 0.35)
-            arr = np.asarray(img)
-            if a < 1:
-                arr = (arr.astype(np.float32) * max(a, 0)).astype(np.uint8)
-            proc.stdin.write(arr.tobytes())
-            q += 1
+    jobs = [(ci, i) for ci, c in enumerate(cenas) for i in range(int(round(c.dur * FPS)))]
+    with mp.get_context("fork").Pool(os.cpu_count()) as pool:
+        for q, buf in enumerate(pool.imap(_render, jobs, chunksize=8), 1):
+            proc.stdin.write(buf)
             if q % 300 == 0:
-                print(f"  quadro {q}/{total}", flush=True)
+                print(f"  quadro {q}/{len(jobs)}", flush=True)
     proc.stdin.close()
     proc.wait()
     os.remove(audio)
