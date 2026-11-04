@@ -182,6 +182,13 @@ html,body{margin:0;height:100%;overflow:hidden;background:#08131c;color:var(--tx
 .up{color:#5fd39a}.dn{color:#ff7a7a}
 .tag.emp{background:linear-gradient(#f7d55a,#c8961a);color:#3a2600}
 #intro .iflag{width:min(46vw,260px);aspect-ratio:3/2;border:3px solid #d4a017;box-shadow:0 0 30px #f2c23088;margin-bottom:6px;max-width:100%}
+.near{display:flex;flex-direction:column;gap:5px;margin-top:4px}
+.nr{display:grid;grid-template-columns:minmax(0,1.3fr) 1fr 38px;gap:8px;align-items:center;font-size:12.5px;color:var(--txt);text-align:left}
+.nr span:first-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nr img{width:20px;height:13px;vertical-align:-2px;border:1px solid #0008}
+.nr .nb{height:6px;background:#26313d;border-radius:3px;overflow:hidden}.nr .nb i{display:block;height:100%;background:linear-gradient(90deg,#c8961a,#f7d55a)}
+.nr b{text-align:right;font-variant-numeric:tabular-nums}.nr.me{color:#ffe28a}
+.modal .rk-tabs{flex-wrap:wrap}.modal .rk-tabs button{flex:1 1 22%;font-size:12px}
 @keyframes pop{from{transform:scale(.9);opacity:0}to{transform:none;opacity:1}}
 .modal{position:fixed;inset:0;background:#000a;display:none;align-items:center;justify-content:center;z-index:20}
 .modal .box{background:#111a24;border:1px solid var(--line);border-radius:14px;padding:22px;max-width:460px;width:90%;text-align:center}
@@ -1975,19 +1982,32 @@ $('vs').addEventListener('click', () => { $('vs').hidden = true; });
 $('money').addEventListener('click', () => { sel = P; $('panel').classList.remove('min'); dirty = true; updateUI(); });
 function renderRank() {
   const alive = C.filter(c => c.alive);
+  const atWar = wars.filter(w => !w.parent).length;
+  const sum = `<div class="rk-sum"><span><b>${alive.length}</b> países vivos</span><span><b>${alive.filter(c => c.empire).length}</b> impérios</span><span><b>${atWar}</b> guerras</span><span><b>${fmt(C.reduce((s, c) => s + c.casualties, 0))}</b> baixas</span></div>`;
+  const tabs = `<div class="tabs rk-tabs">${[['mil', '⚔ Poder militar'], ['emp', '👑 Impérios'], ['terr', '🗺 Território'], ['eco', '💰 Economia']].map(([t, l]) => `<button data-rk="${t}" class="${rankTab === t ? 'on' : ''}">${l}</button>`).join('')}</div>`;
+  const nameCell = c => `<td><img src="${c.flagURL}" alt=""> ${esc(c.name)}${c.nuclear ? ' ☢' : ''}</td>`;
+  if (rankTab === 'emp') {
+    const emps = alive.filter(c => c.empire).sort((a, b) => milPower(b) - milPower(a));
+    const need = c => Math.max(EMP_MIN, c.cells0 * EMP_UP);
+    const near = alive.filter(c => !c.empire && c.cells0).map(c => ({ c, f: c.cells / need(c) })).sort((a, b) => b.f - a.f).slice(0, 6);
+    $('mtext').innerHTML = sum + tabs + (emps.length
+      ? `<div class="rk-wrap"><table class="rk"><thead><tr><th>#</th><th>Império</th><th>Poder</th><th>Prov.</th><th>Desde</th></tr></thead><tbody>
+        ${emps.map((c, i) => `<tr class="${c.id === P ? 'me' : ''}"><td>${i === 0 ? '👑' : i + 1}</td>${nameCell(c)}<td>${fmt(milPower(c))}</td><td>${fmt(c.cells)}</td><td>${c.empSince != null ? fmtDateBig(c.empSince) : '—'}</td></tr>`).join('')}
+        </tbody></table></div>`
+      : `<div class="hint" style="text-align:center;margin:10px 0">Nenhum império ainda. Um país vira império quando chega a ${EMP_UP.toString().replace('.', ',')}× o território com que começou.</div>`)
+      + `<div class="sect" style="text-align:left">Perto de virar império</div><div class="near">${near.map(({ c, f }) => `<div class="nr${c.id === P ? ' me' : ''}"><span><img src="${c.flagURL}" alt=""> ${esc(c.name)}</span><span class="nb"><i style="width:${Math.min(100, f * 100).toFixed(0)}%"></i></span><b>${Math.min(99, Math.floor(f * 100))}%</b></div>`).join('')}</div>`;
+    return;
+  }
   const key = { mil: milPower, terr: c => c.cells, eco: c => c.inc || income(c) }[rankTab];
   alive.sort((a, b) => key(b) - key(a));
   const rows = alive.slice(0, 15);
   if (P >= 0 && C[P].alive && !rows.includes(C[P])) rows.push(C[P]);
-  const atWar = wars.filter(w => !w.parent).length;
   const head = { mil: '<th>Poder</th><th>Tropas</th><th>Tec.</th>', terr: '<th>Prov.</th><th>Tropas</th><th>Baixas</th>', eco: '<th>Renda/dia</th><th>Dinheiro</th><th>Nota</th>' }[rankTab];
   const cells = c => ({ mil: `<td>${fmt(milPower(c))}</td><td>${fmt(c.troops)}</td><td>${Object.values(c.tech).reduce((a, b) => a + b, 0) + c.mil.base + c.mil.trn}</td>`,
     terr: `<td>${fmt(c.cells)}</td><td>${fmt(c.troops)}</td><td>${fmt(c.casualties)}</td>`,
     eco: `<td>${fmtM(c.inc || income(c))}</td><td>${fmtM(c.money)}</td><td>${ratingOf(c)}</td>` }[rankTab]);
-  $('mtext').innerHTML = `<div class="rk-sum"><span><b>${alive.length}</b> países vivos</span><span><b>${atWar}</b> guerras</span><span><b>${fmt(C.reduce((s, c) => s + c.casualties, 0))}</b> baixas</span></div>
-  <div class="tabs rk-tabs">${[['mil', '⚔ Poder militar'], ['terr', '🗺 Território'], ['eco', '💰 Economia']].map(([t, l]) => `<button data-rk="${t}" class="${rankTab === t ? 'on' : ''}">${l}</button>`).join('')}</div>
-  <div class="rk-wrap"><table class="rk"><thead><tr><th>#</th><th>País</th>${head}</tr></thead><tbody>
-  ${rows.map(c => `<tr class="${c.id === P ? 'me' : ''}"><td>${alive.indexOf(c) + 1}</td><td><img src="${c.flagURL}" alt=""> ${esc(c.name)}${c.nuclear ? ' ☢' : ''}</td>${cells(c)}</tr>`).join('')}
+  $('mtext').innerHTML = sum + tabs + `<div class="rk-wrap"><table class="rk"><thead><tr><th>#</th><th>País</th>${head}</tr></thead><tbody>
+  ${rows.map(c => `<tr class="${c.id === P ? 'me' : ''}"><td>${alive.indexOf(c) + 1}</td>${nameCell(c)}${cells(c)}</tr>`).join('')}
   </tbody></table></div>`;
 }
 $('rank').addEventListener('click', () => { showModal('Ranking mundial', '', [['Fechar', () => {}]]); renderRank(); });
@@ -2147,7 +2167,7 @@ function snapshotGame() {
   return {
     v: 1, market, mode: worldMode, split: splitOrig, gw: GW, gh: GH, s: S, nCount, day, P, warSeq,
     land: worldMode === 'real' ? null : rle(land), owner: rle(owner), core: rle(core),
-    C: C.map(c => ({ n: c.baseName || c.name, col: c.col.map(v => Math.round(v)), fo: (c.flagBase || c.flag).img ? c.orig : -1, band: !!(c.flagBase || c.flag).band, fl: (c.flagBase || c.flag).img ? null : (c.flagBase || c.flag), emp: !!c.empire, c0: c.cells0,
+    C: C.map(c => ({ n: c.baseName || c.name, col: c.col.map(v => Math.round(v)), fo: (c.flagBase || c.flag).img ? c.orig : -1, band: !!(c.flagBase || c.flag).band, fl: (c.flagBase || c.flag).img ? null : (c.flagBase || c.flag), emp: !!c.empire, es: c.empSince ?? null, c0: c.cells0,
       alive: c.alive, cells: c.cells, mult: c.mult, nuclear: c.nuclear, troops: Math.round(c.troops), cas: Math.round(c.casualties), cap: c.cap, aggr: c.aggr,
       lx: c.lx, ly: c.ly, rcd: c.recruitCD, acd: c.allyCD, dcd: c.aidCD, econ: c.econ, money: Math.round(c.money), tech: c.tech,
       clv: c.clickLv, ctot: Math.round(c.clickTotal), rr: c.raidReady, orig: c.orig, st: c.isState, par: c.parent,
@@ -2187,7 +2207,7 @@ function restoreGame(sv) {
   if (sv.market) market = sv.market; else initMarket();
   anims = []; nukes = []; raids = []; reqs = []; focus = null; nukeArmed = false; airArmed = false; nukeReady = 0;
   day = sv.day; P = sv.P; sel = P; phase = 'game'; ended = false;
-  sv.C.forEach((d, i) => { if (d.emp && C[i].alive) makeEmpire(C[i], true); });
+  sv.C.forEach((d, i) => { if (d.emp && C[i].alive) { C[i].empSince = d.es ?? null; makeEmpire(C[i], true); } });
   scanBorders(); computeLabels(); updateDivs();
   fillSearch();
   if (C[P]) { cam.z = Math.max(cam.fit * 2.6, 6); cam.x = VW / 2 - (C[P].lx + .5) * cam.z; cam.y = VH * (VW < 760 ? .3 : .5) - (C[P].ly + .5) * cam.z; }
@@ -2357,6 +2377,7 @@ function makeEmpire(c, silent = false) {
   drawImperialFlag(g, 150, 100, c);
   const url = cv.toDataURL(), im = new Image(); im.onload = () => { dirty = true; }; im.src = url;
   c.empire = true; c.flag = { img: im, url, imperial: true }; c.flagURL = url;
+  if (!silent || c.empSince == null) c.empSince = c.empSince ?? day;
   c.empPix = g.getImageData(0, 0, 150, 100).data; c.empW = 150; c.empH = 100;
   c.name = empName(c.baseName || c.name);
   dirty = true; last.info = '';
@@ -2365,7 +2386,7 @@ function makeEmpire(c, silent = false) {
   else toast(`👑 Nasceu o ${c.name}!`, P >= 0 && (adj[c.id * N + P] || warMat[P * N + c.id] >= 0 || isAllied(P, c.id)) ? 'bad' : 'g');
 }
 function endEmpire(c) {
-  c.empire = false; c.flag = c.flagBase; c.flagURL = c.flagBaseURL; c.empPix = null; c.name = c.baseName;
+  c.empire = false; c.empSince = null; c.flag = c.flagBase; c.flagURL = c.flagBaseURL; c.empPix = null; c.name = c.baseName;
   dirty = true; last.info = '';
   toast(c.id === P ? `👑 Seu império caiu. Voltou a ser ${c.name}.` : `👑 O império caiu: voltou a ser ${c.name}.`, c.id === P ? 'bad' : 'g');
 }
