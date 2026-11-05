@@ -192,6 +192,9 @@ html,body{margin:0;height:100%;overflow:hidden;background:#08131c;color:var(--tx
 .nr .nb{height:6px;background:#26313d;border-radius:3px;overflow:hidden}.nr .nb i{display:block;height:100%;background:linear-gradient(90deg,#c8961a,#f7d55a)}
 .nr b{text-align:right;font-variant-numeric:tabular-nums}.nr.me{color:#ffe28a}
 .modal .rk-tabs{flex-wrap:wrap}.modal .rk-tabs button{flex:1 1 22%;font-size:12px}
+#pswitch{margin-top:10px;display:flex;flex-direction:column;gap:4px}
+#pswitch:empty{display:none}
+#pswitch button.switch{font:inherit;font-size:14px;padding:9px 10px;border-radius:8px;border:1px solid #3d68a8;background:#1d3550;color:var(--txt);cursor:pointer;font-weight:700}
 @keyframes pop{from{transform:scale(.9);opacity:0}to{transform:none;opacity:1}}
 .modal{position:fixed;inset:0;background:#000a;display:none;align-items:center;justify-content:center;z-index:20}
 .modal .box{background:#111a24;border:1px solid var(--line);border-radius:14px;padding:22px;max-width:460px;width:90%;text-align:center}
@@ -238,7 +241,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#08131c;color:var(--tx
 <div id="cas"></div>
 <div id="toasts"></div>
 <div id="vs" hidden></div>
-<div id="panel"><button id="ptog" aria-label="Minimizar painel"></button><div id="pinfo"></div><div id="pact"></div><div id="log"></div></div>
+<div id="panel"><button id="ptog" aria-label="Minimizar painel"></button><div id="pinfo"></div><div id="pswitch"></div><div id="pact"></div><div id="log"></div></div>
 <div id="reqs"></div>
 <div id="wartitle" hidden></div>
 <div id="intro" hidden></div>
@@ -533,9 +536,101 @@ function countryFlag(i) {
   if (!FIMG[i]) { const im = new Image(); im.onload = () => { dirty = true; }; im.src = w.f; FIMG[i] = im; }
   return { img: FIMG[i], url: w.f };
 }
+
+// ---------- cenários históricos ----------
+// Cada grupo junta países de hoje num país da época. 'emp' = já começa como império (com bandeira imperial).
+const SCEN = {
+  '1939': {
+    title: '1939 – Segunda Guerra Mundial', date: [1939, 8, 1], nukes: false, air: true,
+    desc: 'A Alemanha invade a Polônia. Reino Unido e França vão à guerra; o Japão já luta contra a China.',
+    groups: [
+      { n: 'Alemanha', a: ['DE', 'AT', 'CZ'], flag: 'reich', pw: 2.6 },
+      { n: 'União Soviética', a: ['RU', 'UA', 'BY', 'KZ', 'UZ', 'TM', 'KG', 'TJ', 'GE', 'AM', 'AZ'], flag: 'ussr', pw: 1.5 },
+      { n: 'Reino Unido', emp: 'Império Britânico', a: ['GB', 'IN', 'PK', 'BD', 'MM', 'LK', 'NG', 'GH', 'KE', 'UG', 'TZ', 'ZM', 'ZW', 'MW', 'SL', 'SD', 'SS', 'BW', 'LS', 'SZ', 'GM', 'MY', 'SG', 'BN', 'CY', 'MT', 'JM', 'BZ', 'GY', 'BH', 'QA', 'AE', 'KW', 'JO', 'IL', 'PS', 'EG'], base: 'GB', pw: 1.7 },
+      { n: 'França', a: ['FR', 'DZ', 'MA', 'TN', 'SN', 'ML', 'MR', 'NE', 'BF', 'GN', 'CI', 'BJ', 'TG', 'TD', 'CF', 'CG', 'GA', 'CM', 'MG', 'VN', 'LA', 'KH', 'SY', 'LB', 'DJ', 'KM'], base: 'FR', pw: 1.6 },
+      { n: 'Itália', a: ['IT', 'LY', 'ET', 'ER', 'SO', 'AL'], base: 'IT', pw: 1.6 },
+      { n: 'Japão', emp: 'Império do Japão', a: ['JP', 'KR', 'KP', 'TW'], base: 'JP', empFlag: 'jpimp', pw: 2.2 },
+      { n: 'China', a: ['CN'], base: 'TW', pw: .9 },
+      { n: 'Países Baixos', a: ['NL', 'ID', 'SR'], base: 'NL' },
+      { n: 'Bélgica', a: ['BE', 'CD', 'RW', 'BI'], base: 'BE' },
+      { n: 'Portugal', a: ['PT', 'AO', 'MZ', 'GW', 'TL', 'CV', 'ST'], base: 'PT' },
+      { n: 'Espanha', a: ['ES', 'EH', 'GQ'], base: 'ES' },
+      { n: 'Iugoslávia', a: ['RS', 'HR', 'SI', 'BA', 'ME', 'MK', 'XK'], flag: 'yugo' },
+      { n: 'Estados Unidos', a: ['US', 'PH'], base: 'US', pw: 1.8 },
+      { n: 'Romênia', a: ['RO', 'MD'], base: 'RO' },
+      { n: 'Dinamarca', a: ['DK', 'IS', 'GL'], base: 'DK' },
+      { n: 'Polônia', a: ['PL'], base: 'PL', pw: 1.3 },
+    ],
+    allies: [['Reino Unido', 'França'], ['Reino Unido', 'Polônia'], ['França', 'Polônia'], ['Alemanha', 'Itália'], ['Alemanha', 'Japão'], ['Itália', 'Japão'],
+      ['Reino Unido', 'Canadá'], ['Reino Unido', 'Austrália'], ['Reino Unido', 'Nova Zelândia'], ['Reino Unido', 'África do Sul']],
+    wars: [['Alemanha', 'Polônia', 'ataque'], ['Reino Unido', 'Alemanha', 'ataque'], ['França', 'Alemanha', 'ataque'], ['Japão', 'China', 'ataque']],
+  },
+  '1822': {
+    title: '1822 – Império do Brasil', date: [1822, 8, 7], nukes: false, air: false,
+    desc: 'Dom Pedro I proclama a independência. O Império do Brasil luta contra Portugal; as Américas se libertam e os impérios dominam o mundo.',
+    groups: [
+      { n: 'Brasil', emp: 'Império do Brasil', a: ['BR', 'UY'], empFlag: 'brimp', base: 'BR', pw: 1.4 },
+      { n: 'Grã-Colômbia', a: ['CO', 'VE', 'EC', 'PA'], flag: 'granc' },
+      { n: 'Províncias Unidas do Rio da Prata', a: ['AR'], base: 'AR' },
+      { n: 'México', emp: 'Império Mexicano', a: ['MX', 'GT', 'HN', 'SV', 'NI', 'CR', 'BZ'], base: 'MX', empFlag: 'mximp' },
+      { n: 'Peru', a: ['PE', 'BO'], base: 'PE' },
+      { n: 'Reino Unido', emp: 'Império Britânico', a: ['GB', 'IE', 'CA', 'IN', 'PK', 'BD', 'LK', 'AU', 'NZ', 'GY', 'JM', 'BS', 'MT', 'SL', 'SG'], base: 'GB', pw: 1.8 },
+      { n: 'Rússia', emp: 'Império Russo', a: ['RU', 'FI', 'UA', 'BY', 'EE', 'LV', 'LT', 'PL', 'GE', 'AM', 'AZ', 'KZ', 'MD'], base: 'RU', empFlag: 'ruimp', pw: 1.3 },
+      { n: 'Áustria', emp: 'Império Austríaco', a: ['AT', 'HU', 'CZ', 'SK', 'SI', 'HR'], base: 'AT', empFlag: 'atimp', pw: 1.5 },
+      { n: 'Turquia', emp: 'Império Otomano', a: ['TR', 'GR', 'BG', 'RO', 'RS', 'BA', 'MK', 'AL', 'ME', 'XK', 'CY', 'SY', 'LB', 'IL', 'PS', 'JO', 'IQ', 'EG', 'LY', 'TN', 'KW'], base: 'TR', pw: 1.1 },
+      { n: 'China', emp: 'Império Qing', a: ['CN', 'MN', 'TW'], base: 'CN', empFlag: 'qing' },
+      { n: 'Prússia', a: ['DE'], flag: 'prussia', pw: 1.6 },
+      { n: 'Espanha', a: ['ES', 'CU', 'PH', 'EH'], base: 'ES' },
+      { n: 'Portugal', a: ['PT', 'AO', 'MZ', 'GW', 'CV', 'ST', 'TL'], base: 'PT', pw: 1.2 },
+      { n: 'Países Baixos', a: ['NL', 'BE', 'LU', 'ID'], base: 'NL' },
+      { n: 'Japão', a: ['JP'], base: 'JP' },
+      { n: 'Pérsia', a: ['IR'], base: 'IR' },
+    ],
+    allies: [['Rússia', 'Áustria'], ['Rússia', 'Prússia'], ['Áustria', 'Prússia'], ['Portugal', 'Reino Unido']],
+    wars: [['Brasil', 'Portugal', 'ataque'], ['Espanha', 'Grã-Colômbia', 'ataque'], ['Espanha', 'Peru', 'ataque']],
+  },
+};
+let scen = 'hoje', START = [2026, 0, 1], scenNukes = true, scenAir = true;
+const SFLAGS = {
+  reich: (g, W, H) => bands(g, W, H, ['#111', '#f4f4f4', '#c8102e']),
+  ussr: (g, W, H) => {
+    g.fillStyle = '#cc0000'; g.fillRect(0, 0, W, H); g.fillStyle = '#ffd700'; g.strokeStyle = '#ffd700';
+    const sx = W * .2, sy = H * .18; g.beginPath(); for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, r = i % 2 ? H * .03 : H * .07; g.lineTo(sx + Math.cos(a) * r, sy + Math.sin(a) * r); } g.closePath(); g.fill();
+    g.lineWidth = H * .045; g.beginPath(); g.arc(W * .2, H * .42, H * .12, Math.PI * .1, Math.PI * 1.2); g.stroke();
+    g.beginPath(); g.moveTo(W * .14, H * .5); g.lineTo(W * .27, H * .3); g.stroke(); g.fillRect(W * .24, H * .27, W * .05, H * .06);
+  },
+  yugo: (g, W, H) => bands(g, W, H, ['#0c4076', '#f4f4f4', '#c6363c']),
+  granc: (g, W, H) => { g.fillStyle = '#fcd116'; g.fillRect(0, 0, W, H * .5); g.fillStyle = '#003893'; g.fillRect(0, H * .5, W, H * .25); g.fillStyle = '#ce1126'; g.fillRect(0, H * .75, W, H * .25); },
+  prussia: (g, W, H) => { bands(g, W, H, ['#f4f4f4', '#111']); g.fillStyle = '#111'; g.beginPath(); g.arc(W * .5, H * .3, H * .13, 0, 7); g.fill(); },
+  brimp: (g, W, H) => flagBRImperial(g, W, H),
+  mximp: (g, W, H) => { bands(g, W, H, ['#006847', '#f4f4f4', '#ce1126'], true); g.fillStyle = '#8a5a2b'; g.beginPath(); g.ellipse(W * .5, H * .58, W * .07, H * .14, 0, 0, 7); g.fill(); crown(g, W * .5, H * .36, W * .14); },
+  ruimp: (g, W, H) => { bands(g, W, H, ['#111', '#f2c230', '#f4f4f4']); crown(g, W * .5, H * .5, W * .2); },
+  atimp: (g, W, H) => { bands(g, W, H, ['#111', '#f2c230']); crown(g, W * .5, H * .52, W * .2); },
+  qing: (g, W, H) => drawImperialFlag(g, W, H, { orig: WORLD.countries.findIndex(w => w.a === 'CN'), isState: false }),
+  jpimp: (g, W, H) => { g.fillStyle = '#fff'; g.fillRect(0, 0, W, H); rays(g, W, H, W * .44, H * .5, 16, '#c8102e'); g.fillStyle = '#c8102e'; g.beginPath(); g.arc(W * .44, H * .5, H * .26, 0, 7); g.fill(); },
+};
+function sflag(key) {
+  const cv = document.createElement('canvas'); cv.width = 150; cv.height = 100; const g = cv.getContext('2d');
+  SFLAGS[key](g, 150, 100);
+  const url = cv.toDataURL(), im = new Image(); im.onload = () => { dirty = true; }; im.src = url;
+  return { img: im, url, scf: key, pix: g.getImageData(0, 0, 150, 100).data };
+}
+function applyScenario(S0, list, groupIdx) {
+  // impérios do cenário já começam como impérios
+  list.forEach((d, i) => {
+    if (!d.hist) return;
+    const c = C[i]; c.empire = true; c.histEmpire = true; c.name = d.hist.name; c.empSince = 0;
+    c.flag = d.hist.flag; c.flagURL = d.hist.flag.url; if (d.hist.flag.pix) { c.empPix = d.hist.flag.pix; c.empW = 150; c.empH = 100; }
+  });
+  const byName = n => C.find(c => c.baseName === n || c.name === n);
+  for (const [a, b] of S0.allies) { const A = byName(a), B = byName(b); if (A && B) { allied[A.id * N + B.id] = allied[B.id * N + A.id] = 1; relAdd(A.id, B.id, 60); } }
+  for (const [a, b, m] of S0.wars) { const A = byName(a), B = byName(b); if (A && B && A.alive && B.alive) declareWar(A.id, B.id, m, 0, -1, true); }
+}
 // split: índice do país (em WORLD.countries) dividido em estados, ou -1
-function genReal(split = -1) {
-  splitOrig = split;
+function genReal(split = -1, sc = scen) {
+  splitOrig = split; scen = sc;
+  const S0 = SCEN[sc] || null;
+  START = S0 ? [S0.date[0], S0.date[1] - 1, S0.date[2]] : [2026, 0, 1]; scenNukes = !S0 || S0.nukes; scenAir = !S0 || S0.air;
   alloc(WORLD.gw, WORLD.gh, 3);
   let k = 0;
   for (let r = 0; r < WORLD.runs.length; r += 2) for (let j = 0; j < WORLD.runs[r + 1]; j++) { owner[k] = WORLD.runs[r] - 1; land[k] = owner[k] >= 0 ? 1 : 0; k++; }
@@ -544,10 +639,25 @@ function genReal(split = -1) {
   finishTerrain(() => .45);
   const cnt = new Array(WORLD.countries.length).fill(0); for (let i = 0; i < NC; i++) if (owner[i] >= 0) cnt[owner[i]]++;
   const list = [], remap = new Int32Array(WORLD.countries.length).fill(-1), stMap = new Map();
+  const idxA2 = a2 => WORLD.countries.findIndex(w => w.a === a2);
+  if (S0) {
+    const groupOf = new Int32Array(WORLD.countries.length).fill(-1);
+    S0.groups.forEach((g, gi) => g.a.forEach(a => { const i = idxA2(a); if (i >= 0 && groupOf[i] < 0) groupOf[i] = gi; }));
+    S0.groups.forEach((g, gi) => {
+      const members = []; groupOf.forEach((v, i) => { if (v === gi) members.push(i); });
+      if (!members.length) return;
+      const lead = idxA2(g.a[0]) >= 0 ? idxA2(g.a[0]) : members[0], w = WORLD.countries[lead], tot = members.reduce((s, i) => s + cnt[i], 0);
+      const flag = g.flag ? sflag(g.flag) : countryFlag(g.base ? Math.max(0, idxA2(g.base)) : lead);
+      const ent = { name: g.n, flag, cap: -1, mult: (g.pw || POWER[w.a] || 1) * clamp((60 / Math.max(tot, 1)) ** .35, 1, 2.6), nuclear: false, orig: lead, econ: g.econ || ECON[w.a] || 1,
+        hist: g.emp ? { name: g.emp, flag: g.empFlag ? sflag(g.empFlag) : flag } : null };
+      for (const i of members) remap[i] = list.length;
+      list.push(ent);
+    });
+  }
   WORLD.countries.forEach((w, i) => {
-    if (i === split) return;
+    if (i === split || remap[i] >= 0) return;
     remap[i] = list.length;
-    list.push({ name: w.n, flag: countryFlag(i), cap: -1, mult: (POWER[w.a] || 1) * clamp((60 / Math.max(cnt[i], 1)) ** .35, 1, 2.6), nuclear: NUKES.has(w.a), orig: i, econ: ECON[w.a] || 1 });
+    list.push({ name: w.n, flag: countryFlag(i), cap: -1, mult: (POWER[w.a] || 1) * clamp((60 / Math.max(cnt[i], 1)) ** .35, 1, 2.6), nuclear: !S0 && NUKES.has(w.a), orig: i, econ: ECON[w.a] || 1 });
   });
   if (split >= 0) {
     const sc = new Map(), pw = WORLD.countries[split];
@@ -561,6 +671,7 @@ function genReal(split = -1) {
   const first = stMap.size ? stMap.values().next().value : -1;
   for (let i = 0; i < NC; i++) { const o = owner[i]; if (o < 0) continue; owner[i] = o === split ? (stMap.get(stateGrid[i]) ?? first) : remap[o]; }
   makeCountries(list);
+  if (S0) applyScenario(S0, list);
   if (split >= 0) {
     for (const a of C) if (a.isState) {
       a.aggr = .5 + R() * .45;
@@ -568,10 +679,10 @@ function genReal(split = -1) {
     }
   }
 }
-function newWorld() { worldMode === 'real' ? genReal(-1) : genWorld(nCount); fillSearch(); }
+function newWorld() { if (worldMode === 'real') genReal(-1, scen); else { scen = 'hoje'; START = [2026, 0, 1]; scenNukes = scenAir = true; genWorld(nCount); } fillSearch(); }
 function regenKeepCam(split) {
   const keep = { x: cam.x, y: cam.y, z: cam.z };
-  genReal(split); fillSearch();
+  genReal(split, scen); fillSearch();
   Object.assign(cam, keep); fitted = true;
 }
 function fillSearch() { $('clist').innerHTML = C.map(c => `<option value="${esc(c.name)}"></option>`).join(''); }
@@ -663,7 +774,7 @@ function showVs(w) {
     clearTimeout(vsTimer); vsTimer = setTimeout(() => { el.hidden = true; }, 6500);
   }, 0);
 }
-function declareWar(a, b, mode, parent = 0, helpFor = -1) {
+function declareWar(a, b, mode, parent = 0, helpFor = -1, noCascade = false) {
   if (a === b || !C[a].alive || !C[b].alive || warMat[a * N + b] >= 0) return null;
   if (isAllied(a, b)) setAlly(a, b, 0);
   const w = { id: warSeq++, a, b, mode, start: day, parent, helpFor, casA: 0, casB: 0,
@@ -677,7 +788,7 @@ function declareWar(a, b, mode, parent = 0, helpFor = -1) {
   else if (parent && w.helpFor === P) toast(`📣 ${C[a].name} entrou na guerra ao seu lado contra ${C[b].name}!`, 'good');
   else if (!parent && (P < 0 || adj[a * N + P] || adj[b * N + P] || C[a].cells > 120 || C[b].cells > 120)) toast(`${C[a].name} declarou guerra a ${C[b].name}${mode === 'morte' ? ' (até a morte)' : ''}`, 'g');
   for (const x of [a, b]) for (const o of alliesOf(x)) relAdd(o, x === a ? b : a, -20);
-  if (!parent) {
+  if (!parent && !noCascade) {
     // aliados do defensor podem entrar na guerra
     for (const x of alliesOf(b)) {
       if (x === a || isAllied(x, a) || warMat[x * N + a] >= 0) continue;
@@ -930,7 +1041,7 @@ function aiThink(c) {
     } else if (!w.parent && ((dur > 140 && R() < .25) || (lost > .25 && R() < .4))) endWar(w, 'peace');
   }
   const active = wars.filter(w => !w.parent).length;
-  if (my.length && day >= c.raidReady && c.money > CFG.RAID_COST * 2.5 && R() < .35) {
+  if (scenAir && my.length && day >= c.raidReady && c.money > CFG.RAID_COST * 2.5 && R() < .35) {
     const w = my[ri(0, my.length - 1)], e = enemyIn(w, id), fr = w.a === id ? w.fb : w.fa;
     launchRaid(id, fr.length ? fr[ri(0, fr.length - 1)] : C[e].cap);
   }
@@ -1756,11 +1867,13 @@ function actionsHTML() {
     if (sel >= 0 && C[sel].alive) {
       h += `<button class="big" data-act="play">▶ Jogar com ${C[sel].isState ? 'o estado' : 'o país'} ${esc(C[sel].name)}</button>`;
       const n = STATES_PER[C[sel].orig] || 0;
-      if (worldMode === 'real' && splitOrig < 0 && n > 1) h += `<button data-act="split">🗺 Dividir ${esc(C[sel].name)} em ${n} estados (guerra de estados)</button>`;
+      if (worldMode === 'real' && scen === 'hoje' && splitOrig < 0 && n > 1) h += `<button data-act="split">🗺 Dividir ${esc(C[sel].name)} em ${n} estados (guerra de estados)</button>`;
     }
     if (worldMode === 'real' && splitOrig >= 0) h += `<div class="hint">🗺 ${esc(WORLD.countries[splitOrig].n)} está dividido em estados. Toque num estado para jogar com ele.</div><button data-act="unsplit">🌍 Juntar ${esc(WORLD.countries[splitOrig].n)} de novo</button>`;
     h += `<div class="row"><input id="search" list="clist" placeholder="🔎 Buscar país…" autocomplete="off"></div>`;
-    h += `<div class="row"><select id="wmode"><option value="real"${worldMode === 'real' ? ' selected' : ''}>🌍 Mundo real (hoje)</option><option value="rand"${worldMode === 'rand' ? ' selected' : ''}>🎲 Continente aleatório</option></select></div>`;
+    const wm = worldMode === 'rand' ? 'rand' : scen;
+    h += `<div class="row"><select id="wmode">${[['hoje', '🌍 Mundo real (hoje)'], ['1939', '🗓 1939 – Segunda Guerra'], ['1822', '👑 1822 – Império do Brasil'], ['rand', '🎲 Continente aleatório']].map(([v, l]) => `<option value="${v}"${wm === v ? ' selected' : ''}>${l}</option>`).join('')}</select></div>`;
+    if (SCEN[wm]) h += `<div class="hint">📜 <b>${SCEN[wm].title}</b>: ${SCEN[wm].desc}${SCEN[wm].nukes ? '' : ' Sem bombas nucleares'}${SCEN[wm].air ? '.' : ' e sem aviões.'}</div>`;
     if (worldMode === 'rand') h += `<div class="row"><select id="ncount">${[8, 12, 16, 20, 26, 32, 40].map(v => `<option value="${v}"${v === nCount ? ' selected' : ''}>${v} países</option>`).join('')}</select><button data-act="newmap">🎲 Novo mapa</button></div>`;
     return h;
   }
@@ -1853,7 +1966,7 @@ function actionsHTML() {
   }
   const w = warOf(P, sel);
   if (w) {
-    const airB = `<button data-act="air"${day < C[P].raidReady || C[P].money < CFG.RAID_COST ? ' disabled' : ''}>✈ ${cd(C[P].raidReady, `Bombardeio aéreo (${fmtM(CFG.RAID_COST)}) — toque no alvo`)}</button>`;
+    const airB = !scenAir ? '' : `<button data-act="air"${day < C[P].raidReady || C[P].money < CFG.RAID_COST ? ' disabled' : ''}>✈ ${cd(C[P].raidReady, `Bombardeio aéreo (${fmtM(CFG.RAID_COST)}) — toque no alvo`)}</button>`;
     const ship = airB + `<button data-act="ship"${day < (w.shipCD || 0) ? ' disabled' : ''}>🚢 ${cd(w.shipCD || 0, 'Enviar invasão (navio ou marcha)')}</button>`
       + (w.fa.length ? '' : `<div class="hint">Sem fronteira com ${esc(C[sel].name)}: mande navios, ou tropas por terra se não houver mar.</div>`);
     if (w.mode === 'ataque') return ship + `<button class="peace" data-act="peace"${day < w.peaceCD ? ' disabled' : ''}>🕊 ${cd(w.peaceCD, 'Propor paz')}</button>`
@@ -1896,8 +2009,8 @@ function ecoButtons() {
 }
 const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
 const MESES_L = ['JANEIRO', 'FEVEREIRO', 'MARÇO', 'ABRIL', 'MAIO', 'JUNHO', 'JULHO', 'AGOSTO', 'SETEMBRO', 'OUTUBRO', 'NOVEMBRO', 'DEZEMBRO'];
-function fmtDateBig(d) { const t = new Date(2026, 0, 1 + d); return `${t.getFullYear()}/${String(t.getMonth() + 1).padStart(2, '0')}/${String(t.getDate()).padStart(2, '0')}`; }
-function fmtDateLong(d) { const t = new Date(2026, 0, 1 + d); return `${t.getDate()} ${MESES_L[t.getMonth()]} ${t.getFullYear()}`; }
+function fmtDateBig(d) { const t = new Date(START[0], START[1], START[2] + d); return `${t.getFullYear()}/${String(t.getMonth() + 1).padStart(2, '0')}/${String(t.getDate()).padStart(2, '0')}`; }
+function fmtDateLong(d) { const t = new Date(START[0], START[1], START[2] + d); return `${t.getDate()} ${MESES_L[t.getMonth()]} ${t.getFullYear()}`; }
 function warName(w) { return `GUERRA ${C[w.a].name.toUpperCase()}–${C[w.b].name.toUpperCase()}`; }
 let introT = 0;
 function showIntro(name) {
@@ -1906,7 +2019,7 @@ function showIntro(name) {
   el.hidden = false; el.classList.remove('go'); void el.offsetWidth; el.classList.add('go');
   clearTimeout(introT); introT = setTimeout(() => { el.hidden = true; }, 2600);
 }
-function fmtDate(d) { const t = new Date(2026, 0, 1 + d); return `${t.getDate()} ${MESES[t.getMonth()]} ${t.getFullYear()}`; }
+function fmtDate(d) { const t = new Date(START[0], START[1], START[2] + d); return `${t.getDate()} ${MESES[t.getMonth()]} ${t.getFullYear()}`; }
 function spark(w) {
   const h = w.hist || []; if (h.length < 2) return '';
   const meA = w.a === P, mx = Math.max(1, ...h.map(v => Math.max(v[0], v[1])));
@@ -1935,7 +2048,7 @@ function casHTML() {
   if (ws.length > shown) h += `<div class="cmode">+${ws.length - shown} guerras</div>`;
   return h;
 }
-const last = { info: '', act: '', cas: '', log: '' };
+const last = { info: '', act: '', cas: '', log: '', sw: '' };
 function setIf(id, key, html) { if (last[key] !== html) { last[key] = html; $(id).innerHTML = html; } }
 function updateUI() {
   $('day').textContent = phase === 'game' ? (opts.hud ? fmtDateBig(day) : fmtDate(day)) : 'Escolha um país';
@@ -1951,6 +2064,7 @@ function updateUI() {
   if (showM) { const c = C[P], h = `💰 ${fmtM(c.money)} <small class="${c.net >= 0 ? 'up' : 'dn'}">${c.net >= 0 ? '+' : ''}${fmtM(c.net)}/dia</small>`; if (mb.innerHTML !== h) mb.innerHTML = h; }
   setIf('pinfo', 'info', infoHTML());
   setIf('pact', 'act', actionsHTML());
+  setIf('pswitch', 'sw', phase === 'game' && P >= 0 && sel >= 0 && sel !== P && C[sel] && C[sel].alive ? `<button data-act="switch" class="switch">🔄 Trocar para ${esc(C[sel].name)}</button><div class="hint">Você passa a jogar com esse país, no mesmo mundo e na mesma data.</div>` : '');
   const cas = casHTML(); setIf('cas', 'cas', cas); $('cas').style.display = cas ? 'block' : 'none';
   setIf('log', 'log', phase === 'game' && sel === P ? logs.slice(0, 6).map(l => `<div>${esc(l)}</div>`).join('') : '');
   if (reqsChanged) {
@@ -1964,6 +2078,10 @@ $('panel').addEventListener('click', e => {
   const act = b.dataset.act;
   if (act === 'play') { P = sel; phase = 'game'; lastAuto = performance.now(); showIntro(C[P].name); if (VW < 760 || worldMode === 'real') { cam.z = worldMode === 'real' ? Math.max(cam.fit * 2.6, 6) : cam.fit * 2.2; cam.x = VW / 2 - (C[P].lx + .5) * cam.z; cam.y = VH * .3 - (C[P].ly + .5) * cam.z; } toast(`Você governa ${C[P].name}. Boa sorte!`, 'good'); }
   else if (act === 'newmap') newWorld();
+  else if (act === 'switch') {
+    const old = C[P].name; P = sel; focus = null; nukeArmed = false; airArmed = false; ptab = 'army'; loanOpen = -1;
+    $('vs').hidden = true; showIntro(C[P].name); toast(`🔄 Você deixou ${old} e agora governa ${C[P].name}.`, 'good');
+  }
   else if (act === 'continue') { loadGame(latestSlot || 'auto'); return; }
   else if (act === 'split') { const o = C[sel].orig, lx = C[sel].lx, ly = C[sel].ly; regenKeepCam(o); cam.z = Math.max(cam.z, cam.fit * 3); cam.x = VW / 2 - (lx + .5) * cam.z; cam.y = VH * (VW < 760 ? .3 : .5) - (ly + .5) * cam.z; }
   else if (act === 'unsplit') regenKeepCam(-1);
@@ -1998,7 +2116,7 @@ $('panel').addEventListener('click', e => {
 });
 $('panel').addEventListener('change', e => {
   if (e.target.id === 'ncount') { nCount = +e.target.value; newWorld(); updateUI(); }
-  else if (e.target.id === 'wmode') { worldMode = e.target.value; newWorld(); updateUI(); }
+  else if (e.target.id === 'wmode') { const v = e.target.value; worldMode = v === 'rand' ? 'rand' : 'real'; if (v !== 'rand') scen = v; newWorld(); updateUI(); }
   else if (e.target.id === 'search') {
     const c = C.find(c => c.name.toLowerCase() === e.target.value.trim().toLowerCase());
     if (c && c.alive) { sel = c.id; cam.z = Math.max(cam.z, cam.fit * 2.5); cam.x = VW / 2 - (c.lx + .5) * cam.z; cam.y = VH * (VW < 760 ? .3 : .5) - (c.ly + .5) * cam.z; dirty = true; updateUI(); }
@@ -2282,7 +2400,7 @@ async function unpackSave(p) {
 }
 function snapshotGame() {
   return {
-    v: 1, market, mode: worldMode, split: splitOrig, gw: GW, gh: GH, s: S, nCount, day, P, warSeq,
+    v: 1, market, scen, mode: worldMode, split: splitOrig, gw: GW, gh: GH, s: S, nCount, day, P, warSeq,
     land: worldMode === 'real' ? null : rle(land), owner: rle(owner), core: rle(core),
     C: C.map(c => ({ n: c.baseName || c.name, col: c.col.map(v => Math.round(v)), fo: (c.flagBase || c.flag).img ? c.orig : -1, band: !!(c.flagBase || c.flag).band, fl: (c.flagBase || c.flag).img ? null : (c.flagBase || c.flag), emp: !!c.empire, es: c.empSince ?? null, c0: c.cells0,
       alive: c.alive, cells: c.cells, mult: c.mult, nuclear: c.nuclear, troops: Math.round(c.troops), cas: Math.round(c.casualties), cap: c.cap, aggr: c.aggr,
@@ -2299,12 +2417,13 @@ function snapshotGame() {
 }
 function restoreGame(sv) {
   worldMode = sv.mode; nCount = sv.nCount || nCount;
-  if (sv.mode === 'real') genReal(sv.split);
-  else { alloc(sv.gw, sv.gh, sv.s); unrle(sv.land, land); latOfRow = y => 55 - y / GH * 110; finishTerrain(() => .5); splitOrig = -1; }
+  if (sv.mode === 'real') genReal(sv.split, sv.scen || 'hoje');
+  else { alloc(sv.gw, sv.gh, sv.s); unrle(sv.land, land); latOfRow = y => 55 - y / GH * 110; finishTerrain(() => .5); splitOrig = -1; scen = 'hoje'; START = [2026, 0, 1]; scenNukes = scenAir = true; }
+  const base = sv.mode === 'real' && C.length === sv.C.length ? C.slice() : null;
   unrle(sv.owner, owner); unrle(sv.core, core);
   N = sv.C.length;
   C = sv.C.map((d, i) => ({
-    id: i, name: d.n, col: d.col, flag: d.fo >= 0 ? (d.band ? { ...countryFlag(d.fo), band: d.col } : countryFlag(d.fo)) : d.fl,
+    id: i, name: d.n, col: d.col, flag: base ? base[i].flagBase : d.fo >= 0 ? (d.band ? { ...countryFlag(d.fo), band: d.col } : countryFlag(d.fo)) : d.fl,
     alive: d.alive, cells: d.cells, mult: d.mult, nuclear: d.nuclear, nukeReady: 0, troops: d.troops, casualties: d.cas, cap: d.cap, aggr: d.aggr,
     lx: d.lx, ly: d.ly, recruitCD: d.rcd, allyCD: d.acd, aidCD: d.dcd, econ: d.econ, money: d.money, net: 0,
     tech: { atk: 0, def: 0, eco: 0, log: 0, nav: 0, air: 0, ...d.tech }, clickLv: d.clv || 0, clickTotal: d.ctot || 0, raidReady: d.rr || 0,
@@ -2324,7 +2443,12 @@ function restoreGame(sv) {
   if (sv.market) market = sv.market; else initMarket();
   anims = []; nukes = []; raids = []; reqs = []; focus = null; nukeArmed = false; airArmed = false; nukeReady = 0;
   day = sv.day; P = sv.P; sel = P; phase = 'game'; ended = false;
-  sv.C.forEach((d, i) => { if (d.emp && C[i].alive) { C[i].empSince = d.es ?? null; makeEmpire(C[i], true); } });
+  sv.C.forEach((d, i) => {
+    if (!d.emp || !C[i].alive) return;
+    const b = base && base[i];
+    if (b && b.histEmpire) { const c = C[i]; c.empire = true; c.histEmpire = true; c.name = b.name; c.flag = b.flag; c.flagURL = b.flagURL; c.empPix = b.empPix; c.empW = b.empW; c.empH = b.empH; c.empSince = d.es ?? 0; }
+    else { C[i].empSince = d.es ?? null; makeEmpire(C[i], true); }
+  });
   scanBorders(); computeLabels(); updateDivs();
   fillSearch();
   if (C[P]) { cam.z = Math.max(cam.fit * 2.6, 6); cam.x = VW / 2 - (C[P].lx + .5) * cam.z; cam.y = VH * (VW < 760 ? .3 : .5) - (C[P].ly + .5) * cam.z; }
@@ -2341,7 +2465,7 @@ async function readMeta(k) { const d = await readSlot(k); return d ? d.meta : nu
 async function saveGame(k, quiet = false) {
   if (phase !== 'game' || P < 0 || !C[P].alive) return false;
   try {
-    const doc = { meta: { country: C[P].name, flag: C[P].flagURL.length < 4000 ? C[P].flagURL : '', date: fmtDateBig(day), savedAt: Date.now(), mode: worldMode }, ...(await packSave(snapshotGame())) };
+    const doc = { meta: { country: C[P].name, flag: C[P].flagURL.length < 4000 ? C[P].flagURL : '', date: fmtDateBig(day), savedAt: Date.now(), mode: worldMode, scen }, ...(await packSave(snapshotGame())) };
     if (store.db) await slotRef(k).set(doc); else localStorage.setItem('gg-save-' + k, JSON.stringify(doc));
     if (!latestSlot || !autoMeta || doc.meta.savedAt >= autoMeta.savedAt) { autoMeta = doc.meta; latestSlot = k; }
     if (!quiet) toast(`💾 Jogo salvo (${C[P].name}, ${fmtDateBig(day)}).`, 'good');
@@ -2511,7 +2635,7 @@ function checkEmpires() {
   for (const c of C) {
     if (!c.alive || !c.cells0) continue;
     if (!c.empire && day > 20 && c.cells >= Math.max(EMP_MIN, c.cells0 * EMP_UP)) makeEmpire(c);
-    else if (c.empire && c.cells < c.cells0 * EMP_DOWN) endEmpire(c);
+    else if (c.empire && c.cells < c.cells0 * (c.histEmpire ? .5 : EMP_DOWN)) { c.histEmpire = false; endEmpire(c); }
   }
 }
 function showEmpireBanner(c) {
@@ -2597,7 +2721,7 @@ function drawNukes(now, z) {
   return shake;
 }
 function nukeButton() {
-  const b = $('nuke'), show = phase === 'game' && P >= 0 && C[P].alive && warsOf(P).length > 0;
+  const b = $('nuke'), show = scenNukes && phase === 'game' && P >= 0 && C[P].alive && warsOf(P).length > 0;
   b.hidden = !show; if (!show) { nukeArmed = false; return; }
   const left = Math.ceil((nukeReady - performance.now()) / 1000);
   const html = nukeArmed ? '☢<small>ALVO?</small>' : left > 0 ? `☢<small>${left}s</small>` : '☢<small>PRONTA</small>';
@@ -2713,7 +2837,7 @@ function drawRaids(now, z) {
   }
 }
 function airButton() {
-  const b = $('air'), show = phase === 'game' && P >= 0 && C[P].alive && warsOf(P).length > 0;
+  const b = $('air'), show = scenAir && phase === 'game' && P >= 0 && C[P].alive && warsOf(P).length > 0;
   b.hidden = !show; if (!show) { airArmed = false; return; }
   const left = C[P].raidReady - day, poor = C[P].money < CFG.RAID_COST;
   const html = airArmed ? '✈<small>ALVO?</small>' : left > 0 ? `✈<small>${left}d</small>` : `✈<small>${fmtM(CFG.RAID_COST)}</small>`;
