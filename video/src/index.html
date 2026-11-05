@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8">
+<style>
+html,body{margin:0;width:1920px;height:1080px;overflow:hidden;background:#04110b;font-family:"DejaVu Sans",sans-serif}
+canvas{position:absolute;inset:0}
+#ui{position:absolute;inset:0;color:#fff}
+.tag{position:absolute;left:80px;top:70px;font-size:26px;letter-spacing:6px;color:#ffd84a;font-weight:bold;text-transform:uppercase}
+.title{position:absolute;left:80px;top:115px;font-size:78px;font-weight:bold;text-shadow:0 6px 30px rgba(0,0,0,.7);max-width:1100px;line-height:1.05}
+.prop{position:absolute;left:80px;top:300px;width:720px;font-size:34px;line-height:1.35;background:rgba(0,30,15,.62);border-left:8px solid #ffd84a;padding:22px 28px;border-radius:6px}
+.card{position:absolute;width:720px;font-size:29px;line-height:1.35;padding:20px 26px;border-radius:10px;backdrop-filter:blur(2px)}
+.card b{display:block;font-size:22px;letter-spacing:3px;margin-bottom:6px}
+.pro{left:80px;top:590px;background:rgba(10,90,45,.78);border:2px solid #3fd17a}
+.con{left:80px;top:800px;background:rgba(90,25,20,.78);border:2px solid #ff7a6a}
+.foot{position:absolute;left:0;right:0;bottom:0;height:54px;background:rgba(0,0,0,.55);font-size:22px;color:#cfd;display:flex;align-items:center;padding-left:80px;letter-spacing:1px}
+.big{position:absolute;left:0;right:0;text-align:center;font-weight:bold;text-shadow:0 8px 40px rgba(0,0,0,.8)}
+.prog{position:absolute;right:80px;top:76px;font-size:24px;color:#9fc}
+</style></head><body>
+<script src="node_modules/three/build/three.min.js"></script>
+<div id="ui"></div>
+<script>
+const W=1920,H=1080;
+const renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});
+renderer.setSize(W,H);renderer.setPixelRatio(1);
+renderer.shadowMap.enabled=true;
+document.body.insertBefore(renderer.domElement,document.body.firstChild);
+const scene=new THREE.Scene();
+scene.fog=new THREE.Fog(0x04110b,30,90);
+const cam=new THREE.PerspectiveCamera(45,W/H,0.1,200);
+scene.add(new THREE.HemisphereLight(0xbfffe0,0x0a2a18,0.7));
+const sun=new THREE.DirectionalLight(0xffffff,1.1);sun.position.set(10,20,12);sun.castShadow=true;
+sun.shadow.mapSize.set(2048,2048);Object.assign(sun.shadow.camera,{left:-20,right:20,top:20,bottom:-20});
+scene.add(sun);
+const rim=new THREE.PointLight(0xffd84a,1.2,60);rim.position.set(-8,6,-6);scene.add(rim);
+
+const M=(c,o={})=>new THREE.MeshStandardMaterial(Object.assign({color:c,roughness:.45,metalness:.15},o));
+const GREEN=0x009c3b,YEL=0xffdf00,BLUE=0x002776,WHITE=0xf4f4f4;
+const floor=new THREE.Mesh(new THREE.CircleGeometry(60,64),M(0x062a18,{roughness:.9}));
+floor.rotation.x=-Math.PI/2;floor.receiveShadow=true;scene.add(floor);
+
+// particles
+const pg=new THREE.BufferGeometry();const pc=[];const N=600;
+let seed=7;const rnd=()=>(seed=(seed*16807)%2147483647)/2147483647;
+for(let i=0;i<N;i++)pc.push((rnd()-.5)*60,rnd()*25,(rnd()-.5)*60);
+pg.setAttribute('position',new THREE.Float32BufferAttribute(pc,3));
+const parts=new THREE.Points(pg,new THREE.PointsMaterial({color:YEL,size:.12,transparent:true,opacity:.7}));
+scene.add(parts);
+
+function add(g,o){g.add(o);o.castShadow=true;o.receiveShadow=true;return o}
+const groups={};
+
+// 0 Intro: Congresso estilizado
+{const g=new THREE.Group();groups.intro=g;
+ add(g,new THREE.Mesh(new THREE.BoxGeometry(14,.6,5),M(WHITE))).position.y=1.6;
+ for(let i=0;i<10;i++){add(g,new THREE.Mesh(new THREE.CylinderGeometry(.12,.12,1.3),M(WHITE))).position.set(-6+i*1.33,.65,2)}
+ const dome=add(g,new THREE.Mesh(new THREE.SphereGeometry(2.2,48,24,0,Math.PI*2,0,Math.PI/2),M(WHITE)));dome.position.set(4,1.9,0);
+ const bowl=add(g,new THREE.Mesh(new THREE.SphereGeometry(3,48,24,0,Math.PI*2,Math.PI/2,Math.PI/2),M(WHITE,{side:THREE.DoubleSide})));bowl.position.set(-4,4.9,0);
+ for(const x of[-.7,.7])add(g,new THREE.Mesh(new THREE.BoxGeometry(1.1,11,1.6),M(0xdfe8e4,{metalness:.4}))).position.set(x,7.4,-1);
+ add(g,new THREE.Mesh(new THREE.BoxGeometry(2.5,.5,1.6),M(0xdfe8e4))).position.set(0,10.2,-1);
+ const flag=add(g,new THREE.Mesh(new THREE.PlaneGeometry(3,2,20,10),M(GREEN,{side:THREE.DoubleSide})));flag.position.set(-7,6,-2);g.userData.flag=flag;
+ const pole=add(g,new THREE.Mesh(new THREE.CylinderGeometry(.06,.06,8),M(0xcccccc,{metalness:.8})));pole.position.set(-8.5,4,-2);
+ const lz=add(g,new THREE.Mesh(new THREE.CircleGeometry(.6,4),M(YEL,{side:THREE.DoubleSide})));lz.scale.set(1.8,1,1);lz.position.set(-7,6,-1.95);
+ const bc=add(g,new THREE.Mesh(new THREE.CircleGeometry(.42,32),M(BLUE,{side:THREE.DoubleSide})));bc.position.set(-7,6,-1.93);
+ g.userData.flagParts=[lz,bc];
+}
+// 1 Segurança: escudo
+{const g=new THREE.Group();groups.seg=g;
+ const s=new THREE.Shape();s.moveTo(0,3);s.bezierCurveTo(1.5,3,2.5,2.6,2.6,2.4);s.lineTo(2.4,0);s.bezierCurveTo(2.2,-2,1,-3,0,-3.6);s.bezierCurveTo(-1,-3,-2.2,-2,-2.4,0);s.lineTo(-2.6,2.4);s.bezierCurveTo(-2.5,2.6,-1.5,3,0,3);
+ const sh=add(g,new THREE.Mesh(new THREE.ExtrudeGeometry(s,{depth:.6,bevelEnabled:true,bevelSize:.15,bevelThickness:.15,bevelSegments:4}),M(BLUE,{metalness:.6,roughness:.3})));
+ const st=new THREE.Shape();for(let i=0;i<10;i++){const r=i%2?0.6:1.4,a=Math.PI/2+i*Math.PI/5;i?st.lineTo(Math.cos(a)*r,Math.sin(a)*r):st.moveTo(Math.cos(a)*r,Math.sin(a)*r)}
+ const star=add(g,new THREE.Mesh(new THREE.ExtrudeGeometry(st,{depth:.3,bevelEnabled:false}),M(YEL,{metalness:.8,roughness:.2})));star.position.z=.75;
+ const sg=new THREE.Group();sg.add(sh,star);sg.position.y=5;g.add(sg);g.userData.sh=sg;
+ const l1=new THREE.PointLight(0x2255ff,0,30),l2=new THREE.PointLight(0xff2222,0,30);l1.position.set(-6,3,4);l2.position.set(6,3,4);g.add(l1,l2);g.userData.l=[l1,l2];
+ for(let i=0;i<14;i++){const b=add(g,new THREE.Mesh(new THREE.BoxGeometry(1.4,2+rnd()*7,1.4),M(0x1a2a36)));const a=Math.PI+i/13*Math.PI;b.position.set(Math.cos(a)*13+3,b.geometry.parameters.height/2,Math.sin(a)*6-9)}
+}
+// 2 Economia: barras + moedas
+{const g=new THREE.Group();groups.eco=g;g.userData.bars=[];g.userData.coins=[];
+ for(let i=0;i<7;i++){const b=add(g,new THREE.Mesh(new THREE.BoxGeometry(1.2,1,1.2),M(i%2?GREEN:0x22c55e,{metalness:.3})));b.position.set(-5.4+i*1.8,0,0);g.userData.bars.push(b)}
+ for(let i=0;i<24;i++){const c=add(g,new THREE.Mesh(new THREE.CylinderGeometry(.5,.5,.12,32),M(YEL,{metalness:.9,roughness:.25})));c.userData={x:(rnd()-.5)*14,z:(rnd()-.5)*6,o:rnd()*10,s:.5+rnd()};g.userData.coins.push(c)}
+}
+// 3 Anistia / STF: balança
+{const g=new THREE.Group();groups.just=g;
+ add(g,new THREE.Mesh(new THREE.CylinderGeometry(1.5,2,.6,32),M(0x8a6a2a,{metalness:.7}))).position.y=.3;
+ add(g,new THREE.Mesh(new THREE.CylinderGeometry(.15,.15,7),M(0xd4af37,{metalness:.9,roughness:.2}))).position.y=4;
+ const beam=new THREE.Group();beam.position.y=7.4;g.add(beam);g.userData.beam=beam;
+ add(beam,new THREE.Mesh(new THREE.BoxGeometry(8,.2,.2),M(0xd4af37,{metalness:.9,roughness:.2})));
+ g.userData.pans=[];
+ for(const x of[-3.8,3.8]){const p=new THREE.Group();p.position.x=x;beam.add(p);
+  for(let k=0;k<3;k++){const a=k/3*Math.PI*2;const c=add(p,new THREE.Mesh(new THREE.CylinderGeometry(.02,.02,3),M(0xd4af37)));c.position.set(Math.cos(a)*.6,-1.5,Math.sin(a)*.6)}
+  const pan=add(p,new THREE.Mesh(new THREE.SphereGeometry(1.2,32,12,0,Math.PI*2,Math.PI/2,Math.PI/3),M(0xd4af37,{metalness:.9,side:THREE.DoubleSide})));pan.position.y=-2.4;
+  g.userData.pans.push(p)}
+ // colunas
+ for(let i=0;i<6;i++){add(g,new THREE.Mesh(new THREE.CylinderGeometry(.4,.45,8,24),M(WHITE))).position.set(-10+i*4,4,-8)}
+}
+// 4 Agro e meio ambiente
+{const g=new THREE.Group();groups.agro=g;g.userData.crops=[];g.userData.trees=[];
+ const field=add(g,new THREE.Mesh(new THREE.PlaneGeometry(13,10),M(0x5a3d1e,{roughness:1})));field.rotation.x=-Math.PI/2;field.position.set(-3.5,.02,0);
+ for(let i=0;i<10;i++)for(let j=0;j<7;j++){const c=add(g,new THREE.Mesh(new THREE.ConeGeometry(.25,1,6),M(j%2?0xd9c43a:0x7ccf3a)));c.position.set(-9+i*1.2,0,-4+j*1.3);g.userData.crops.push(c)}
+ for(let i=0;i<22;i++){const t=new THREE.Group();add(t,new THREE.Mesh(new THREE.CylinderGeometry(.15,.2,1.5),M(0x5b3a1a))).position.y=.75;
+  add(t,new THREE.Mesh(new THREE.IcosahedronGeometry(1,0),M(0x0f7a32,{flatShading:true}))).position.y=2.1;
+  t.position.set(3.5+rnd()*5,0,-6+rnd()*9);t.userData.k=i/22;g.add(t);g.userData.trees.push(t)}
+ const tr=new THREE.Group();g.add(tr);g.userData.tr=tr;
+ add(tr,new THREE.Mesh(new THREE.BoxGeometry(2,1.2,1.4),M(0x1f9d3a))).position.y=1.2;
+ add(tr,new THREE.Mesh(new THREE.BoxGeometry(1,1,1.2),M(0x9ec9ff,{metalness:.5}))).position.set(-.4,2.2,0);
+ for(const[x,r]of[[.7,.7],[-.7,.45]])for(const z of[-.75,.75]){const w=add(tr,new THREE.Mesh(new THREE.CylinderGeometry(r,r,.4,20),M(0x222222)));w.rotation.x=Math.PI/2;w.position.set(x,r,z)}
+}
+// 5 Armas -> alvo e cadeado (sem mostrar armas)
+{const g=new THREE.Group();groups.arm=g;
+ const tg=new THREE.Group();tg.position.y=5;g.add(tg);g.userData.tg=tg;
+ for(let i=0;i<5;i++){const r=add(tg,new THREE.Mesh(new THREE.CylinderGeometry(3.5-i*.65,3.5-i*.65,.3+i*.06,48),M(i%2?WHITE:0xc1272d)));r.rotation.x=Math.PI/2;r.position.z=i*.03}
+ const lock=new THREE.Group();lock.position.set(5.5,3,2);g.add(lock);g.userData.lock=lock;
+ add(lock,new THREE.Mesh(new THREE.BoxGeometry(2,1.7,.8),M(0xd4af37,{metalness:.9,roughness:.25})));
+ const shk=add(lock,new THREE.Mesh(new THREE.TorusGeometry(.65,.14,16,32,Math.PI),M(0xbbbbbb,{metalness:.95,roughness:.15})));shk.position.y=.85;g.userData.shk=shk;
+}
+// 6 Política externa: globo
+{const g=new THREE.Group();groups.ext=g;
+ const gl=new THREE.Group();gl.position.y=5;g.add(gl);g.userData.gl=gl;
+ add(gl,new THREE.Mesh(new THREE.SphereGeometry(3.6,48,32),M(0x0b4f8a,{roughness:.6})));
+ gl.add(new THREE.Mesh(new THREE.SphereGeometry(3.62,24,16),new THREE.MeshBasicMaterial({color:0x6fd3ff,wireframe:true,transparent:true,opacity:.25})));
+ const ll=(lat,lon,r=3.65)=>{const p=lat*Math.PI/180,l=lon*Math.PI/180;return new THREE.Vector3(r*Math.cos(p)*Math.cos(l),r*Math.sin(p),-r*Math.cos(p)*Math.sin(l))};
+ const pts={br:ll(-14,-51),us:ll(39,-98),cn:ll(35,104)};
+ const cols={br:GREEN,us:0x3b82f6,cn:0xe11d48};
+ for(const k in pts){const m=new THREE.Mesh(new THREE.SphereGeometry(.28,16,16),new THREE.MeshBasicMaterial({color:cols[k]}));m.position.copy(pts[k]);gl.add(m)}
+ g.userData.arcs=[];
+ for(const[k,w]of[['us',.12],['cn',.05]]){const a=pts.br,b=pts[k];const mid=a.clone().add(b).multiplyScalar(.5).normalize().multiplyScalar(5.6);
+  const curve=new THREE.QuadraticBezierCurve3(a,mid,b);const tube=new THREE.Mesh(new THREE.TubeGeometry(curve,64,w,8),new THREE.MeshBasicMaterial({color:k=='us'?0xffd84a:0xff8a8a}));
+  gl.add(tube);g.userData.arcs.push(tube)}
+}
+// 7 Costumes: casa e família
+{const g=new THREE.Group();groups.cos=g;
+ const h=new THREE.Group();h.position.set(0,0,-1);g.add(h);
+ add(h,new THREE.Mesh(new THREE.BoxGeometry(5,3.5,4),M(0xf3e6c8))).position.y=1.75;
+ const roof=add(h,new THREE.Mesh(new THREE.ConeGeometry(4.2,2.5,4),M(0xb5452a)));roof.position.y=4.75;roof.rotation.y=Math.PI/4;
+ add(h,new THREE.Mesh(new THREE.BoxGeometry(1,1.8,.1),M(0x6b3b1a))).position.set(0,.9,2.01);
+ const hearts=[];g.userData.hearts=hearts;
+ const hs=new THREE.Shape();hs.moveTo(0,-.5);hs.bezierCurveTo(-1,.2,-.6,1,0,.5);hs.bezierCurveTo(.6,1,1,.2,0,-.5);
+ for(let i=0;i<8;i++){const m=add(g,new THREE.Mesh(new THREE.ExtrudeGeometry(hs,{depth:.15,bevelEnabled:false}),M(0xff4d6d,{emissive:0x550010})));m.userData.o=i;hearts.push(m)}
+ g.userData.fam=[];
+ for(const[x,s,c]of[[-2,1,0x2563eb],[-.9,.95,0xdb2777],[.1,.6,0x16a34a],[.9,.5,0xf59e0b]]){const p=new THREE.Group();
+  add(p,new THREE.Mesh(new THREE.CapsuleGeometry(.35*s,1.1*s,6,12),M(c))).position.y=.9*s;
+  add(p,new THREE.Mesh(new THREE.SphereGeometry(.32*s,20,16),M(0xe0b48a))).position.y=1.95*s;
+  p.position.set(x,0,3);g.add(p);g.userData.fam.push(p)}
+}
+// 8 Governabilidade: plenário
+{const g=new THREE.Group();groups.gov=g;g.userData.seats=[];
+ const blocs=[[0x1d4ed8,.20],[0xfacc15,.42],[0x9ca3af,.68],[0xdc2626,1]];// direita, centrão, outros, oposição
+ let idx=0;const total=[];
+ for(let r=0;r<6;r++){const R=4+r*1.1,n=14+r*5;for(let i=0;i<n;i++){const a=Math.PI*(i/(n-1));total.push({x:-Math.cos(a)*R,z:-Math.sin(a)*R,a})}}
+ total.sort((p,q)=>p.a-q.a);
+ total.forEach((p,i)=>{const f=i/total.length;const col=blocs.find(b=>f<=b[1])[0];
+  const s=add(g,new THREE.Mesh(new THREE.SphereGeometry(.32,14,10),M(col,{emissive:col,emissiveIntensity:.15})));s.position.set(p.x,.35,p.z+3);s.userData.f=f;g.userData.seats.push(s)});
+ add(g,new THREE.Mesh(new THREE.BoxGeometry(3,1.2,1),M(0x7c5a2e))).position.set(0,.6,4.5);
+}
+// 9 Final: urna
+{const g=new THREE.Group();groups.end=g;
+ const u=new THREE.Group();u.position.y=0;g.add(u);g.userData.u=u;
+ add(u,new THREE.Mesh(new THREE.BoxGeometry(5,3,3.4),M(0xe9e9e4))).position.y=1.5;
+ const scr=add(u,new THREE.Mesh(new THREE.BoxGeometry(2.4,1.4,.1),M(0x111111,{emissive:0x0a3d1f})));scr.position.set(-.9,2.2,1.71);
+ for(let i=0;i<4;i++)for(let j=0;j<3;j++){add(u,new THREE.Mesh(new THREE.BoxGeometry(.38,.28,.12),M(0x222222))).position.set(1.1+j*.48,2.6-i*.38,1.71)}
+ add(u,new THREE.Mesh(new THREE.BoxGeometry(.5,.28,.12),M(0x16a34a))).position.set(2.05,1.0,1.71);
+ g.userData.chk=[];
+ for(let i=0;i<30;i++){const c=add(g,new THREE.Mesh(new THREE.BoxGeometry(.5,.5,.5),M([GREEN,YEL,BLUE,WHITE][i%4])));c.userData={a:rnd()*6.28,r:4+rnd()*4,y:rnd()*8,s:.3+rnd()*.6};g.userData.chk.push(c)}
+}
+for(const k in groups){scene.add(groups[k]);groups[k].visible=false}
+
+// ---------------- roteiro ----------------
+const S=[
+ {k:'intro',d:8},
+ {k:'seg',d:9,n:'1/8',tag:'Segurança pública',title:'Mão dura contra o crime',
+  prop:'Defende classificar facções como PCC e CV como organizações terroristas e endurecer penas.',
+  pro:'Mais força para combater o crime organizado e retomar territórios.',
+  con:'Risco de excessos policiais e de prisões ainda mais superlotadas.'},
+ {k:'eco',d:9,n:'2/8',tag:'Economia',title:'Estado menor, menos impostos',
+  prop:'Linha liberal: privatizações, corte de gastos e redução da carga tributária.',
+  pro:'Mais investimento privado, emprego e confiança do mercado.',
+  con:'Pressão sobre serviços públicos e dúvidas sobre o equilíbrio fiscal.'},
+ {k:'just',d:9,n:'3/8',tag:'Justiça e instituições',title:'Anistia e choque com o STF',
+  prop:'Apoia anistia aos condenados pelo 8 de janeiro e critica o que chama de “ativismo” do STF.',
+  pro:'Seria um gesto de “pacificação” do país, segundo apoiadores.',
+  con:'Sinal de impunidade e risco de crise entre os Poderes.'},
+ {k:'agro',d:9,n:'4/8',tag:'Agro e meio ambiente',title:'O agro no centro',
+  prop:'Forte apoio ao agronegócio e a regras ambientais e de licenciamento mais flexíveis.',
+  pro:'Mais produção, exportações e renda no campo.',
+  con:'Mais desmatamento e pressão de parceiros comerciais como a União Europeia.'},
+ {k:'arm',d:9,n:'5/8',tag:'Armas',title:'Mais acesso a armas',
+  prop:'Defende ampliar o direito do cidadão de comprar e portar armas (CACs, legítima defesa).',
+  pro:'Cidadão com mais meios de se defender.',
+  con:'Estudos associam mais armas em circulação a mais mortes violentas.'},
+ {k:'ext',d:9,n:'6/8',tag:'Política externa',title:'Alinhamento com os EUA',
+  prop:'Aproximação com os Estados Unidos e governos conservadores.',
+  pro:'Acordos, investimentos e aliança com o Ocidente.',
+  con:'Tensão com a China, o maior parceiro comercial do Brasil.'},
+ {k:'cos',d:9,n:'7/8',tag:'Costumes',title:'Pauta conservadora',
+  prop:'Contra a legalização do aborto e das drogas; discurso de defesa da “família tradicional”.',
+  pro:'Agrada eleitores religiosos e conservadores.',
+  con:'Críticos veem risco de retrocesso em direitos de minorias.'},
+ {k:'gov',d:9,n:'8/8',tag:'Governabilidade',title:'E o Congresso?',
+  prop:'Nenhum presidente governa sozinho: aprovar reformas exigiria alianças com o Centrão.',
+  pro:'Base de direita forte pode acelerar as votações.',
+  con:'Negociação de cargos e emendas; polarização continua alta.'},
+ {k:'end',d:9},
+];
+let acc=0;for(const s of S){s.t0=acc;acc+=s.d}
+window.TOTAL=acc;
+
+const ui=document.getElementById('ui');
+const clamp=(x,a=0,b=1)=>Math.min(b,Math.max(a,x));
+const ease=x=>{x=clamp(x);return x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2};
+const fade=(lt,a,d)=>clamp((lt-a)/.5)*clamp((d-.4-lt)/.4);
+function css(lt,a,d,dx=-40){const o=fade(lt,a,d);return `opacity:${o};transform:translateX(${(1-ease(clamp((lt-a)/.6)))*dx}px)`}
+const FOOT='Cenário hipotético e informativo, baseado em posições públicas — não é previsão nem propaganda.';
+
+function renderAt(t){
+ const s=S.find(s=>t>=s.t0&&t<s.t0+s.d)||S[S.length-1];
+ const lt=t-s.t0,d=s.d;
+ for(const k in groups)groups[k].visible=(k==s.k);
+ const g=groups[s.k],u=g.userData;
+ // camera orbit
+ const ang=lt*.12+S.indexOf(s)*.9;const R=18-ease(lt/2)*3;
+ const offX=s.k=='intro'||s.k=='end'?0:-4;
+ cam.position.set(Math.sin(ang)*R*.35+offX*-.6,6+Math.sin(lt*.4)*1,R);
+ cam.lookAt(offX,4,0);
+ g.position.x=(s.k=='intro'||s.k=='end')?0:0;g.rotation.y=Math.sin(lt*.25)*.25;
+ parts.rotation.y=t*.02;parts.position.y=Math.sin(t*.3)*.5;
+ const pop=ease(lt/1.2);g.scale.setScalar(.6+.4*pop);
+
+ if(s.k=='intro'){g.rotation.y=lt*.15-.4;const pos=u.flag.geometry.attributes.position;
+  for(let i=0;i<pos.count;i++){const x=pos.getX(i);pos.setZ(i,Math.sin(x*2+t*4)*.15*(x+1.5))}pos.needsUpdate=true;}
+ if(s.k=='seg'){u.sh.rotation.y=lt*.8;u.sh.position.y=5+Math.sin(lt*2)*.3;const on=Math.floor(lt*3)%2;u.l[0].intensity=on?4:0;u.l[1].intensity=on?0:4}
+ if(s.k=='eco'){u.bars.forEach((b,i)=>{const h=1+ease((lt-.3-i*.15)/1.5)*(1.5+i*1.1);b.scale.y=h;b.position.y=h/2});
+  u.coins.forEach(c=>{const d=c.userData;const y=12-((lt*3*d.s+d.o)%14);c.position.set(d.x,y,d.z);c.rotation.set(lt*2*d.s,0,lt*3*d.s+d.o)})}
+ if(s.k=='just'){const tilt=Math.sin(lt*1.3)*.18*Math.exp(-lt*.1);u.beam.rotation.z=tilt;u.pans.forEach(p=>p.rotation.z=-tilt)}
+ if(s.k=='agro'){u.crops.forEach((c,i)=>{const k=ease((lt-.2-(i%10)*.08)/1.2);c.scale.set(1,.05+k,1);c.position.y=.5*(.05+k)});
+  u.tr.position.set(-9+((lt*1.6)%12),0,4.8);
+  u.trees.forEach(tr=>{const k=clamp((lt-3-tr.userData.k*4)/.6);tr.scale.setScalar(1-k*.95);tr.rotation.z=k*1.2})}
+ if(s.k=='arm'){u.tg.rotation.y=Math.sin(lt*.7)*.5;const o=ease((lt-1.5)/1);u.shk.position.y=.85+o*.6;u.shk.rotation.y=o*1.2;u.lock.rotation.y=-.4+Math.sin(lt)*.2}
+ if(s.k=='ext'){u.gl.rotation.y=-1.6+lt*.18;u.gl.rotation.x=.25;u.arcs[0].scale.setScalar(1);u.arcs.forEach((a,i)=>{a.material.opacity=1})}
+ if(s.k=='cos'){u.hearts.forEach(h=>{const o=h.userData.o;const y=((lt*.9+o*.8)%6);h.position.set(Math.sin(o*1.7)*4,3+y,Math.cos(o*1.7)*2);h.rotation.y=lt*2+o;h.scale.setScalar(.6*Math.sin(Math.PI*y/6))});
+  u.fam.forEach((p,i)=>p.position.y=Math.abs(Math.sin(lt*3+i))*.25)}
+ if(s.k=='gov'){u.seats.forEach(st=>{const k=ease((lt-.3-st.userData.f*2.5)/.4);st.scale.setScalar(.01+k);st.position.y=.35+(1-k)*3})}
+ if(s.k=='end'){u.u.rotation.y=Math.sin(lt*.5)*.4;u.chk.forEach(c=>{const d=c.userData;c.position.set(Math.cos(d.a+lt*d.s)*d.r,1+((d.y+lt*.6)%8),Math.sin(d.a+lt*d.s)*d.r);c.rotation.set(lt*d.s*2,lt,0)})}
+ renderer.render(scene,cam);
+
+ // UI
+ let h='';
+ if(s.k=='intro'){
+  h=`<div style="position:absolute;inset:0;background:radial-gradient(ellipse at 50% 42%,rgba(0,0,0,.75),rgba(0,0,0,.2) 55%,rgba(0,0,0,0) 75%)"></div><div class="big" style="top:250px;font-size:44px;color:#ffd84a;letter-spacing:10px;${css(lt,.3,d,0)}">E SE...</div>
+  <div class="big" style="top:320px;font-size:96px;${css(lt,.8,d,0)}">Flávio Bolsonaro<br>fosse presidente?</div>
+  <div class="big" style="top:590px;font-size:36px;color:#cfe;${css(lt,2,d,0)}">As propostas, o que poderia mudar no Brasil<br>e o que dizem apoiadores e críticos</div>`;
+ }else if(s.k=='end'){
+  h=`<div class="big" style="top:180px;font-size:84px;${css(lt,.3,d,0)}">Quem decide é você.</div>
+  <div class="big" style="top:330px;font-size:38px;color:#cfe;line-height:1.5;${css(lt,1.2,d,0)}">Nenhum cenário está garantido: tudo dependeria<br>do Congresso, da Justiça, da economia mundial e da sociedade.</div>
+  <div class="big" style="top:860px;font-size:28px;color:#ffd84a;${css(lt,2.5,d,0)}">Pesquise as propostas oficiais e compare os candidatos.</div>`;
+ }else{
+  h=`<div class="tag" style="${css(lt,.2,d)}">${s.tag}</div><div class="prog" style="${css(lt,.2,d,0)}">${s.n}</div>
+  <div class="title" style="${css(lt,.4,d)}">${s.title}</div>
+  <div class="prop" style="${css(lt,1,d)}">${s.prop}</div>
+  <div class="card pro" style="${css(lt,2.6,d)}"><b style="color:#7dffb0">✔ APOIADORES DIZEM</b>${s.pro}</div>
+  <div class="card con" style="${css(lt,4,d)}"><b style="color:#ffb3a8">⚠ CRÍTICOS ALERTAM</b>${s.con}</div>`;
+ }
+ const gf=clamp(t/.6)*clamp((TOTAL-t)/.6);
+ h+=`<div class="foot">${FOOT}</div><div style="position:absolute;inset:0;background:#000;opacity:${1-gf}"></div>`;
+ // flash entre cenas
+ const tr=Math.min(lt,d-lt);if(tr<.25&&t>.3&&t<TOTAL-.3)h+=`<div style="position:absolute;inset:0;background:#000;opacity:${1-tr/.25}"></div>`;
+ ui.innerHTML=h;
+}
+window.renderAt=renderAt;
+</script></body></html>
