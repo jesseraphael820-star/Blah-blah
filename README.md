@@ -21,7 +21,8 @@ Jogo de estratégia de guerra no mapa-múndi atual (193 países com bandeiras re
 - **🎬 Estilo de vídeo**: mapa satélite (só países em guerra pintados), divisões com bandeirinhas, tropas escritas na linha de frente, data grande e título da guerra.
 - **💾 Salvar**: 3 espaços + salvamento automático a cada 30 s e ao sair; "Continuar" abre o save mais recente.
 - **💼 Economia**: impostos, acordos comerciais, empréstimos (pedir e emprestar) e eventos aleatórios.
-- **🎮 Controle da guerra**: em cada guerra escolha Atacar, Manter, Recuar ou Automático.
+- **🎮 Controle da guerra**: em cada guerra escolha Atacar, Manter, Recuar ou Automático, e 💯 Força máxima para jogar o exército inteiro numa guerra.
+- **🌊 Submarinos**: torpedeiam navios inimigos que chegam perto do seu país.
 - **🎬 Replay**: reveja a partida acelerada e grave um vídeo (MP4/WebM) só com o mapa.
 - **📜 Cenários**: 1939 (Segunda Guerra) e 1822 (Império do Brasil), com fronteiras, impérios, alianças e guerras da época.
 - **🔄 Trocar de país** no meio da partida.

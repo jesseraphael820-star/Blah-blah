@@ -219,6 +219,8 @@ body.rp #top,body.rp #panel,body.rp #cas,body.rp #reqs,body.rp #nuke,body.rp #ai
 #pact .stance button.s-manter{background:#1e3f55;border-color:#4c8ec0}
 #pact .stance button.s-recuar{background:#4a3a10;border-color:#a8841e}
 .stl{font-size:12px}
+#pact button.allin{text-align:center;font-weight:700;background:#2a1f3d;border-color:#6a4fa8;margin-top:4px}
+#pact button.allin.on{background:#6a2fb0;border-color:#b48cff;color:#fff;animation:arm .9s infinite alternate}
 @keyframes pop{from{transform:scale(.9);opacity:0}to{transform:none;opacity:1}}
 .modal{position:fixed;inset:0;background:#000a;display:none;align-items:center;justify-content:center;z-index:20}
 .modal .box{background:#111a24;border:1px solid var(--line);border-radius:14px;padding:22px;max-width:460px;width:90%;text-align:center}
@@ -731,7 +733,7 @@ function makeCountries(list) {
     recruitCD: 0, allyCD: 0, aidCD: 0,
     econ: d.econ || 1, money: cnt[i] * 60 * (d.econ || 1) + 3000, net: 0,
     tech: { atk: 0, def: 0, eco: 0, log: 0, nav: 0, air: 0 }, clickLv: 0, clickTotal: 0, raidReady: 0,
-    eq: { tank: 0, art: 0, jet: 0, ship: 0 },
+    eq: { tank: 0, art: 0, jet: 0, ship: 0, sub: 0 },
     inv: { bond: 0, stock: 0, crypto: 0 }, invCost: { bond: 0, stock: 0, crypto: 0 }, proj: { usina: 0, porto: 0, banco: 0 },
     mil: { base: 0, trn: 0 }, loans: [], trades: [], tax: 1, boom: null, tradeCD: 0, loanCD: 0, armyCD: 0,
   }));
@@ -750,7 +752,7 @@ function makeCountries(list) {
   wars = []; rebuildWarMat();
   scanBorders();
   for (let a = 0; a < N; a++) for (let b = 0; b < N; b++) if (adj[a * N + b]) rel[a * N + b] -= 8;
-  anims = []; nukes = []; raids = []; wrecks = []; airArmed = false; nukeArmed = false; nukeReady = 0; $('vs').hidden = true; reqs = []; logs = []; focus = null;
+  anims = []; nukes = []; raids = []; wrecks = []; torps = []; airArmed = false; nukeArmed = false; nukeReady = 0; $('vs').hidden = true; reqs = []; logs = []; focus = null;
   day = 0; P = -1; sel = -1; phase = 'select'; ended = false;
   dirty = true; reqsChanged = true;
 }
@@ -915,16 +917,22 @@ const STANCES = [
 ];
 function stanceMods(w) {
   const m = { sa: 1, sb: 1, la: 1, lb: 1, ca: 1, cb: 1, n: 1 };
-  const st = (w.a === P || w.b === P) ? (w.stance || 'auto') : 'auto'; if (st === 'auto') return m;
-  const me = w.a === P ? 'a' : 'b', en = me === 'a' ? 'b' : 'a';
-  if (st === 'atacar') { m['s' + me] = 1.25; m['c' + me] = 1.25; m['l' + me] = 1.25; m.n = 1.4; }
-  else if (st === 'manter') { m['s' + me] = 1.1; m['c' + me] = 0; m['c' + en] = .45; m['l' + me] = .75; m.n = .7; }
-  else if (st === 'recuar') { m['c' + me] = 0; m['c' + en] = 1.3; m['l' + me] = .35; m['l' + en] = .5; m.n = .8; }
+  if (!(w.a === P || w.b === P)) return m;
+  const st = w.stance || 'auto', me = w.a === P ? 'a' : 'b', en = me === 'a' ? 'b' : 'a';
+  // força máxima: o exército inteiro vai para esta guerra; as outras frentes ficam fracas
+  if (w.allIn) { m['s' + me] *= 1.15; m['l' + me] *= 1.3; m.n *= 1.6; }
+  else if (allInW && (allInW.a === P || allInW.b === P)) { m['s' + me] *= .45; m.n *= .7; }
+  if (st === 'auto') return m;
+  if (st === 'atacar') { m['s' + me] *= 1.25; m['c' + me] = 1.25; m['l' + me] *= 1.25; m.n *= 1.4; }
+  else if (st === 'manter') { m['s' + me] *= 1.1; m['c' + me] = 0; m['c' + en] = .45; m['l' + me] *= .75; m.n *= .7; }
+  else if (st === 'recuar') { m['c' + me] = 0; m['c' + en] = 1.3; m['l' + me] *= .35; m['l' + en] *= .5; m.n *= .8; }
   return m;
 }
+let allInW = null;
 function stanceButtons(w) {
   const cur = w.stance || 'auto';
-  return `<div class="stance" role="group" aria-label="Controle da guerra">${STANCES.map(([k, i, n]) => `<button data-act="stance" data-w="${w.id}" data-s="${k}" class="${cur === k ? 'on s-' + k : ''}">${i}<small>${n}</small></button>`).join('')}</div>`;
+  return `<div class="stance" role="group" aria-label="Controle da guerra">${STANCES.map(([k, i, n]) => `<button data-act="stance" data-w="${w.id}" data-s="${k}" class="${cur === k ? 'on s-' + k : ''}">${i}<small>${n}</small></button>`).join('')}</div>
+    <button data-act="allin" data-w="${w.id}" class="allin${w.allIn ? ' on' : ''}">💯 ${w.allIn ? 'Força máxima ATIVA (toque para desligar)' : 'Usar força máxima nesta guerra'}</button>`;
 }
 function battle(w, ca, cb, sea) {
   const A = C[w.a], B = C[w.b];
@@ -973,6 +981,8 @@ function tick() {
   for (const c of C) if (c.alive) c.troops = Math.max(0, c.troops + c.cells * CFG.REGEN * c.mult * (1 + .15 * c.tech.log) * (1 + .1 * c.mil.base) * TAX[c.tax].regen * (1 - c.troops / maxT(c)));
   scanBorders();
   frontTot = new Float32Array(N); for (const w of wars) { frontTot[w.a] += w.fa.length; frontTot[w.b] += w.fa.length; }
+  allInW = wars.find(w => w.allIn && (w.a === P || w.b === P)) || null;
+  if (allInW) frontTot[P] = Math.max(4, allInW.fa.length);
   for (const w of wars.slice()) {
     if (!wars.includes(w) || !C[w.a].alive || !C[w.b].alive) continue;
     const L = w.fa.length;
@@ -1028,6 +1038,7 @@ function tick() {
     if (u.prog >= u.path.length - 1) { units.splice(units.indexOf(u), 1); landUnit(u, w); }
   }
   shipCollisions();
+  if (scenAir) subAttacks();
   for (const c of C) if (c.alive && c.cells <= 0) kill(c.id);
   if (day % 6 === 0) updateDivs();
   if (day % REC_EVERY === 0) recordFrame();
@@ -1044,7 +1055,7 @@ function tick() {
       if (c.tech[k] < TECH_MAX && c.money > techCost(c, k) * 1.5) { c.money -= techCost(c, k); c.tech[k]++; }
       const pk = PROJ[ri(0, PROJ.length - 1)].k;
       if (c.proj[pk] < PROJ_MAX && c.money > projCost(c, pk) * 2.5) { c.money -= projCost(c, pk); c.proj[pk]++; }
-      if (atWar[c.id]) { const ek = EQ[ri(0, scenAir ? 3 : 1)].k, e = EQ.find(x => x.k === ek), nb = ri(1, 4); if (c.money > e.cost * nb * 3) { c.money -= e.cost * nb; c.eq[ek] += nb; } }
+      if (atWar[c.id]) { const ek = (scenAir ? EQ : EQ.filter(e => e.k !== 'jet' && e.k !== 'sub'))[ri(0, (scenAir ? EQ.length : EQ.length - 2) - 1)].k, e = EQ.find(x => x.k === ek), nb = ri(1, 4); if (c.money > e.cost * nb * 3) { c.money -= e.cost * nb; c.eq[ek] += nb; } }
       const mk = R() < .5 ? 'base' : 'trn';
       if (c.mil[mk] < TECH_MAX && c.money > milCost(c, mk) * 2) { c.money -= milCost(c, mk); c.mil[mk]++; }
     }
@@ -1207,8 +1218,9 @@ const EQ = [
   { k: 'art', i: '💥', n: 'Artilharia', cost: 3000, up: 12, max: .4, half: 20, d: 'baixas causadas no inimigo' },
   { k: 'jet', i: '✈', n: 'Caças', cost: 8000, up: 40, max: .5, half: 15, d: 'dano dos bombardeios e defesa contra aviões' },
   { k: 'ship', i: '⚓', n: 'Navios de guerra', cost: 7000, up: 35, max: .5, half: 15, d: 'força e velocidade dos desembarques' },
+  { k: 'sub', i: '🌊', n: 'Submarinos', cost: 9000, up: 45, max: .6, half: 15, d: 'chance de afundar navios inimigos que chegam perto' },
 ];
-const eqB = (c, k) => { const e = EQ.find(x => x.k === k), n = c.eq ? c.eq[k] : 0; return e.max * (1 - Math.exp(-n / e.half)); };
+const eqB = (c, k) => { const e = EQ.find(x => x.k === k), n = c.eq ? (c.eq[k] || 0) : 0; return e.max * (1 - Math.exp(-n / e.half)); };
 const eqUpkeep = c => c.eq ? EQ.reduce((s, e) => s + c.eq[e.k] * e.up, 0) : 0;
 function actEq(k, n) {
   const c = C[P], e = EQ.find(x => x.k === k), cost = e.cost * n;
@@ -1218,7 +1230,7 @@ function actEq(k, n) {
 }
 function milPower(c) {
   const T = c.tech;
-  return (1 + eqB(c, 'tank')) * (1 + eqB(c, 'art') * .5) * (1 + eqB(c, 'jet') * .5) * (1 + eqB(c, 'ship') * .3) * c.troops * (1 + .1 * T.atk) * (1 + .07 * T.def) * (1 + .05 * T.air) * (1 + .03 * T.nav) * (1 + .06 * c.mil.trn) * (c.nuclear ? 1.1 : 1) * (c.empire ? 1.1 : 1);
+  return (1 + eqB(c, 'tank')) * (1 + eqB(c, 'art') * .5) * (1 + eqB(c, 'jet') * .5) * (1 + eqB(c, 'ship') * .3) * (1 + eqB(c, 'sub') * .25) * c.troops * (1 + .1 * T.atk) * (1 + .07 * T.def) * (1 + .05 * T.air) * (1 + .03 * T.nav) * (1 + .06 * c.mil.trn) * (c.nuclear ? 1.1 : 1) * (c.empire ? 1.1 : 1);
 }
 const MIL = [
   { k: 'base', i: '🏰', n: 'Bases militares', d: '+15% de capacidade de tropas e +10% de recrutamento', base: 10000 },
@@ -1881,6 +1893,7 @@ function draw() {
     ctx.strokeText(f.text, f.x, f.y - 14 - k * 40); ctx.fillStyle = '#ffd54a'; ctx.fillText(f.text, f.x, f.y - 14 - k * 40);
     ctx.restore();
   }
+  drawTorps(now, z);
   drawWrecks(now, z);
   drawReplayHUD(now);
   // foco de ataque
@@ -1968,7 +1981,7 @@ function actionsHTML() {
             <span class="pips">${'<i class="on"></i>'.repeat(lv)}${'<i></i>'.repeat(TECH_MAX - lv)}</span></span>
             <span class="tc">${maxed ? 'MÁX' : fmtM(cost)}</span></button>`;
         }).join('') + `<div class="sect">🛒 Arsenal</div>`
-        + EQ.filter(e => scenAir || e.k !== 'jet').map(e => `<div class="eq"><div class="eq-h"><span>${e.i} <b>${e.n}</b> · ${me.eq[e.k]}</span><span class="up">+${Math.round(eqB(me, e.k) * 100)}%<small> / máx. ${Math.round(e.max * 100)}%</small></span></div>
+        + EQ.filter(e => scenAir || (e.k !== 'jet' && e.k !== 'sub')).map(e => `<div class="eq"><div class="eq-h"><span>${e.i} <b>${e.n}</b> · ${me.eq[e.k]}</span><span class="up">+${Math.round(eqB(me, e.k) * 100)}%<small> / máx. ${Math.round(e.max * 100)}%</small></span></div>
           <div class="hint">${e.d} · ${fmtM(e.cost)} cada · manutenção ${fmtM(e.up)}/dia cada</div>
           <div class="row"><button data-act="eq" data-k="${e.k}" data-n="1"${me.money < e.cost ? ' disabled' : ''}>+1<small>${fmtM(e.cost)}</small></button><button data-act="eq" data-k="${e.k}" data-n="5"${me.money < e.cost * 5 ? ' disabled' : ''}>+5<small>${fmtM(e.cost * 5)}</small></button><button data-act="eq" data-k="${e.k}" data-n="20"${me.money < e.cost * 20 ? ' disabled' : ''}>+20<small>${fmtM(e.cost * 20)}</small></button></div></div>`).join('')
         + `<div class="hint">O poder militar soma tropas, tecnologia, treinamento e armas nucleares. Veja o top no 🏆 Ranking.</div>`;
@@ -2123,7 +2136,7 @@ function casHTML() {
       <div class="crow"><img src="${C[P].flagURL}" alt=""><span style="color:#ff5d6c">${fmt(mine)}</span></div>
       <div class="crow"><img src="${C[e].flagURL}" alt=""><span style="color:#5aa9ff">${fmt(theirs)}</span></div>
       <div class="cch"><span>Vitória</span><div class="tr2"><i style="width:${winChance(w)}%"></i></div><b>${winChance(w)}%</b></div>
-      <div class="ctr">${trend(w)}<span class="stl">${(STANCES.find(x => x[0] === (w.stance || 'auto')) || STANCES[0])[1]}</span><span class="mut">${fmt(C[P].cells)} × ${fmt(C[e].cells)} prov.</span></div>${spark(w)}</div>`;
+      <div class="ctr">${trend(w)}<span class="stl">${w.allIn ? '💯' : ''}${(STANCES.find(x => x[0] === (w.stance || 'auto')) || STANCES[0])[1]}</span><span class="mut">${fmt(C[P].cells)} × ${fmt(C[e].cells)} prov.</span></div>${spark(w)}</div>`;
   }
   const shown = VW < 760 ? 2 : 3;
   if (ws.length > shown) h += `<div class="cmode">+${ws.length - shown} guerras</div>`;
@@ -2181,6 +2194,11 @@ $('panel').addEventListener('click', e => {
   else if (act === 'recruit') actRecruit();
   else if (act === 'tab') ptab = b.dataset.t;
   else if (act === 'mil') actMil(b.dataset.k);
+  else if (act === 'allin') {
+    const w = wars.find(x => x.id === +b.dataset.w);
+    if (w) { const on = !w.allIn; for (const x of wars) x.allIn = false; w.allIn = on; allInW = on ? w : null;
+      toast(on ? `💯 Força máxima contra ${C[enemyIn(w, P)].name}: o exército inteiro vai pra essa frente (+15% de força, mais combates, mais baixas; as outras frentes ficam fracas).` : '💯 Força máxima desligada: o exército volta a se dividir entre as frentes.', on ? 'good' : ''); }
+  }
   else if (act === 'stance') { const w = wars.find(x => x.id === +b.dataset.w); if (w) { w.stance = b.dataset.s; const st = STANCES.find(x => x[0] === w.stance); toast(`${st[1]} ${st[2]} contra ${C[enemyIn(w, P)].name}.`); } }
   else if (act === 'eq') actEq(b.dataset.k, +b.dataset.n);
   else if (act === 'inv') actInvest(b.dataset.k, b.dataset.n === 'all' ? 'all' : +b.dataset.n);
@@ -2493,7 +2511,7 @@ function snapshotGame() {
       mil: c.mil, loans: c.loans, trades: c.trades, tax: c.tax, boom: c.boom, tcd: c.tradeCD, lcd: c.loanCD })),
     rel: Array.from(rel, v => Math.round(v)), allied: rle(allied),
     wars: wars.map(w => ({ id: w.id, a: w.a, b: w.b, mode: w.mode, start: w.start, parent: w.parent, helpFor: w.helpFor, casA: Math.round(w.casA), casB: Math.round(w.casB),
-      a0: w.a0, b0: w.b0, peaceCD: w.peaceCD, shipCD: w.shipCD || 0, stance: w.stance || 'auto', mom: w.mom || 0, hist: w.hist || [] })),
+      a0: w.a0, b0: w.b0, peaceCD: w.peaceCD, shipCD: w.shipCD || 0, stance: w.stance || 'auto', allIn: !!w.allIn, mom: w.mom || 0, hist: w.hist || [] })),
     units: units.map(u => ({ reinf: !!u.reinf, war: u.war, from: u.from, to: u.to, kind: u.kind, path: u.path, prog: u.prog, troops: Math.round(u.troops), speed: u.speed, ph: u.ph })),
     logs: logs.slice(0, 20),
   };
@@ -2510,7 +2528,7 @@ function restoreGame(sv) {
     alive: d.alive, cells: d.cells, mult: d.mult, nuclear: d.nuclear, nukeReady: 0, troops: d.troops, casualties: d.cas, cap: d.cap, aggr: d.aggr,
     lx: d.lx, ly: d.ly, recruitCD: d.rcd, allyCD: d.acd, aidCD: d.dcd, econ: d.econ, money: d.money, net: 0,
     tech: { atk: 0, def: 0, eco: 0, log: 0, nav: 0, air: 0, ...d.tech }, clickLv: d.clv || 0, clickTotal: d.ctot || 0, raidReady: d.rr || 0,
-    eq: { tank: 0, art: 0, jet: 0, ship: 0, ...(d.eq || {}) },
+    eq: { tank: 0, art: 0, jet: 0, ship: 0, sub: 0, ...(d.eq || {}) },
     inv: { bond: 0, stock: 0, crypto: 0, ...(d.inv || {}) }, invCost: { bond: 0, stock: 0, crypto: 0, ...(d.ic || {}) }, proj: { usina: 0, porto: 0, banco: 0, ...(d.proj || {}) },
     mil: { base: 0, trn: 0, ...(d.mil || {}) }, loans: d.loans || [], trades: d.trades || [], tax: d.tax ?? 1, boom: d.boom || null, tradeCD: d.tcd || 0, loanCD: d.lcd || 0,
     orig: d.orig, isState: d.st, parent: d.par || '',
@@ -2849,6 +2867,54 @@ function drawReplayHUD(now) {
 }
 const env0 = 0;
 
+// ---------- submarinos: atacam navios inimigos que chegam perto do seu país ----------
+let torps = [];
+function subAttacks() {
+  const sunk = new Set();
+  for (const u of units) {
+    if (u.kind !== 'boat' || u.prog < 2) continue;
+    const [bx, by] = boatPos(u, u.prog);
+    for (const k of C) {
+      if (!k.alive || !k.eq || !k.eq.sub || k.id === u.from || warMat[k.id * N + u.from] < 0) continue;
+      // alcance: navio indo atacar esse país (perto do fim da rota) ou a até 40 províncias do centro dele
+      const left = u.path.length - 1 - u.prog, near = (u.to === k.id && left < 30) || (bx - k.lx) ** 2 + (by - k.ly) ** 2 < 1600;
+      if (!near || R() > .22 * eqB(k, 'sub') / .6) continue;
+      sunk.add(u);
+      const a = R() * Math.PI * 2, d = 3 + R() * 3;
+      torps.push({ sx: bx + Math.cos(a) * d, sy: by + Math.sin(a) * d, tx: bx, ty: by, t: performance.now(), sub: k.id, boat: u.from, ang: Math.atan2(by - (by + Math.sin(a) * d), bx - (bx + Math.cos(a) * d)) });
+      const B = C[u.from]; B.casualties += u.troops;
+      const w = warOf(k.id, u.from); if (w) { if (w.a === u.from) w.casA += u.troops; else w.casB += u.troops; }
+      if (u.from === P) toast(`🌊 Um submarino de ${k.name} torpedeou seu navio! (−${fmt(u.troops)} soldados)`, 'bad');
+      else if (k.id === P) toast(`🌊 Seu submarino afundou um navio de ${B.name}! (−${fmt(u.troops)} soldados dele)`, 'good');
+      else toast(`🌊 Submarino de ${k.name} afundou um navio de ${B.name}.`, 'g');
+      break;
+    }
+  }
+  if (sunk.size) units = units.filter(u => !sunk.has(u));
+}
+function drawTorps(now, z) {
+  const RUN = 700;
+  torps = torps.filter(t => now - t.t < RUN + 300);
+  for (const t of torps) {
+    const k = Math.min(1, (now - t.t) / RUN);
+    const sx = cam.x + (t.sx + .5) * z, sy = cam.y + (t.sy + .5) * z, tx = cam.x + (t.tx + .5) * z, ty = cam.y + (t.ty + .5) * z, b = clamp(z * 1.4, 9, 20);
+    // submarino emergindo
+    ctx.save(); ctx.globalAlpha = Math.max(0, 1 - (now - t.t) / (RUN + 300)); ctx.translate(sx, sy); ctx.rotate(t.ang);
+    ctx.fillStyle = '#20252c'; ctx.strokeStyle = '#000'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.ellipse(0, 0, b * .8, b * .2, 0, 0, 7); ctx.fill(); ctx.stroke();
+    ctx.fillRect(-b * .1, -b * .38, b * .26, b * .2); ctx.restore();
+    // torpedo com rastro de bolhas
+    const px = sx + (tx - sx) * k, py = sy + (ty - sy) * k;
+    ctx.strokeStyle = 'rgba(220,240,255,.7)'; ctx.lineWidth = 1.5; ctx.setLineDash([2, 3]);
+    ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(px, py); ctx.stroke(); ctx.setLineDash([]);
+    if (k < 1) {
+      ctx.fillStyle = '#ddd'; ctx.beginPath(); ctx.arc(px, py, 2.2, 0, 7); ctx.fill();
+      // o navio ainda aparece até o torpedo chegar
+      ctx.save(); ctx.translate(tx, ty); ctx.fillStyle = '#2a2f37'; ctx.strokeStyle = '#000';
+      ctx.beginPath(); ctx.moveTo(-b * .8, 0); ctx.lineTo(b * .9, 0); ctx.lineTo(b * .55, b * .35); ctx.lineTo(-b * .6, b * .35); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore();
+    } else if (!t.boom) { t.boom = true; wrecks.push({ x: t.tx, y: t.ty, t: now, a: t.boat, b: t.sub, ang: t.ang }); }
+  }
+}
 // ---------- navios que se batem: os dois afundam com explosão ----------
 let wrecks = [];
 function boatPos(u, prog) {
