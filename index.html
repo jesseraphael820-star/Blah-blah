@@ -210,6 +210,15 @@ body.rp #top,body.rp #panel,body.rp #cas,body.rp #reqs,body.rp #nuke,body.rp #ai
 .eq-h small{color:var(--mut);font-weight:400}
 #pact .eq .row button{display:flex;flex-direction:column;align-items:center;gap:1px;text-align:center;padding:6px 2px;font-weight:700;background:#1f3324;border-color:#335a3f}
 #pact .eq .row button small{font-size:10.5px;color:var(--gold);font-weight:600}
+.stance{display:grid;grid-template-columns:repeat(4,1fr);gap:4px}
+#pact .stance button{display:flex;flex-direction:column;align-items:center;gap:1px;padding:6px 2px;font-size:17px;text-align:center;background:#16202b}
+#pact .stance button small{font-size:10.5px;font-weight:700;color:var(--mut)}
+#pact .stance button.on small{color:var(--txt)}
+#pact .stance button.s-auto{background:#243446;border-color:#4c79a8}
+#pact .stance button.s-atacar{background:#5a1f25;border-color:#c0404c}
+#pact .stance button.s-manter{background:#1e3f55;border-color:#4c8ec0}
+#pact .stance button.s-recuar{background:#4a3a10;border-color:#a8841e}
+.stl{font-size:12px}
 @keyframes pop{from{transform:scale(.9);opacity:0}to{transform:none;opacity:1}}
 .modal{position:fixed;inset:0;background:#000a;display:none;align-items:center;justify-content:center;z-index:20}
 .modal .box{background:#111a24;border:1px solid var(--line);border-radius:14px;padding:22px;max-width:460px;width:90%;text-align:center}
@@ -898,6 +907,25 @@ function captureCell(cell, to, from) {
     else if (to === P) toast(`🏛 Você tomou a capital de ${C[from].name}!`, 'good');
   }
 }
+const STANCES = [
+  ['auto', '🤖', 'Automático', 'O exército luta sozinho, do jeito normal.'],
+  ['atacar', '⚔', 'Atacar', '+25% de força e avanço mais rápido, mas mais baixas.'],
+  ['manter', '🛡', 'Manter', 'Segura a frente: você não avança e o inimigo avança bem menos; menos baixas.'],
+  ['recuar', '↩', 'Recuar', 'Recua aos poucos e preserva o exército: poucas baixas, mas perde território.'],
+];
+function stanceMods(w) {
+  const m = { sa: 1, sb: 1, la: 1, lb: 1, ca: 1, cb: 1, n: 1 };
+  const st = (w.a === P || w.b === P) ? (w.stance || 'auto') : 'auto'; if (st === 'auto') return m;
+  const me = w.a === P ? 'a' : 'b', en = me === 'a' ? 'b' : 'a';
+  if (st === 'atacar') { m['s' + me] = 1.25; m['c' + me] = 1.25; m['l' + me] = 1.25; m.n = 1.4; }
+  else if (st === 'manter') { m['s' + me] = 1.1; m['c' + me] = 0; m['c' + en] = .45; m['l' + me] = .75; m.n = .7; }
+  else if (st === 'recuar') { m['c' + me] = 0; m['c' + en] = 1.3; m['l' + me] = .35; m['l' + en] = .5; m.n = .8; }
+  return m;
+}
+function stanceButtons(w) {
+  const cur = w.stance || 'auto';
+  return `<div class="stance" role="group" aria-label="Controle da guerra">${STANCES.map(([k, i, n]) => `<button data-act="stance" data-w="${w.id}" data-s="${k}" class="${cur === k ? 'on s-' + k : ''}">${i}<small>${n}</small></button>`).join('')}</div>`;
+}
 function battle(w, ca, cb, sea) {
   const A = C[w.a], B = C[w.b];
   const da = dens(A), db = dens(B);
@@ -910,17 +938,20 @@ function battle(w, ca, cb, sea) {
   if (bomb[ca] && day - bomb[ca] < CFG.BOMB_DAYS) ba *= .6;
   if (bomb[cb] && day - bomb[cb] < CFG.BOMB_DAYS) bb *= .6;
   if (rad[cb] && day - rad[cb] < CFG.RAD_DAYS) bb *= .45;
+  // controle de guerra do jogador: atacar / manter / recuar
+  const M = stanceMods(w);
   // força na frente: o exército do país dividido pelo tamanho de todas as frentes em que ele luta
   const pa = (A.troops / Math.max(frontTot[w.a] || 0, 4)) ** .6, pb = (B.troops / Math.max(frontTot[w.b] || 0, 4)) ** .6;
-  const sa = (pa + 4) * (.55 + R() * .9) * ba * (1 + .1 * A.tech.atk) * (1 + .06 * A.mil.trn) * (A.empire ? 1.1 : 1) * (1 + eqB(A, 'tank')), sb = (pb + 4) * (.55 + R() * .9) * bb * (1 + .1 * B.tech.atk) * (1 + .06 * B.mil.trn) * (B.empire ? 1.1 : 1) * (1 + eqB(B, 'tank'));
+  const sa = (pa + 4) * (.55 + R() * .9) * ba * (1 + .1 * A.tech.atk) * (1 + .06 * A.mil.trn) * (A.empire ? 1.1 : 1) * (1 + eqB(A, 'tank')) * M.sa, sb = (pb + 4) * (.55 + R() * .9) * bb * (1 + .1 * B.tech.atk) * (1 + .06 * B.mil.trn) * (B.empire ? 1.1 : 1) * (1 + eqB(B, 'tank')) * M.sb;
   const base = (da + db) * .09 * (.5 + R()) + 4;
   const aWins = sa > sb;
   let la = base * (aWins ? .6 : 1.3) / (1 + .1 * A.tech.def) * (1 + eqB(B, 'art')), lb = base * (aWins ? 1.3 : .6) / (1 + .1 * B.tech.def) * (1 + eqB(A, 'art'));
+  la *= M.la; lb *= M.lb;
   la = Math.min(la, A.troops); lb = Math.min(lb, B.troops);
   A.troops -= la; A.casualties += la; w.casA += la;
   B.troops -= lb; B.casualties += lb; w.casB += lb;
   const W = aWins ? A : B, Lz = aWins ? B : A;
-  if (R() < (sea ? CFG.CAPTURE_SEA : CFG.CAPTURE) * (1 + .1 * W.tech.atk) / (1 + .12 * Lz.tech.def)) aWins ? capture(cb, w.a, w.b) : capture(ca, w.b, w.a);
+  if (R() < (sea ? CFG.CAPTURE_SEA : CFG.CAPTURE) * (1 + .1 * W.tech.atk) / (1 + .12 * Lz.tech.def) * (aWins ? M.ca : M.cb)) aWins ? capture(cb, w.a, w.b) : capture(ca, w.b, w.a);
 }
 function amphibious(w) {
   const A = C[w.a], B = C[w.b];
@@ -960,7 +991,7 @@ function tick() {
       const ns = Math.min(12, Math.ceil(L / 8)); w.sold = [];
       for (let i = 0; i < ns; i++) { const j = Math.floor((i + .25 + R() * .5) * L / ns); w.sold.push({ a: w.fa[j], b: w.fb[j], ph: R() * 6.28 }); }
     }
-    const n = Math.min(2 + Math.floor(L * .045), 14);
+    const n = Math.round(Math.min(2 + Math.floor(L * .045), 14) * stanceMods(w).n);
     const pf = focus && (w.a === P || w.b === P) && focus.enemy === enemyIn(w, P);
     const aStrong = C[w.a].troops / Math.max(C[w.a].cells, 1) >= C[w.b].troops / Math.max(C[w.b].cells, 1);
     const press = j => aStrong ? support(w.fb[j], w.a) : support(w.fa[j], w.b);
@@ -2006,6 +2037,7 @@ function actionsHTML() {
       for (const a of al) if (warMat[a * N + e] < 0 && !isAllied(a, e))
         h += `<button data-act="help" data-a="${a}" data-e="${e}">📣 Pedir a ${esc(C[a].name)} ajuda contra ${esc(C[e].name)}</button>`;
     }
+    if (myWars.length) h += `<div class="sect">🎮 Controle das suas guerras</div>` + myWars.map(w => { const e = C[enemyIn(w, P)]; return `<div class="li"><img src="${e.flagURL}" alt=""> ${esc(e.name)}</div>${stanceButtons(w)}`; }).join('');
     if (!myWars.length) h += `<div class="hint">Você está em paz. Toque em outro país para declarar guerra ou propor aliança.</div>`;
     else h += `<div class="hint">🎯 Toque no território inimigo para focar o ataque.</div>`;
     return h;
@@ -2013,7 +2045,8 @@ function actionsHTML() {
   const w = warOf(P, sel);
   if (w) {
     const airB = !scenAir ? '' : `<button data-act="air"${day < C[P].raidReady || C[P].money < CFG.RAID_COST ? ' disabled' : ''}>✈ ${cd(C[P].raidReady, `Bombardeio aéreo (${fmtM(CFG.RAID_COST)}) — toque no alvo`)}</button>`;
-    const ship = airB + `<button data-act="ship"${day < (w.shipCD || 0) ? ' disabled' : ''}>🚢 ${cd(w.shipCD || 0, 'Enviar invasão (navio ou marcha)')}</button>`
+    const ctl = `<div class="sect">🎮 Controle da guerra</div>${stanceButtons(w)}<div class="hint">${STANCES.find(x => x[0] === (w.stance || 'auto'))[3]}</div>`;
+    const ship = ctl + airB + `<button data-act="ship"${day < (w.shipCD || 0) ? ' disabled' : ''}>🚢 ${cd(w.shipCD || 0, 'Enviar invasão (navio ou marcha)')}</button>`
       + (w.fa.length ? '' : `<div class="hint">Sem fronteira com ${esc(C[sel].name)}: mande navios, ou tropas por terra se não houver mar.</div>`);
     if (w.mode === 'ataque') return ship + `<button class="peace" data-act="peace"${day < w.peaceCD ? ' disabled' : ''}>🕊 ${cd(w.peaceCD, 'Propor paz')}</button>`
       + `<button class="peace" data-act="peacepay"${day < w.peaceCD || C[P].money < peacePrice(sel) ? ' disabled' : ''}>🕊💸 ${cd(w.peaceCD, `Paz pagando ${fmtM(peacePrice(sel))} (mais chance)`)}</button>`
@@ -2088,7 +2121,7 @@ function casHTML() {
       <div class="crow"><img src="${C[P].flagURL}" alt=""><span style="color:#ff5d6c">${fmt(mine)}</span></div>
       <div class="crow"><img src="${C[e].flagURL}" alt=""><span style="color:#5aa9ff">${fmt(theirs)}</span></div>
       <div class="cch"><span>Vitória</span><div class="tr2"><i style="width:${winChance(w)}%"></i></div><b>${winChance(w)}%</b></div>
-      <div class="ctr">${trend(w)}<span class="mut">${fmt(C[P].cells)} × ${fmt(C[e].cells)} prov.</span></div>${spark(w)}</div>`;
+      <div class="ctr">${trend(w)}<span class="stl">${(STANCES.find(x => x[0] === (w.stance || 'auto')) || STANCES[0])[1]}</span><span class="mut">${fmt(C[P].cells)} × ${fmt(C[e].cells)} prov.</span></div>${spark(w)}</div>`;
   }
   const shown = VW < 760 ? 2 : 3;
   if (ws.length > shown) h += `<div class="cmode">+${ws.length - shown} guerras</div>`;
@@ -2146,6 +2179,7 @@ $('panel').addEventListener('click', e => {
   else if (act === 'recruit') actRecruit();
   else if (act === 'tab') ptab = b.dataset.t;
   else if (act === 'mil') actMil(b.dataset.k);
+  else if (act === 'stance') { const w = wars.find(x => x.id === +b.dataset.w); if (w) { w.stance = b.dataset.s; const st = STANCES.find(x => x[0] === w.stance); toast(`${st[1]} ${st[2]} contra ${C[enemyIn(w, P)].name}.`); } }
   else if (act === 'eq') actEq(b.dataset.k, +b.dataset.n);
   else if (act === 'inv') actInvest(b.dataset.k, b.dataset.n === 'all' ? 'all' : +b.dataset.n);
   else if (act === 'sell') actSell(b.dataset.k);
@@ -2457,7 +2491,7 @@ function snapshotGame() {
       mil: c.mil, loans: c.loans, trades: c.trades, tax: c.tax, boom: c.boom, tcd: c.tradeCD, lcd: c.loanCD })),
     rel: Array.from(rel, v => Math.round(v)), allied: rle(allied),
     wars: wars.map(w => ({ id: w.id, a: w.a, b: w.b, mode: w.mode, start: w.start, parent: w.parent, helpFor: w.helpFor, casA: Math.round(w.casA), casB: Math.round(w.casB),
-      a0: w.a0, b0: w.b0, peaceCD: w.peaceCD, shipCD: w.shipCD || 0, mom: w.mom || 0, hist: w.hist || [] })),
+      a0: w.a0, b0: w.b0, peaceCD: w.peaceCD, shipCD: w.shipCD || 0, stance: w.stance || 'auto', mom: w.mom || 0, hist: w.hist || [] })),
     units: units.map(u => ({ reinf: !!u.reinf, war: u.war, from: u.from, to: u.to, kind: u.kind, path: u.path, prog: u.prog, troops: Math.round(u.troops), speed: u.speed, ph: u.ph })),
     logs: logs.slice(0, 20),
   };
