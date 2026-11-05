@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8">
+<style>
+html,body{margin:0;width:1080px;height:1920px;overflow:hidden;background:#000;font-family:"Inter Display","Inter",sans-serif}
+canvas{position:absolute;inset:0}
+#ui{position:absolute;inset:0;color:#fff;pointer-events:none}
+.cap{position:absolute;left:60px;right:60px;text-align:center;font-weight:900;text-transform:uppercase;line-height:.98;
+ -webkit-text-stroke:10px #000;paint-order:stroke fill;text-shadow:0 10px 0 rgba(0,0,0,.55);letter-spacing:-1px}
+.y{color:#ffe600}.r{color:#ff2d3d}.c{color:#4df3ff}.p{color:#c58bff}
+.bar{position:absolute;left:0;top:0;height:12px;background:#ffe600}
+</style></head><body>
+<script src="node_modules/three/build/three.min.js"></script>
+<div id="ui"></div>
+<script>
+const W=1080,H=1920;
+const renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});
+renderer.setSize(W,H);renderer.setPixelRatio(1);
+document.body.insertBefore(renderer.domElement,document.body.firstChild);
+const scene=new THREE.Scene();
+const cam=new THREE.PerspectiveCamera(50,W/H,.1,600);
+const amb=new THREE.AmbientLight(0xffffff,.2);scene.add(amb);
+const sun=new THREE.DirectionalLight(0xffffff,1.6);sun.position.set(12,5,14);scene.add(sun);
+const M=(c,o={})=>new THREE.MeshStandardMaterial(Object.assign({color:c,roughness:.6},o));
+let seed=23;const rnd=()=>(seed=(seed*16807)%2147483647)/2147483647;
+
+// ruído
+const P=[];for(let i=0;i<512;i++)P.push(Math.floor(rnd()*256));
+const hash=(x,y)=>P[(P[x&255]+y)&255]/255;const sm=t=>t*t*(3-2*t);
+function vn(x,y){const xi=Math.floor(x),yi=Math.floor(y),xf=x-xi,yf=y-yi;const a=hash(xi,yi),b=hash(xi+1,yi),c=hash(xi,yi+1),d=hash(xi+1,yi+1);
+ return a+(b-a)*sm(xf)+(c-a)*sm(yf)+(a-b-c+d)*sm(xf)*sm(yf)}
+function fbm(x,y){let s=0,a=.5,f=1;for(let i=0;i<5;i++){s+=a*vn(x*f,y*f);a*=.5;f*=2}return s}
+function tex(fn){const cv=document.createElement('canvas');cv.width=1024;cv.height=512;const ctx=cv.getContext('2d');const img=ctx.createImageData(1024,512);
+ for(let y=0;y<512;y++)for(let x=0;x<1024;x++){const u=x/1024*8;const n=fbm(u,y/512*4)*(1-x/1024)+fbm(u-8,y/512*4)*(x/1024);
+  const [r,g,b]=fn(n,(y/512-.5)*Math.PI,x,y,u);const i=(y*1024+x)*4;img.data[i]=r;img.data[i+1]=g;img.data[i+2]=b;img.data[i+3]=255}
+ ctx.putImageData(img,0,0);return {cv,ctx}}
+const et=tex((n,lat,x,y,u)=>{if(Math.abs(lat)>1.25)return[235,235,235];if(n>.52){const d=.7+n*.5,dry=fbm(u*2,y/64)>.55;return[(dry?150:50)*d,120*d,(dry?60:40)*d]}const d=.55+n*.5;return[8*d,60*d,160*d]});
+const earthTex=new THREE.CanvasTexture(et.cv);
+const mt=tex((n,lat,x,y,u)=>{const v=110+n*120+(fbm(u*3,y/40)>.6?-45:0);return[v,v,v*1.02]});
+for(let i=0;i<140;i++){const x=rnd()*1024,y=40+rnd()*432,r=3+rnd()*rnd()*30;const g=mt.ctx.createRadialGradient(x,y,r*.2,x,y,r);
+ g.addColorStop(0,'rgba(60,60,60,.55)');g.addColorStop(.8,'rgba(90,90,90,.35)');g.addColorStop(1,'rgba(230,230,230,.25)');mt.ctx.fillStyle=g;mt.ctx.beginPath();mt.ctx.arc(x,y,r,0,7);mt.ctx.fill()}
+const moonTex=new THREE.CanvasTexture(mt.cv);
+
+// estrelas
+const stars=(()=>{const g=new THREE.BufferGeometry(),p=[];for(let i=0;i<3000;i++){const v=new THREE.Vector3(rnd()-.5,rnd()-.5,rnd()-.5).normalize().multiplyScalar(200+rnd()*150);p.push(v.x,v.y,v.z)}
+ g.setAttribute('position',new THREE.Float32BufferAttribute(p,3));const s=new THREE.Points(g,new THREE.PointsMaterial({color:0xffffff,size:.8,transparent:true}));scene.add(s);return s})();
+
+// ---- espaço ----
+const space=new THREE.Group();scene.add(space);
+const earth=new THREE.Group();space.add(earth);
+const globe=new THREE.Mesh(new THREE.SphereGeometry(5,96,64),new THREE.MeshStandardMaterial({map:earthTex,roughness:.85}));earth.add(globe);
+earth.add(new THREE.Mesh(new THREE.SphereGeometry(5.25,64,48),new THREE.MeshBasicMaterial({color:0x5fb8ff,transparent:true,opacity:.18,side:THREE.BackSide})));
+const bulge=new THREE.Mesh(new THREE.SphereGeometry(5.05,64,48),new THREE.MeshStandardMaterial({color:0x2a8cff,transparent:true,opacity:.55,roughness:.2}));space.add(bulge);
+const axis=new THREE.Mesh(new THREE.CylinderGeometry(.12,.12,16),new THREE.MeshBasicMaterial({color:0xff2d3d}));earth.add(axis);
+const moon=new THREE.Mesh(new THREE.SphereGeometry(1.6,64,48),new THREE.MeshStandardMaterial({map:moonTex,roughness:1}));space.add(moon);
+const orbit=new THREE.Mesh(new THREE.TorusGeometry(8,.04,8,160),new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:.35}));orbit.rotation.x=Math.PI/2;space.add(orbit);
+// poeira da explosão
+const dustN=900;const dustG=new THREE.BufferGeometry();const dustP=new Float32Array(dustN*3);const dustV=[];
+for(let i=0;i<dustN;i++){dustV.push(new THREE.Vector3(rnd()-.5,rnd()-.5,rnd()-.5).normalize().multiplyScalar(2+rnd()*9))}
+dustG.setAttribute('position',new THREE.BufferAttribute(dustP,3));
+const dust=new THREE.Points(dustG,new THREE.PointsMaterial({color:0xd8d8d8,size:.25,transparent:true}));space.add(dust);
+const sunBall=new THREE.Mesh(new THREE.SphereGeometry(3,48,32),new THREE.MeshBasicMaterial({color:0xffd34d}));space.add(sunBall);
+const sunGlow=new THREE.Mesh(new THREE.SphereGeometry(4.6,48,32),new THREE.MeshBasicMaterial({color:0xffa500,transparent:true,opacity:.25}));sunBall.add(sunGlow);
+const corona=new THREE.Mesh(new THREE.RingGeometry(3.05,4.8,64),new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:.0,side:THREE.DoubleSide}));sunBall.add(corona);
+
+// ---- chão (noite / praia) ----
+const ground=new THREE.Group();scene.add(ground);
+const sand=new THREE.Mesh(new THREE.PlaneGeometry(300,300),M(0xe3c98f,{roughness:1}));sand.rotation.x=-Math.PI/2;ground.add(sand);
+const seaGeo=new THREE.PlaneGeometry(300,150,120,60);const sea=new THREE.Mesh(seaGeo,M(0x1d6fd1,{roughness:.2,metalness:.3,flatShading:true}));
+sea.rotation.x=-Math.PI/2;sea.position.set(0,.1,-85);ground.add(sea);
+const moonLight=new THREE.DirectionalLight(0xbcd4ff,1);moonLight.position.set(-10,30,-40);scene.add(moonLight);
+const skyMoon=new THREE.Mesh(new THREE.SphereGeometry(9,48,32),new THREE.MeshBasicMaterial({map:moonTex,color:0xffffff}));skyMoon.position.set(-14,40,-120);ground.add(skyMoon);
+const houses=[];for(let i=0;i<9;i++){const o=new THREE.Group();const b=new THREE.Mesh(new THREE.BoxGeometry(3,3,3),M(0xf3e6c8));b.position.y=1.5;
+ const r=new THREE.Mesh(new THREE.ConeGeometry(2.6,1.8,4),M(0xb5452a));r.position.y=3.9;r.rotation.y=Math.PI/4;o.add(b,r);
+ o.position.set(-20+i*5,0,8+(i%2)*4);ground.add(o);houses.push(o)}
+const turtles=[];for(let i=0;i<10;i++){const tt=new THREE.Group();
+ const sh=new THREE.Mesh(new THREE.SphereGeometry(.7,20,12),M(0x3f6b2a,{flatShading:true}));sh.scale.set(1,.45,1.2);sh.position.y=.35;
+ const hd=new THREE.Mesh(new THREE.SphereGeometry(.28,14,10),M(0x7aa35a));hd.position.set(0,.35,-.95);
+ tt.add(sh,hd);for(const[x,z]of[[-.6,-.5],[.6,-.5],[-.5,.6],[.5,.6]]){const f=new THREE.Mesh(new THREE.BoxGeometry(.6,.08,.25),M(0x7aa35a));f.position.set(x,.15,z);tt.add(f)}
+ tt.userData={x:-10+i*2.3+rnd(),z:6+rnd()*4,ph:rnd()*6};ground.add(tt);turtles.push(tt)}
+
+// ---------------- roteiro ----------------
+const S=[{k:'hook',d:3.8},{k:'tide',d:4.6},{k:'night',d:4.4},{k:'turtle',d:4.6},{k:'axis',d:5},{k:'ecl',d:4.4},{k:'end',d:4.6}];
+let acc=0;for(const s of S){s.t0=acc;acc+=s.d}window.TOTAL=acc;window.CUTS=S.map(s=>s.t0);
+const clamp=(x,a=0,b=1)=>Math.min(b,Math.max(a,x));
+const ease=x=>{x=clamp(x);return 1-Math.pow(1-x,3)};
+const back=x=>{x=clamp(x);const c=1.9;return 1+(c+1)*Math.pow(x-1,3)+c*Math.pow(x-1,2)};
+const ui=document.getElementById('ui');
+function cap(lt,at,top,size,html){if(lt<at)return'';const k=back((lt-at)/.22);
+ return `<div class="cap" style="top:${top}px;font-size:${size}px;transform:scale(${k});opacity:${clamp((lt-at)/.08)}">${html}</div>`}
+
+function renderAt(t){
+ const s=S.find(s=>t>=s.t0&&t<s.t0+s.d)||S[S.length-1];const lt=t-s.t0,d=s.d;
+ const isG=s.k=='night'||s.k=='turtle';
+ space.visible=!isG;ground.visible=isG;moonLight.visible=isG;
+ scene.background=new THREE.Color(isG?0x050b1e:0x000008);scene.fog=isG?new THREE.Fog(0x050b1e,60,220):null;
+ bulge.visible=s.k=='tide';axis.visible=s.k=='axis';orbit.visible=false;dust.visible=false;moon.visible=false;
+ sunBall.visible=s.k=='ecl';corona.material.opacity=0;sun.intensity=1.6;amb.intensity=.15;stars.material.opacity=1;
+ earth.visible=s.k!='ecl';earth.position.set(0,0,0);earth.rotation.set(.41,0,0);
+ let shake=0,h='';
+ if(s.k=='hook'){const boom=2.3;earth.rotation.y=lt*.4;cam.position.set(0,1,42-ease(lt/boom)*5);cam.lookAt(2,4.5,0);
+  const a=-.35+lt*.25;moon.position.set(Math.cos(a)*8,0,Math.sin(a)*8);moon.rotation.y=lt;orbit.visible=true;
+  if(lt<boom){moon.visible=true;moon.scale.setScalar(1+Math.max(0,lt-1.9)*.6)}
+  else{shake=Math.exp(-(lt-boom)*4)*35;dust.visible=true;const e=lt-boom;const pa=dustG.attributes.position;
+   for(let i=0;i<dustN;i++){const v=dustV[i];pa.setXYZ(i,moon.position.x+v.x*e,moon.position.y+v.y*e,moon.position.z+v.z*e)}pa.needsUpdate=true;
+   dust.material.opacity=clamp(1-e/1.4);orbit.material.opacity=.35*clamp(1-e)}
+  h+=cap(lt,.05,330,120,'E SE A LUA')+cap(lt,.45,480,200,'<span class="r">SUMISSE</span>')+cap(lt,.85,700,120,'AMANHÃ?');
+  if(lt>boom)h+=cap(lt,boom+.15,1450,70,'<span class="y">PUF. SEM AVISO.</span>');
+ }
+ if(s.k=='tide'){earth.rotation.y=lt*.3;cam.position.set(0,6,26);cam.lookAt(0,0,0);
+  const k=ease((lt-1.2)/1.6);const st=1.32-k*.22;bulge.scale.set(st,1,1);bulge.rotation.y=.2;
+  h+=cap(lt,.05,300,110,'AS MARÉS')+cap(lt,.4,430,110,'FICARIAM')+cap(lt,.75,560,190,'<span class="c">3X</span>')+cap(lt,.75,760,110,'MENORES');
+  h+=cap(lt,2.4,1420,66,'QUEM PUXA A ÁGUA HOJE<br>É MAIS A <span class="y">LUA</span> QUE O SOL');
+ }
+ if(s.k=='night'){cam.position.set(0,7,34);cam.lookAt(0,10,-40);
+  const k=ease((lt-1.6)/1.4);skyMoon.visible=k<.98;skyMoon.material.opacity=1-k;skyMoon.material.transparent=true;skyMoon.scale.setScalar(1-k*.6);
+  moonLight.intensity=2.2*(1-k)+.05;amb.intensity=.45-.4*k;sun.intensity=0;
+  const pos=seaGeo.attributes.position;for(let i=0;i<pos.count;i++){const x=pos.getX(i),y=pos.getY(i);pos.setZ(i,Math.sin(x*.2+t*2)*.4+Math.cos(y*.3+t*1.5)*.3)}pos.needsUpdate=true;
+  houses.forEach(o=>o.visible=true);turtles.forEach(o=>o.visible=false);
+  h+=cap(lt,.05,300,110,'AS NOITES')+cap(lt,.4,430,110,'SERIAM')+cap(lt,.75,560,150,'<span class="p">MUITO MAIS</span>')+cap(lt,1.1,720,150,'ESCURAS');
+  h+=cap(lt,2.4,1440,66,'A LUA CHEIA BRILHA <span class="y">30 MIL X</span><br>MAIS QUE A ESTRELA MAIS FORTE');
+ }
+ if(s.k=='turtle'){cam.position.set(0,7,21);cam.lookAt(0,0,3);skyMoon.visible=false;moonLight.intensity=.25;amb.intensity=.35;sun.intensity=.2;
+  houses.forEach(o=>o.visible=false);turtles.forEach((o,i)=>{o.visible=true;const u=o.userData;
+   const wander=lt*1.2+u.ph;o.rotation.y=Math.sin(wander*1.3)*2.4+(i%2?Math.PI:0);
+   o.position.set(u.x+Math.sin(wander)*1.5,0,u.z-Math.cos(wander*.7)*1.2);o.children[0].rotation.z=Math.sin(lt*10+i)*.08});
+  const pos=seaGeo.attributes.position;for(let i=0;i<pos.count;i++){const x=pos.getX(i),y=pos.getY(i);pos.setZ(i,Math.sin(x*.2+t*2)*.4+Math.cos(y*.3+t*1.5)*.3)}pos.needsUpdate=true;
+  h+=cap(lt,.05,300,110,'ANIMAIS')+cap(lt,.4,430,170,'<span class="r">PERDIDOS</span>');
+  h+=cap(lt,1.6,1380,66,'TARTARUGAS E CORAIS<br>USAM A <span class="y">LUA</span> COMO GUIA');
+ }
+ if(s.k=='axis'){const k=ease((lt-.9)/1);const wob=k*(Math.sin(lt*2.6)*.9+Math.sin(lt*4.1)*.35);
+  earth.rotation.set(.41+wob,lt*.6,wob*.5);cam.position.set(0,1,30);cam.lookAt(0,1.5,0);if(lt>.9)shake=4;
+  h+=cap(lt,.05,290,96,'O EIXO DA TERRA')+cap(lt,.4,400,96,'PODERIA')+cap(lt,.75,510,170,'<span class="r">BALANÇAR</span>');
+  h+=cap(lt,1.8,1360,72,'<span class="c">INVERNOS</span> E <span class="y">VERÕES</span>')+cap(lt,2.2,1450,110,'EXTREMOS')+cap(lt,2.9,1580,50,'(AO LONGO DE MILHÕES DE ANOS)');
+ }
+ if(s.k=='ecl'){sunBall.position.set(0,0,0);cam.position.set(0,0,22);cam.lookAt(0,0,0);
+  // primeiro um eclipse "lembrança", depois a Lua some
+  moon.visible=lt<1.6;moon.material.color.set(0x111111);moon.scale.setScalar(1.95);
+  moon.position.set(-8+ease(lt/1.1)*8,0,6);corona.material.opacity=lt<1.6?clamp((lt-.8)/.3)*.5:0;
+  if(lt>=1.6&&lt<1.8)shake=20;
+  h+=cap(lt,.05,300,120,'E ADEUS,')+cap(lt,.4,440,190,'<span class="y">ECLIPSES</span>');
+  h+=cap(lt,1.8,1380,72,'NUNCA MAIS<br>UM <span class="r">ECLIPSE SOLAR</span>');
+ }
+ if(s.k=='end'){earth.rotation.y=lt*.5;cam.position.set(0,1,40);cam.lookAt(2,3,0);orbit.visible=true;orbit.material.opacity=.35*clamp((lt-1.5)/1);
+  if(lt>1.5){moon.visible=true;moon.material.color.set(0xffffff);const k=back((lt-1.5)/.5);moon.scale.setScalar(Math.max(.01,k));const a=lt*.6+1.4-(d*.6)+.6*3.8*0;moon.position.set(Math.cos(-.35+(lt-1.5)*.25)*8,0,Math.sin(-.35+(lt-1.5)*.25)*8)}
+  h+=cap(lt,.05,320,84,'CALMA: A LUA SÓ')+cap(lt,.4,420,84,'SE AFASTA')+cap(lt,.75,530,150,'<span class="c">3,8 CM</span>')+cap(lt,1,690,84,'POR ANO');
+  h+=cap(lt,2,1380,72,'SEGUE PRA MAIS')+cap(lt,2.3,1475,120,'<span class="y">"E SE..."</span>');
+ }
+ if(s.k!='ecl')moon.material.color.set(0xffffff);
+ const punch=1+Math.exp(-lt*10)*.12;cam.fov=50/punch;
+ if(shake){cam.position.x+=Math.sin(t*93)*shake*.01;cam.position.y+=Math.cos(t*71)*shake*.01}
+ cam.updateProjectionMatrix();renderer.render(scene,cam);
+ h+=`<div style="position:absolute;inset:0;background:#fff;opacity:${Math.exp(-lt*14)*.6}"></div>`;
+ h+=`<div class="bar" style="width:${t/TOTAL*100}%"></div>`;
+ ui.innerHTML=h;ui.style.transform=shake?`translate(${Math.sin(t*97)*shake*.25}px,${Math.cos(t*83)*shake*.25}px)`:'';
+}
+window.renderAt=renderAt;
+</script></body></html>
