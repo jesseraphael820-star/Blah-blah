@@ -195,6 +195,16 @@ html,body{margin:0;height:100%;overflow:hidden;background:#08131c;color:var(--tx
 #pswitch{margin-top:10px;display:flex;flex-direction:column;gap:4px}
 #pswitch:empty{display:none}
 #pswitch button.switch{font:inherit;font-size:14px;padding:9px 10px;border-radius:8px;border:1px solid #3d68a8;background:#1d3550;color:var(--txt);cursor:pointer;font-weight:700}
+body.rp #top,body.rp #panel,body.rp #cas,body.rp #reqs,body.rp #nuke,body.rp #air,body.rp #toasts,body.rp #vs,body.rp #wartitle,body.rp #intro{display:none!important}
+#rpbar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(14px + env(safe-area-inset-bottom,0px));width:min(94vw,560px);background:rgba(10,14,20,.94);border:1px solid var(--line);border-radius:14px;padding:10px 12px;z-index:15;display:flex;flex-direction:column;gap:8px}
+.rp-row{display:flex;gap:6px;align-items:center}
+#rpbar button{font:inherit;font-size:14px;padding:8px 10px;border-radius:8px;border:1px solid var(--line);background:#1b2734;color:var(--txt);cursor:pointer;flex:none}
+.rp-row:nth-child(2) button{flex:1}
+#rpbar button.rec{background:#5a1f25;border-color:#a8323c;font-weight:700}
+#rpseek{flex:1;min-width:0;accent-color:var(--gold)}
+#rpdate{font-family:"Archivo Black",system-ui,sans-serif;font-size:13px;color:var(--txt);min-width:88px;text-align:right;font-variant-numeric:tabular-nums}
+#rpmsg{margin:0}
+#rprec{position:fixed;top:calc(12px + env(safe-area-inset-top,0px));right:12px;z-index:16;font:inherit;font-size:13px;font-weight:700;color:#fff;background:#b3121f;border:0;border-radius:20px;padding:7px 12px;cursor:pointer;animation:arm .8s infinite alternate}
 @keyframes pop{from{transform:scale(.9);opacity:0}to{transform:none;opacity:1}}
 .modal{position:fixed;inset:0;background:#000a;display:none;align-items:center;justify-content:center;z-index:20}
 .modal .box{background:#111a24;border:1px solid var(--line);border-radius:14px;padding:22px;max-width:460px;width:90%;text-align:center}
@@ -233,6 +243,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#08131c;color:var(--tx
   <button class="sp on" data-spd="1">1x</button>
   <button class="sp" data-spd="2">2x</button>
   <button class="sp" data-spd="4">4x</button>
+  <button class="sp" id="replay" title="Replay / gravar vídeo">🎬</button>
   <button class="sp" id="save" title="Salvar e carregar">💾</button>
   <button class="sp" id="rank" title="Ranking mundial">🏆</button>
   <button class="sp" id="cfg" title="Configurações">⚙</button>
@@ -244,6 +255,12 @@ html,body{margin:0;height:100%;overflow:hidden;background:#08131c;color:var(--tx
 <div id="panel"><button id="ptog" aria-label="Minimizar painel"></button><div id="pinfo"></div><div id="pswitch"></div><div id="pact"></div><div id="log"></div></div>
 <div id="reqs"></div>
 <div id="wartitle" hidden></div>
+<div id="rpbar" hidden>
+  <div class="rp-row"><button data-rp="start" aria-label="Voltar ao início">⏮</button><button data-rp="play" aria-label="Tocar">▶</button><input type="range" id="rpseek" min="0" max="1" value="0" aria-label="Posição do replay"><span id="rpdate"></span></div>
+  <div class="rp-row"><button data-rp="spd">1x</button><button data-rp="hide">👁 Esconder</button><button data-rp="rec" class="rec">🎥 Gravar vídeo</button><button data-rp="exit">✖ Sair</button></div>
+  <div id="rpmsg" class="hint">Toque em ▶ para ver a partida acelerada. “Gravar vídeo” toca do começo e salva um vídeo só com o mapa. 👁 esconde os controles (toque no mapa para voltar).</div>
+</div>
+<button id="rprec" hidden>● Gravando… toque para parar</button>
 <div id="intro" hidden></div>
 <button id="nuke" hidden aria-label="Bomba nuclear"></button>
 <button id="air" class="" hidden aria-label="Bombardeio aéreo"></button>
@@ -975,6 +992,7 @@ function tick() {
   }
   for (const c of C) if (c.alive && c.cells <= 0) kill(c.id);
   if (day % 6 === 0) updateDivs();
+  if (day % REC_EVERY === 0) recordFrame();
   marketTick();
   const atWar = new Uint8Array(N); for (const w of wars) { atWar[w.a] = 1; atWar[w.b] = 1; }
   for (const c of C) {
@@ -1770,7 +1788,7 @@ function draw() {
   }
   // capitais
   for (const c of C) {
-    if (neonOn) break;
+    if (neonOn || phase === 'replay') break;
     if (!c.alive || (c.cells < 6 && z < 7 && c.id !== P && c.id !== sel)) continue;
     const x = sx(c.cap % GW), y = sy((c.cap / GW) | 0), r = Math.max(2.5, Math.min(6, z * .9));
     ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fillStyle = c.id === P ? '#f2c443' : '#e8eef5'; ctx.fill();
@@ -1791,7 +1809,7 @@ function draw() {
     ctx.lineWidth = 3.5; ctx.strokeStyle = 'rgba(0,0,0,.8)';
     ctx.strokeText(c.name, x0 + fw + 5 + tw / 2, y);
     ctx.fillStyle = c.id === P ? '#ffe28a' : '#fff'; ctx.fillText(c.name, x0 + fw + 5 + tw / 2, y);
-    if (f >= 11 || c.id === P) {
+    if (phase !== 'replay' && (f >= 11 || c.id === P)) {
       const tf = Math.max(9, f * .75); ctx.font = `600 ${tf}px system-ui,sans-serif`;
       const inWar = P >= 0 && warMat[P * N + c.id] >= 0;
       const t = '🪖 ' + fmt(c.troops);
@@ -1809,6 +1827,7 @@ function draw() {
     ctx.strokeText(f.text, f.x, f.y - 14 - k * 40); ctx.fillStyle = '#ffd54a'; ctx.fillText(f.text, f.x, f.y - 14 - k * 40);
     ctx.restore();
   }
+  drawReplayHUD(now);
   // foco de ataque
   if (focus && phase === 'game') {
     const x = sx(focus.c % GW), y = sy((focus.c / GW) | 0), r = CFG.FOCUS_RADIUS * z * .5, pulse = 1 + Math.sin(now / 200) * .08;
@@ -2076,7 +2095,7 @@ $('panel').addEventListener('click', e => {
   if (e.target.id === 'ptog') { $('panel').classList.toggle('min'); return; }
   const b = e.target.closest('button[data-act]'); if (!b || b.disabled) return;
   const act = b.dataset.act;
-  if (act === 'play') { P = sel; phase = 'game'; lastAuto = performance.now(); showIntro(C[P].name); if (VW < 760 || worldMode === 'real') { cam.z = worldMode === 'real' ? Math.max(cam.fit * 2.6, 6) : cam.fit * 2.2; cam.x = VW / 2 - (C[P].lx + .5) * cam.z; cam.y = VH * .3 - (C[P].ly + .5) * cam.z; } toast(`Você governa ${C[P].name}. Boa sorte!`, 'good'); }
+  if (act === 'play') { P = sel; phase = 'game'; startRecording(); lastAuto = performance.now(); showIntro(C[P].name); if (VW < 760 || worldMode === 'real') { cam.z = worldMode === 'real' ? Math.max(cam.fit * 2.6, 6) : cam.fit * 2.2; cam.x = VW / 2 - (C[P].lx + .5) * cam.z; cam.y = VH * .3 - (C[P].ly + .5) * cam.z; } toast(`Você governa ${C[P].name}. Boa sorte!`, 'good'); }
   else if (act === 'newmap') newWorld();
   else if (act === 'switch') {
     const old = C[P].name; P = sel; focus = null; nukeArmed = false; airArmed = false; ptab = 'army'; loanOpen = -1;
@@ -2452,6 +2471,7 @@ function restoreGame(sv) {
   scanBorders(); computeLabels(); updateDivs();
   fillSearch();
   if (C[P]) { cam.z = Math.max(cam.fit * 2.6, 6); cam.x = VW / 2 - (C[P].lx + .5) * cam.z; cam.y = VH * (VW < 760 ? .3 : .5) - (C[P].ly + .5) * cam.z; }
+  startRecording();
   dirty = true; reqsChanged = true; last.act = ''; updateUI();
 }
 const slotRef = k => store.db.collection('data/users/' + store.uid).doc('save-' + k);
@@ -2644,6 +2664,125 @@ function showEmpireBanner(c) {
   el.hidden = false; el.classList.remove('go'); void el.offsetWidth; el.classList.add('go');
   clearTimeout(introT); introT = setTimeout(() => { el.hidden = true; }, 3600);
 }
+
+// ---------- replay: grava como as fronteiras mudam e passa de novo (dá pra salvar como vídeo) ----------
+const REC_EVERY = 3, REC_MAX = 5000;
+let rec = null, rp = null;
+function startRecording() { rec = { base: owner.slice(), last: owner.slice(), frames: [{ d: day, ch: new Int32Array(0) }] }; }
+function recordFrame() {
+  if (!rec || rec.frames.length >= REC_MAX || rec.last.length !== NC) return;
+  const ch = [];
+  for (let i = 0; i < NC; i++) if (owner[i] !== rec.last[i]) { ch.push(i, owner[i]); rec.last[i] = owner[i]; }
+  rec.frames.push({ d: day, ch: Int32Array.from(ch) });
+}
+function enterReplay() {
+  if (!rec || rec.frames.length < 3) { toast('🎬 Jogue um pouco antes: o replay grava as fronteiras enquanto a partida anda.', 'bad'); return; }
+  rp = { cur: 0, playing: false, speed: 1, acc: 0, recorder: null, lastLab: 0,
+    live: { owner, core, frontMark, rad, bomb, flash, wars, units, raids, nukes, anims, phase, sel, focus,
+      cs: C.map(c => ({ cells: c.cells, lx: c.lx, ly: c.ly, alive: c.alive, ebb: c.ebb, divs: c.divs })) } };
+  owner = rec.base.slice(); core = owner; frontMark = new Uint8Array(NC); rad = new Float32Array(NC); bomb = new Float32Array(NC); flash = new Float32Array(NC);
+  wars = []; rebuildWarMat(); units = []; raids = []; nukes = []; anims = []; focus = null; sel = -1; phase = 'replay';
+  for (const c of C) c.divs = null;
+  rpLabels(); dirty = true;
+  document.body.classList.add('rp'); $('rpbar').hidden = false; $('rpseek').max = rec.frames.length - 1; rpUI();
+}
+function exitReplay() {
+  if (!rp) return;
+  if (rp.recorder && rp.recorder.state !== 'inactive') { rp.cancel = true; rp.recorder.stop(); }
+  const L = rp.live;
+  owner = L.owner; core = L.core; frontMark = L.frontMark; rad = L.rad; bomb = L.bomb; flash = L.flash;
+  wars = L.wars; rebuildWarMat(); units = L.units; raids = L.raids; nukes = L.nukes; anims = L.anims; phase = L.phase; sel = L.sel; focus = L.focus;
+  L.cs.forEach((v, i) => Object.assign(C[i], v));
+  rp = null; dirty = true; document.body.classList.remove('rp'); $('rpbar').hidden = true; $('rprec').hidden = true; last.info = last.act = ''; updateUI();
+}
+function rpLabels() {
+  computeLabels();
+  for (const c of C) c.alive = c.cells > 0;
+}
+function rpSeek(f) {
+  f = clamp(f | 0, 0, rec.frames.length - 1);
+  if (f < rp.cur) { owner.set(rec.base); rp.cur = 0; }
+  for (let k = rp.cur + 1; k <= f; k++) { const ch = rec.frames[k].ch; for (let j = 0; j < ch.length; j += 2) owner[ch[j]] = ch[j + 1]; }
+  rp.cur = f; dirty = true;
+  const now = performance.now(); if (now - rp.lastLab > 90 || !rp.playing) { rp.lastLab = now; rpLabels(); }
+}
+function rpUI() {
+  if (!rp) return;
+  const fr = rec.frames[rp.cur];
+  $('rpseek').value = rp.cur; $('rpdate').textContent = fmtDateBig(fr.d);
+  document.querySelector('[data-rp="play"]').textContent = rp.playing ? '⏸' : '▶';
+  document.querySelector('[data-rp="spd"]').textContent = rp.speed + 'x';
+}
+function rpStep(dt) {
+  if (!rp || !rp.playing) return;
+  rp.acc += dt * 8 * rp.speed / 1000;
+  let n = 0; while (rp.acc >= 1) { rp.acc -= 1; n++; }
+  if (!n) return;
+  if (rp.cur + n >= rec.frames.length - 1) { rpSeek(rec.frames.length - 1); rp.playing = false; rpLabels(); if (rp.recorder && rp.recorder.state !== 'inactive') setTimeout(() => rp && rp.recorder && rp.recorder.state !== 'inactive' && rp.recorder.stop(), 1200); }
+  else rpSeek(rp.cur + n);
+  rpUI();
+}
+function rpMsg(t) { $('rpmsg').textContent = t; }
+async function rpRecord() {
+  if (!cv.captureStream || typeof MediaRecorder === 'undefined') { rpMsg('Este navegador não consegue gravar vídeo. Use o gravador de tela do celular com os controles escondidos (👁).'); return; }
+  const mt = ['video/mp4;codecs=avc1', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'].find(t => MediaRecorder.isTypeSupported(t)) || '';
+  const stream = cv.captureStream(30), chunks = [];
+  const recd = new MediaRecorder(stream, mt ? { mimeType: mt, videoBitsPerSecond: 8e6 } : undefined);
+  recd.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+  recd.onstop = async () => {
+    stream.getTracks().forEach(t => t.stop());
+    $('rprec').hidden = true; if (rp) $('rpbar').hidden = false;
+    if (!rp || rp.cancel) return;
+    rp.recorder = null;
+    const ext = (recd.mimeType || mt).includes('mp4') ? 'mp4' : 'webm';
+    const blob = new Blob(chunks, { type: recd.mimeType || mt || 'video/webm' });
+    rpMsg(`Vídeo pronto (${(blob.size / 1048576).toFixed(1)} MB). Salvando…`);
+    rpMsg(await saveBlob(blob, `guerra-global-${fmtDateBig(rec.frames[0].d).replace(/\//g, '-')}.${ext}`));
+  };
+  rp.recorder = recd; rp.cancel = false;
+  rpSeek(0); rpLabels(); rp.playing = true; rp.acc = 0; rpUI();
+  $('rpbar').hidden = true; $('rprec').hidden = false;
+  recd.start(250);
+}
+async function saveBlob(blob, name) {
+  try {
+    const dl = window.claude && claude.use ? await claude.use('downloads') : null;
+    if (dl) { await dl.save({ filename: name, data: blob }); return '✅ Vídeo salvo.'; }
+  } catch (e) {
+    if (e && e.code === 'declined') return 'Você cancelou o salvamento do vídeo.';
+    if (e && e.code === 'rejected_extension') return 'Este aparelho não aceita esse formato de vídeo.';
+  }
+  try { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove(); return '✅ Vídeo baixado.'; }
+  catch (e) { return 'Não foi possível salvar o vídeo aqui.'; }
+}
+$('rpbar').addEventListener('click', e => {
+  const b = e.target.closest('button[data-rp]'); if (!b || !rp) return;
+  const k = b.dataset.rp;
+  if (k === 'play') { if (!rp.playing && rp.cur >= rec.frames.length - 1) rpSeek(0); rp.playing = !rp.playing; }
+  else if (k === 'start') { rpSeek(0); rpLabels(); }
+  else if (k === 'spd') rp.speed = { 1: 2, 2: 4, 4: 8, 8: 1 }[rp.speed];
+  else if (k === 'hide') { $('rpbar').hidden = true; }
+  else if (k === 'rec') rpRecord();
+  else if (k === 'exit') { exitReplay(); return; }
+  rpUI();
+});
+$('rpseek').addEventListener('input', e => { if (!rp) return; rp.playing = false; rpSeek(+e.target.value); rpLabels(); rpUI(); });
+$('rprec').addEventListener('click', () => { if (rp && rp.recorder && rp.recorder.state !== 'inactive') { rp.playing = false; rp.recorder.stop(); } });
+$('replay').addEventListener('click', () => { if (phase === 'game') enterReplay(); else if (rp) exitReplay(); });
+function drawReplayHUD(now) {
+  if (phase !== 'replay' || !rec) return;
+  const fr = rec.frames[rp.cur], fs = clamp(VW * .055, 22, 46);
+  ctx.save(); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.font = `${fs}px "Archivo Black", system-ui, sans-serif`; ctx.textBaseline = 'top'; ctx.textAlign = 'left'; ctx.lineJoin = 'round';
+  ctx.lineWidth = fs * .16; ctx.strokeStyle = 'rgba(0,0,0,.85)';
+  const t = fmtDateBig(fr.d); ctx.strokeText(t, 16, 16 + (env0 || 0)); ctx.fillStyle = '#fff'; ctx.fillText(t, 16, 16 + (env0 || 0));
+  ctx.font = `${fs * .42}px "Archivo Black", system-ui, sans-serif`; ctx.textAlign = 'right'; ctx.textBaseline = 'bottom';
+  ctx.lineWidth = 4; ctx.strokeText('GUERRA GLOBAL', VW - 14, VH - 12); ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.fillText('GUERRA GLOBAL', VW - 14, VH - 12);
+  const pr = rp.cur / Math.max(1, rec.frames.length - 1);
+  ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.fillRect(0, VH - 4, VW, 4); ctx.fillStyle = '#f2c443'; ctx.fillRect(0, VH - 4, VW * pr, 4);
+  ctx.restore();
+}
+const env0 = 0;
 
 // ---------- bomba nuclear ----------
 function launchNuke(from, cell) {
@@ -2903,6 +3042,7 @@ const endPtr = e => {
 cv.addEventListener('pointerup', endPtr); cv.addEventListener('pointercancel', endPtr);
 cv.addEventListener('wheel', e => { e.preventDefault(); zoomAt(e.clientX, e.clientY, e.deltaY < 0 ? 1.15 : 1 / 1.15); }, { passive: false });
 function tap(px, py) {
+  if (phase === 'replay') { if (!(rp && rp.recorder)) $('rpbar').hidden = false; return; }
   const x = Math.floor((px - cam.x) / cam.z), y = Math.floor((py - cam.y) / cam.z);
   if (x < 0 || y < 0 || x >= GW || y >= GH) return;
   const c = y * GW + x, o = owner[c];
@@ -2949,6 +3089,7 @@ function frame(t) {
   if (dirty && t - lastRO > 60) { renderOff(); dirty = false; lastRO = t; }
   if (phase === 'game' && P >= 0 && C[P].alive && !ended && t - lastAuto > 30000) { lastAuto = t; saveGame('auto', true); }
   updateNukes(t); updateRaids(t);
+  rpStep(dt);
   draw();
   uiT += dt; if (uiT > 250) { uiT = 0; updateUI(); nukeButton(); airButton(); }
   requestAnimationFrame(frame);
