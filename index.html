@@ -750,7 +750,7 @@ function makeCountries(list) {
   wars = []; rebuildWarMat();
   scanBorders();
   for (let a = 0; a < N; a++) for (let b = 0; b < N; b++) if (adj[a * N + b]) rel[a * N + b] -= 8;
-  anims = []; nukes = []; raids = []; airArmed = false; nukeArmed = false; nukeReady = 0; $('vs').hidden = true; reqs = []; logs = []; focus = null;
+  anims = []; nukes = []; raids = []; wrecks = []; airArmed = false; nukeArmed = false; nukeReady = 0; $('vs').hidden = true; reqs = []; logs = []; focus = null;
   day = 0; P = -1; sel = -1; phase = 'select'; ended = false;
   dirty = true; reqsChanged = true;
 }
@@ -1027,6 +1027,7 @@ function tick() {
     u.prog += u.speed;
     if (u.prog >= u.path.length - 1) { units.splice(units.indexOf(u), 1); landUnit(u, w); }
   }
+  shipCollisions();
   for (const c of C) if (c.alive && c.cells <= 0) kill(c.id);
   if (day % 6 === 0) updateDivs();
   if (day % REC_EVERY === 0) recordFrame();
@@ -1880,6 +1881,7 @@ function draw() {
     ctx.strokeText(f.text, f.x, f.y - 14 - k * 40); ctx.fillStyle = '#ffd54a'; ctx.fillText(f.text, f.x, f.y - 14 - k * 40);
     ctx.restore();
   }
+  drawWrecks(now, z);
   drawReplayHUD(now);
   // foco de ataque
   if (focus && phase === 'game') {
@@ -2846,6 +2848,82 @@ function drawReplayHUD(now) {
   ctx.restore();
 }
 const env0 = 0;
+
+// ---------- navios que se batem: os dois afundam com explosão ----------
+let wrecks = [];
+function boatPos(u, prog) {
+  const L1 = u.path.length - 1, f = clamp(prog, 0, L1), i0 = Math.floor(f), t = f - i0, c0 = u.path[i0], c1 = u.path[Math.min(i0 + 1, L1)];
+  return [(c0 % GW) * (1 - t) + (c1 % GW) * t, ((c0 / GW) | 0) * (1 - t) + ((c1 / GW) | 0) * t];
+}
+function shipCollisions() {
+  const boats = units.filter(u => u.kind === 'boat' && u.prog > 1 && u.prog < u.path.length - 2);
+  const dead = new Set();
+  for (let i = 0; i < boats.length; i++) for (let j = i + 1; j < boats.length; j++) {
+    const a = boats[i], b = boats[j];
+    if (dead.has(a) || dead.has(b) || a.from === b.from || warMat[a.from * N + b.from] < 0) continue;
+    // confere a posição agora e no meio do último passo (barcos rápidos não "atravessam" um ao outro)
+    let hit = false, hx = 0, hy = 0;
+    for (const k of [0, .5]) {
+      const [ax, ay] = boatPos(a, a.prog - a.speed * k), [bx, by] = boatPos(b, b.prog - b.speed * k);
+      if ((ax - bx) ** 2 + (ay - by) ** 2 <= 2.6) { hit = true; hx = (ax + bx) / 2; hy = (ay + by) / 2; break; }
+    }
+    if (!hit) continue;
+    dead.add(a); dead.add(b);
+    for (const u of [a, b]) {
+      const k = C[u.from]; k.casualties += u.troops;
+      const w = warOf(a.from, b.from); if (w) { if (w.a === u.from) w.casA += u.troops; else w.casB += u.troops; }
+    }
+    wrecks.push({ x: hx, y: hy, t: performance.now(), a: a.from, b: b.from, ang: Math.atan2(boatPos(a, a.prog + 1)[1] - hy, boatPos(a, a.prog + 1)[0] - hx) });
+    const me = a.from === P ? a : b.from === P ? b : null;
+    if (me) { const o = me === a ? b : a; toast(`💥 Seu navio bateu num navio de ${C[o.from].name}: os dois afundaram (−${fmt(me.troops)} soldados).`, 'bad'); }
+    else if (P >= 0 && (a.to === P || b.to === P)) toast(`💥 Dois navios inimigos se bateram e afundaram perto de você!`, 'good');
+    else toast(`💥 Navios de ${C[a.from].name} e ${C[b.from].name} se bateram e afundaram.`, 'g');
+  }
+  if (dead.size) units = units.filter(u => !dead.has(u));
+}
+function drawWrecks(now, z) {
+  const DUR = 1800;
+  wrecks = wrecks.filter(w => now - w.t < DUR);
+  for (const w of wrecks) {
+    const k = (now - w.t) / DUR, x = cam.x + (w.x + .5) * z, y = cam.y + (w.y + .5) * z, b = clamp(z * 1.7, 12, 24);
+    // casco partido em dois, se afastando e afundando
+    for (const side of [-1, 1]) {
+      const d = k * b * 1.2, ang = w.ang + side * (.4 + k * 1.1);
+      ctx.save(); ctx.globalAlpha = Math.max(0, 1 - k * 1.2);
+      ctx.translate(x + Math.cos(w.ang) * d * side, y + Math.sin(w.ang) * d * side + k * b * .4); ctx.rotate(ang);
+      ctx.fillStyle = side < 0 ? '#2a2f37' : '#3a3f47'; ctx.strokeStyle = '#000'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(side * b * .9, 0); ctx.lineTo(side * b * .6, b * .38); ctx.lineTo(0, b * .3); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.restore();
+    }
+    // anéis de água
+    for (const r0 of [0, .25]) {
+      const kk = k - r0; if (kk <= 0) continue;
+      ctx.strokeStyle = `rgba(200,230,255,${Math.max(0, .7 - kk * .8)})`; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.ellipse(x, y + b * .2, b * (.5 + kk * 2.4), b * (.25 + kk * 1.1), 0, 0, 7); ctx.stroke();
+    }
+    // bola de fogo e fumaça
+    // fumaça subindo
+    for (let i = 0; i < 3; i++) {
+      const kk = k - i * .08; if (kk <= 0) continue;
+      ctx.fillStyle = `rgba(60,60,66,${Math.max(0, .6 - kk * .6)})`;
+      ctx.beginPath(); ctx.arc(x + (i - 1) * b * .5, y - b * (.4 + kk * 2.6), b * (.5 + kk * 1.3), 0, 7); ctx.fill();
+    }
+    if (k < .5) {
+      const e = k / .5, fr = b * (.9 + e * 2.4), al = e < .15 ? 1 : 1 - (e - .15) / .85;
+      const g = ctx.createRadialGradient(x, y, 0, x, y, fr);
+      g.addColorStop(0, `rgba(255,255,230,${al})`); g.addColorStop(.3, `rgba(255,210,80,${al})`); g.addColorStop(.65, `rgba(240,90,20,${al * .85})`); g.addColorStop(1, 'rgba(120,30,10,0)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, fr, 0, 7); ctx.fill();
+      if (e < .25) { ctx.strokeStyle = `rgba(255,240,200,${1 - e * 4})`; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(x, y, b * (1 + e * 6), 0, 7); ctx.stroke(); }
+    }
+    // pedaços do navio voando
+    for (let i = 0; i < 12; i++) {
+      const a = i / 12 * Math.PI * 2 + w.ang + i * .37, d = k * b * (2.5 + (i % 3)), py = -Math.sin(Math.min(1, k * 1.3) * Math.PI) * b * (1 + (i % 2));
+      const sz = i % 3 === 0 ? 5 : 3.5;
+      ctx.fillStyle = `rgba(${i % 2 ? '255,180,60' : '45,45,52'},${Math.max(0, 1 - k * 1.15)})`;
+      ctx.save(); ctx.translate(x + Math.cos(a) * d, y + Math.sin(a) * d * .6 + py); ctx.rotate(k * 9 + i); ctx.fillRect(-sz / 2, -sz / 2, sz, sz); ctx.restore();
+    }
+  }
+}
 
 // ---------- bomba nuclear ----------
 function launchNuke(from, cell) {
