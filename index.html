@@ -914,6 +914,7 @@ function aiThink(c) {
       () => { if (C[P].money >= amt && c.alive) { C[P].money -= amt; c.money += amt; c.loans.push({ lender: P, total: Math.round(amt * (1 + rate)), remaining: amt * (1 + rate), daily: amt * (1 + rate) / LOAN_DAYS, missed: 0, rate, start: day }); relAdd(P, c.id, 10); toast(`🏦 Você emprestou ${fmtM(amt)} a ${c.name}.`, 'good'); } },
       () => relAdd(P, c.id, -4));
   }
+  aiAskHelp(c);
   if (R() < .05 && c.trades.length < 4) {
     const o = ri(0, N - 1);
     if (o !== c.id && o !== P && C[o].alive && warMat[c.id * N + o] < 0 && rel[c.id * N + o] > 15 && !hasTrade(c.id, o)) setTrade(c.id, o, true);
@@ -2149,6 +2150,57 @@ function sendReinf(from, to, amount) {
   return kind;
 }
 const PEDIR_CD = 30;
+// países do computador em guerra pedem ajuda: exército, entrar na guerra ou dinheiro (50% de chance de aceitarem)
+function aiAskHelp(c) {
+  const my = warsOf(c.id).filter(w => !(w.parent && w.a === c.id)); if (!my.length || day < (c.askCD || 0) || R() > .45) return;
+  c.askCD = day + 40;
+  const w = my[ri(0, my.length - 1)], e = enemyIn(w, c.id), E = C[e];
+  const losing = c.troops < E.troops || c.cells < (w.a === c.id ? w.a0 : w.b0) * .9;
+  const kind = c.money < 1500 && R() < .5 ? 'money' : losing && R() < .5 ? 'join' : 'army';
+  // quem pode ajudar: vivo, sem guerra com quem pede, não aliado do inimigo, e com relação boa (ou aliado)
+  let best = -1, bs = -1e9;
+  for (const h of C) {
+    if (!h.alive || h.id === c.id || h.id === e || warMat[h.id * N + c.id] >= 0 || isAllied(h.id, e)) continue;
+    const rr = rel[h.id * N + c.id] + (isAllied(h.id, c.id) ? 60 : 0);
+    if (rr < 15) continue;
+    const sc = rr + Math.log10(h.troops + 10) * 8 + R() * 25;
+    if (sc > bs) { bs = sc; best = h.id; }
+  }
+  if (best < 0) return;
+  const H = C[best], tm = w.mode === 'morte' ? ' (até a morte)' : '';
+  const what = { army: 'mandar exército', join: `entrar na guerra contra ${E.name}${tm}`, money: 'emprestar dinheiro' }[kind];
+  if (best === P) {
+    if (hasReq('ask' + c.id)) return;
+    if (kind === 'army') {
+      const amt = Math.round(C[P].troops * .1);
+      addReq(`🪖 ${c.name} está em guerra com ${E.name} e pede que você mande ${fmt(amt)} soldados (10% do seu exército).`, 'ask' + c.id,
+        () => { if (c.alive && C[P].troops > amt) { const how = sendReinf(P, c.id, amt); relAdd(P, c.id, 12); toast(`🪖 Você mandou ${fmt(amt)} soldados para ${c.name}${how === 'air' ? ' (de avião)' : ''}.`, 'good'); } },
+        () => relAdd(P, c.id, -6));
+    } else if (kind === 'join') {
+      addReq(`📣 ${c.name} pede que você entre na guerra contra ${E.name}${tm}.`, 'ask' + c.id,
+        () => { if (wars.includes(w) && warMat[P * N + e] < 0) { declareWar(P, e, w.mode, w.id, c.id); relAdd(P, c.id, 15); } },
+        () => relAdd(P, c.id, -8));
+    } else {
+      const amt = Math.round(Math.min(C[P].money * .15, 40000) / 1000) * 1000; if (amt < 1000) return;
+      addReq(`🏦 ${c.name} (em guerra com ${E.name}) pede ${fmtM(amt)} emprestados a ${Math.round(loanRate(P, c.id) * 100)}% de juros.`, 'ask' + c.id,
+        () => { if (C[P].money >= amt && c.alive) { makeLoan(P, c.id, amt); relAdd(P, c.id, 8); toast(`🏦 Você emprestou ${fmtM(amt)} a ${c.name}.`, 'good'); } },
+        () => relAdd(P, c.id, -4));
+    }
+    return;
+  }
+  const yes = R() < .5;
+  const near = P >= 0 && (e === P || c.id === P || isAllied(P, c.id) || isAllied(P, e) || warMat[P * N + c.id] >= 0);
+  if (!yes) { addLog(`${H.name} recusou ${what} para ${c.name}`); return; }
+  if (kind === 'army' && H.troops > 2000) {
+    const amt = Math.round(H.troops * (.04 + R() * .16)); sendReinf(best, c.id, amt); relAdd(best, c.id, 4);
+    toast(`🪖 ${H.name} mandou ${fmt(amt)} soldados para ajudar ${c.name} contra ${E.name}.`, e === P ? 'bad' : near ? '' : 'g');
+  } else if (kind === 'join' && (isAllied(best, c.id) || rel[best * N + c.id] > 40) && warMat[best * N + e] < 0) {
+    declareWar(best, e, w.mode, w.id, c.id);
+    if (e !== P) toast(`📣 ${H.name} atendeu ao pedido de ${c.name} e entrou na guerra contra ${E.name}.`, near ? '' : 'g');
+  } else if (kind === 'money' && H.money > 5000 && c.loans.length < 3) {
+    const amt = Math.round(H.money * .2 / 1000) * 1000; if (amt >= 1000) { makeLoan(best, c.id, amt); addLog(`${H.name} emprestou ${fmtM(amt)} a ${c.name}`); }
+  }
+}
 function actAskArmy(o) {
   const c = C[o]; if (day < c.armyCD || warMat[P * N + o] >= 0) return;
   c.armyCD = day + PEDIR_CD;
