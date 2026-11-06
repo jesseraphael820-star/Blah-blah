@@ -354,7 +354,7 @@ let reqs = [], logs = [], anims = [];
 let dirty = true, ended = false, nCount = 20, worldMode = 'real';
 let nukes = [], nukeArmed = false, nukeReady = 0, units = [];
 // opções visuais (salvas só neste navegador)
-const opts = { fxLevel: 'poucos', fx: 'soldados', stripes: true, smooth: true, soldiers: true, flags: true, divs: true, frontNums: true, hud: true, map: 'cor', empFlag: true, flagTerr: '' };
+const opts = { fxLevel: 'poucos', fx: 'soldados', stripes: true, smooth: true, soldiers: true, flags: true, divs: true, frontNums: true, hud: true, map: 'cor', empFlag: true, flagTerr: '', warMode: 'classico' };
 // tecnologias: custo = base × 1,7^nível, até o nível 10
 const TECH = [
   { k: 'atk', i: '⚔', n: 'Armamento', d: '+7% de força em combate e mais chance de tomar províncias', base: 8000 },
@@ -900,7 +900,7 @@ function capture(cell, to, from) {
 }
 function captureCell(cell, to, from) {
   owner[cell] = to; C[to].cells++; C[from].cells--; flash[cell] = day; dirty = true;
-  if (anims.length < 500 && opts.fx !== 'listras' && !lite()) anims.push({ c: cell, from, to, t: performance.now() });
+  if (anims.length < 700 && opts.fx !== 'listras' && (!lite() || opts.warMode === 'suave')) anims.push({ c: cell, from, to, t: performance.now() });
   const wi = warMat[to * N + from]; if (wi >= 0) { const w = wars[wi]; w.mom = (w.mom || 0) + (w.a === to ? 1 : -1); }
   if (C[from].cap === cell) {
     C[from].troops *= .88;
@@ -959,7 +959,31 @@ function battle(w, ca, cb, sea) {
   A.troops -= la; A.casualties += la; w.casA += la;
   B.troops -= lb; B.casualties += lb; w.casB += lb;
   const W = aWins ? A : B, Lz = aWins ? B : A;
-  if (R() < (sea ? CFG.CAPTURE_SEA : CFG.CAPTURE) * (1 + .1 * W.tech.atk) / (1 + .12 * Lz.tech.def) * (aWins ? M.ca : M.cb)) aWins ? capture(cb, w.a, w.b) : capture(ca, w.b, w.a);
+  if (R() < (sea ? CFG.CAPTURE_SEA : CFG.CAPTURE) * (1 + .1 * W.tech.atk) / (1 + .12 * Lz.tech.def) * (aWins ? M.ca : M.cb) * spearMul(w, aWins ? cb : ca, aWins ? 'a' : 'b')) {
+    if (aWins) { capture(cb, w.a, w.b); if (w.sp) { w.sp.a = cb; w.sp.ta = day; w.sp.na++; } }
+    else { capture(ca, w.b, w.a); if (w.sp) { w.sp.b = ca; w.sp.tb = day; w.sp.nb++; } }
+  }
+}
+// sistema suave: cada lado tem uma ponta de lança. Ela segue as conquistas; se travar (12 dias sem tomar nada)
+// ou depois de ~40 conquistas, a ofensiva muda para outro ponto da frente.
+function spearMul(w, cell, side) {
+  if (opts.warMode !== 'suave' || !w.sp || w.sp[side] < 0) return 1;
+  const sp = w.sp[side], d = (cell % GW - sp % GW) ** 2 + (((cell / GW) | 0) - ((sp / GW) | 0)) ** 2;
+  return d <= 16 ? 1.6 : d <= 49 ? 1 : .35;
+}
+function updateSpears(w) {
+  if (!w.sp) w.sp = { a: -1, b: -1, ta: day, tb: day, na: 0, nb: 0, sa: day, sb: day };
+  const L = w.fa.length; if (!L) return;
+  for (const side of ['a', 'b']) {
+    const cur = w.sp[side], own = side === 'a' ? w.a : w.b;
+    const stuck = day - w.sp['t' + side] > 12, done = w.sp['n' + side] > 40, lost = cur >= 0 && owner[cur] !== own;
+    if (cur < 0 || stuck || done || (lost && day - w.sp['t' + side] > 3)) {
+      // novo ponto: uma célula inimiga da frente, sorteada
+      const j = ri(0, L - 1);
+      w.sp[side] = side === 'a' ? w.fb[j] : w.fa[j];
+      w.sp['t' + side] = day; w.sp['n' + side] = 0; w.sp['s' + side] = day;
+    }
+  }
 }
 function amphibious(w) {
   const A = C[w.a], B = C[w.b];
@@ -1005,9 +1029,22 @@ function tick() {
     const pf = focus && (w.a === P || w.b === P) && focus.enemy === enemyIn(w, P);
     const aStrong = C[w.a].troops / Math.max(C[w.a].cells, 1) >= C[w.b].troops / Math.max(C[w.b].cells, 1);
     const press = j => aStrong ? support(w.fb[j], w.a) : support(w.fa[j], w.b);
+    const suave = opts.warMode === 'suave';
+    if (suave) updateSpears(w);
     for (let k = 0; k < n; k++) {
       let idx = ri(0, L - 1);
-      if (!pf) { const j = ri(0, L - 1); if (press(j) > press(idx)) idx = j; }
+      if (suave && !pf) {
+        // cada lado concentra o ataque perto da sua ponta de lança (a parte forte bate mais vezes)
+        const side = R() < (aStrong ? .7 : .3) ? 'a' : 'b', sp = w.sp[side];
+        if (sp >= 0) {
+          const fx = sp % GW, fy = (sp / GW) | 0; let bd = 1e18;
+          for (let s2 = 0; s2 < 8; s2++) {
+            const j = ri(0, L - 1), tc = side === 'a' ? w.fb[j] : w.fa[j];
+            const d = (tc % GW - fx) ** 2 + (((tc / GW) | 0) - fy) ** 2 - (side === 'a' ? support(tc, w.a) : support(tc, w.b)) * 6;
+            if (d < bd) { bd = d; idx = j; }
+          }
+        }
+      } else if (!pf) { const j = ri(0, L - 1); if (press(j) > press(idx)) idx = j; }
       if (pf && R() < .7) {
         const fx = focus.c % GW, fy = (focus.c / GW) | 0; let bd = 1e18;
         for (let s = 0; s < 6; s++) {
@@ -1613,9 +1650,15 @@ function draw() {
   const z = cam.z, sx = x => cam.x + (x + .5) * z, sy = y => cam.y + (y + .5) * z;
   const now = performance.now();
   // conquista: a cor antiga encolhe e revela o novo dono, com um contorno que se expande
-  const AD = 560;
+  const smooth = opts.warMode === 'suave', AD = smooth ? 750 : 560;
   anims = anims.filter(a => now - a.t < AD);
-  for (const a of anims) {
+  if (smooth) for (const a of anims) {
+    // a cor antiga vai sumindo devagar, sem anel: território "escorrendo" de um país pro outro
+    const k = (now - a.t) / AD, x = cam.x + (a.c % GW) * z, y = cam.y + ((a.c / GW) | 0) * z, s = shade[a.c], f = C[a.from].col;
+    ctx.fillStyle = `rgba(${f[0] * s | 0},${f[1] * s | 0},${f[2] * s | 0},${(1 - k) * (1 - k)})`;
+    ctx.fillRect(x - .3, y - .3, z + .6, z + .6);
+  }
+  if (!smooth) for (const a of anims) {
     const k = (now - a.t) / AD, e = 1 - Math.pow(1 - k, 3);
     const x = cam.x + (a.c % GW) * z, y = cam.y + ((a.c / GW) | 0) * z, s = shade[a.c];
     const f = C[a.from].col, t = C[a.to].col, ins = z * e / 2;
@@ -1892,6 +1935,20 @@ function draw() {
     ctx.font = `800 ${16 + (1 - k) * 4}px system-ui,sans-serif`; ctx.textAlign = 'center'; ctx.lineWidth = 4; ctx.strokeStyle = '#000';
     ctx.strokeText(f.text, f.x, f.y - 14 - k * 40); ctx.fillStyle = '#ffd54a'; ctx.fillText(f.text, f.x, f.y - 14 - k * 40);
     ctx.restore();
+  }
+  if (opts.warMode === 'suave' && phase === 'game') for (const w of wars) {
+    if (!w.sp || !(w.a === P || w.b === P)) continue;
+    for (const side of ['a', 'b']) {
+      const sp = w.sp[side]; if (sp < 0) continue;
+      const own = side === 'a' ? w.a : w.b, x = sx(sp % GW), y = sy((sp / GW) | 0);
+      // direção: do centro do país atacante para a ponta de lança
+      const k = C[own], dx = x - sx(k.lx), dy = y - sy(k.ly), d = Math.hypot(dx, dy) || 1, ux = dx / d, uy = dy / d, L = clamp(z * 3, 14, 34);
+      const col = own === P ? '95,211,154' : '255,110,110', pul = .65 + .35 * Math.sin(now / 250);
+      ctx.save(); ctx.globalAlpha = pul; ctx.strokeStyle = `rgb(${col})`; ctx.fillStyle = `rgb(${col})`; ctx.lineWidth = Math.max(2.5, z * .35); ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(x - ux * L, y - uy * L); ctx.lineTo(x, y); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x + ux * L * .35, y + uy * L * .35); ctx.lineTo(x - uy * L * .3, y + ux * L * .3); ctx.lineTo(x + uy * L * .3, y - ux * L * .3); ctx.closePath(); ctx.fill();
+      ctx.restore();
+    }
   }
   drawTorps(now, z);
   drawWrecks(now, z);
@@ -2276,6 +2333,9 @@ $('cfg').addEventListener('click', () => {
     <label><input type="radio" name="fx" value="cinza"${opts.fx === 'cinza' ? ' checked' : ''}> Frente cinza (só o território avançando e recuando)</label>
     <label><input type="radio" name="fx" value="listras"${opts.fx === 'listras' ? ' checked' : ''}> Listras (só listras avançando e recuando na frente)</label>
     <label><input type="radio" name="fx" value="neon"${opts.fx === 'neon' ? ' checked' : ''}> Neon: seu time azul × inimigos vermelhos, mapa satélite e bordas brilhando</label></div>
+    <div class="opt"><b>Sistema de guerra</b>
+    <label><input type="radio" name="wm" value="classico"${opts.warMode !== 'suave' ? ' checked' : ''}> Clássico (combates espalhados pela frente toda)</label>
+    <label><input type="radio" name="wm" value="suave"${opts.warMode === 'suave' ? ' checked' : ''}> Suave (ofensivas: ataca um ponto, avança como uma onda e depois vai para outro lugar; território muda de cor devagar)</label></div>
     <div class="opt"><b>Efeitos visuais</b>
     <label><input type="radio" name="fxl" value="poucos"${opts.fxLevel !== 'normal' ? ' checked' : ''}> Poucos (tela limpa: sem divisões, números na frente, título da guerra, tremida e avisos do resto do mundo)</label>
     <label><input type="radio" name="fxl" value="normal"${opts.fxLevel === 'normal' ? ' checked' : ''}> Todos os detalhes</label></div>
@@ -2305,6 +2365,7 @@ $('mtext').addEventListener('change', e => {
   else if (e.target.id === 'o-flags') opts.flags = e.target.checked;
   else if (e.target.name === 'map') opts.map = e.target.value;
   else if (e.target.name === 'ft') opts.flagTerr = e.target.value;
+  else if (e.target.name === 'wm') opts.warMode = e.target.value;
   else if (e.target.name === 'fxl') { opts.fxLevel = e.target.value; updateUI(); }
   else if (e.target.id === 'o-divs') opts.divs = e.target.checked;
   else if (e.target.id === 'o-fnums') opts.frontNums = e.target.checked;

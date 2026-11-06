@@ -31,4 +31,5 @@ Jogo de estratégia de guerra no mapa-múndi atual (193 países com bandeiras re
 - **👆 Segurar**: segure o dedo no seu país para ganhar dinheiro sem parar.
 - **🎖 Militar**: bases militares, treinamento e arsenal (tanques, artilharia, caças, navios de guerra); ranking de poder militar.
 - **Estilo neon**: seu time azul × inimigos vermelhos sobre mapa satélite, bordas brilhando, tropas no centro e bandeirinhas na frente.
+- **🌊 Sistema de guerra suave** (Configurações): ofensivas que atacam um ponto, avançam como onda e depois mudam de lugar; território muda de cor devagar.
 - **⚙ Configurações**: animação de guerra com soldados e bandeiras, frente cinza ou listras que avançam e recuam; território ocupado listrado; bordas sombreadas.
