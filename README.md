@@ -36,3 +36,4 @@ Jogo de estratégia de guerra no mapa-múndi atual (193 países com bandeiras re
 - **⚙ Configurações**: animação de guerra com soldados e bandeiras, frente cinza ou listras que avançam e recuam; território ocupado listrado; bordas sombreadas.
 
 Bandeiras dos estados do Brasil: pacote [`br-state-flags`](https://www.npmjs.com/package/br-state-flags) (MIT), lido como texto por `tools/build-state-flags-parse.py` (sem executar o código do pacote) e convertido em PNG por `tools/build-state-flags-raster.js`.
+Bandeiras de estados/províncias de EUA, Canadá, México, Colômbia, Alemanha e Austrália: [region-flags](https://github.com/fonttools/region-flags) (domínio público, Wikimedia), via `tools/build-state-flags-iso.py`, `tools/build-state-flags-raster-dir.js` e `tools/build-state-flags-merge.py`.
