@@ -697,7 +697,10 @@ function genReal(split = -1, sc = scen) {
     for (let i = 0; i < NC; i++) if (owner[i] === split && stateGrid[i] > 0) sc.set(stateGrid[i], (sc.get(stateGrid[i]) || 0) + 1);
     for (const [st, n] of [...sc].sort((a, b) => a[0] - b[0])) {
       stMap.set(st, list.length);
-      list.push({ name: WORLD.states.list[st - 1].n, flag: { ...countryFlag(split), band: true }, cap: -1,
+      const sn = WORLD.states.list[st - 1].n, real = WORLD.stateFlags && WORLD.stateFlags[pw.a] && WORLD.stateFlags[pw.a][sn];
+      let sf = { ...countryFlag(split), band: true };
+      if (real) { const im = new Image(); im.onload = () => { dirty = true; }; im.src = real; sf = { img: im, url: real }; }   // bandeira oficial do estado
+      list.push({ name: sn, flag: sf, cap: -1,
         mult: (POWER[pw.a] || 1) * clamp((60 / n) ** .35, 1, 2.6), nuclear: false, orig: split, state: true, parent: pw.n, econ: ECON[pw.a] || 1 });
     }
   }

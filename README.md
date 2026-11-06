@@ -33,3 +33,5 @@ Jogo de estratégia de guerra no mapa-múndi atual (193 países com bandeiras re
 - **Estilo neon**: seu time azul × inimigos vermelhos sobre mapa satélite, bordas brilhando, tropas no centro e bandeirinhas na frente.
 - **🌊 Sistema de guerra suave** (Configurações): ofensivas que atacam um ponto, avançam como onda e depois mudam de lugar; território muda de cor devagar.
 - **⚙ Configurações**: animação de guerra com soldados e bandeiras, frente cinza ou listras que avançam e recuam; território ocupado listrado; bordas sombreadas.
+
+Bandeiras dos estados do Brasil: pacote [`br-state-flags`](https://www.npmjs.com/package/br-state-flags) (MIT), lido como texto por `tools/build-state-flags-parse.py` (sem executar o código do pacote) e convertido em PNG por `tools/build-state-flags-raster.js`.
