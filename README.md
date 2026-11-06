@@ -29,6 +29,7 @@ Jogo de estratégia de guerra no mapa-múndi atual (193 países com bandeiras re
 - **👑 Impérios**: ao passar de 1,6× o território inicial, o país vira império (nome, bandeira imperial pintada no território, +10% de renda e força).
 - **📈 Finanças**: mercado (títulos, ações, cripto), obras públicas (usinas, portos, banco central) e nota de crédito.
 - **👆 Segurar**: segure o dedo no seu país para ganhar dinheiro sem parar.
+- **🪖 Alistamento obrigatório e mercenários** na aba Exército.
 - **🎖 Militar**: bases militares, treinamento e arsenal (tanques, artilharia, caças, navios de guerra); ranking de poder militar.
 - **Estilo neon**: seu time azul × inimigos vermelhos sobre mapa satélite, bordas brilhando, tropas no centro e bandeirinhas na frente.
 - **🌊 Sistema de guerra suave** (Configurações): ofensivas que atacam um ponto, avançam como onda e depois mudam de lugar; território muda de cor devagar.
