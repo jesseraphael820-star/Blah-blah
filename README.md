@@ -23,7 +23,12 @@ Jogo de estratégia de guerra no mapa-múndi atual (193 países com bandeiras re
 - **💼 Economia**: impostos, acordos comerciais, empréstimos (pedir e emprestar) e eventos aleatórios.
 - **🎮 Controle da guerra**: em cada guerra escolha Atacar, Manter, Recuar ou Automático, e 💯 Força máxima para jogar o exército inteiro numa guerra.
 - **🌊 Submarinos**: torpedeiam navios inimigos que chegam perto do seu país.
-- **🎬 Replay**: reveja a partida acelerada e grave um vídeo (MP4/WebM) só com o mapa.
+- **🎬 Replay**: reveja a partida acelerada e grave um vídeo (MP4/WebM) só com o mapa, com placar dos maiores países.
+- **👁 Modo espectador**: assista a IA jogar sozinha, com câmera automática; dá pra assumir qualquer país depois.
+- **🛢 Recursos no mapa**: petróleo, ouro, ferro e comida dão dinheiro, força e recrutamento a quem domina a província.
+- **🖨 Inflação**: imprima dinheiro na aba Finanças; tudo fica mais caro e a renda cai.
+- **🏳 Rendição**: países perdendo se rendem entregando território e dinheiro; você também pode se render.
+- **⚓ Bloqueio naval**: com 5+ navios de guerra, corte o comércio do inimigo e afunde navios que saem do porto.
 - **📜 Cenários**: 1939 (Segunda Guerra) e 1822 (Império do Brasil), com fronteiras, impérios, alianças e guerras da época.
 - **🔄 Trocar de país** no meio da partida.
 - **👑 Impérios**: ao passar de 1,6× o território inicial, o país vira império (nome, bandeira imperial pintada no território, +10% de renda e força).

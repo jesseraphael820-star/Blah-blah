@@ -221,6 +221,14 @@ body.rp #top,body.rp #panel,body.rp #cas,body.rp #reqs,body.rp #nuke,body.rp #ai
 .stl{font-size:12px}
 #pact button.allin{text-align:center;font-weight:700;background:#2a1f3d;border-color:#6a4fa8;margin-top:4px}
 #pact button.allin.on{background:#6a2fb0;border-color:#b48cff;color:#fff;animation:arm .9s infinite alternate}
+#pact button.block{background:#14304a;border-color:#3d6fa8;font-weight:700}
+#pact button.block.on{background:#1f5fa0;border-color:#9fd0ff;color:#fff}
+#pact button.spec{background:#2a2440;border-color:#6a5fa8;font-weight:700;text-align:center}
+#specbar{position:fixed;left:50%;transform:translateX(-50%);top:calc(56px + env(safe-area-inset-top,0px));z-index:6;display:flex;gap:8px;align-items:center;background:rgba(10,14,20,.9);border:1px solid var(--line);border-radius:20px;padding:5px 6px 5px 12px;font-size:13px;font-weight:700}
+#specbar button{font:inherit;font-size:12px;padding:5px 10px;border-radius:14px;border:1px solid var(--line);background:#1b2734;color:var(--txt);cursor:pointer}
+#specbar button.on{background:#2c5b3f;border-color:#3f8a5d}
+body.rp #specbar{display:none!important}
+@media (max-width:760px){#specbar{top:auto;bottom:calc(43vh + 70px)}}
 @keyframes pop{from{transform:scale(.9);opacity:0}to{transform:none;opacity:1}}
 .modal{position:fixed;inset:0;background:#000a;display:none;align-items:center;justify-content:center;z-index:20}
 .modal .box{background:#111a24;border:1px solid var(--line);border-radius:14px;padding:22px;max-width:460px;width:90%;text-align:center}
@@ -270,10 +278,11 @@ body.rp #top,body.rp #panel,body.rp #cas,body.rp #reqs,body.rp #nuke,body.rp #ai
 <div id="vs" hidden></div>
 <div id="panel"><button id="ptog" aria-label="Minimizar painel"></button><div id="pinfo"></div><div id="pswitch"></div><div id="pact"></div><div id="log"></div></div>
 <div id="reqs"></div>
+<div id="specbar" hidden><span>👁 Espectador</span><button id="autocam">🎥 Câmera automática: desligada</button></div>
 <div id="wartitle" hidden></div>
 <div id="rpbar" hidden>
   <div class="rp-row"><button data-rp="start" aria-label="Voltar ao início">⏮</button><button data-rp="play" aria-label="Tocar">▶</button><input type="range" id="rpseek" min="0" max="1" value="0" aria-label="Posição do replay"><span id="rpdate"></span></div>
-  <div class="rp-row"><button data-rp="spd">1x</button><button data-rp="hide">👁 Esconder</button><button data-rp="rec" class="rec">🎥 Gravar vídeo</button><button data-rp="exit">✖ Sair</button></div>
+  <div class="rp-row"><button data-rp="spd">1x</button><button data-rp="hide">👁 Esconder</button><button data-rp="board">📊 Placar</button><button data-rp="rec" class="rec">🎥 Gravar vídeo</button><button data-rp="exit">✖ Sair</button></div>
   <div id="rpmsg" class="hint">Toque em ▶ para ver a partida acelerada. “Gravar vídeo” toca do começo e salva um vídeo só com o mapa. 👁 esconde os controles (toque no mapa para voltar).</div>
 </div>
 <button id="rprec" hidden>● Gravando… toque para parar</button>
@@ -365,7 +374,111 @@ const TECH = [
   { k: 'air', i: '✈', n: 'Força Aérea', d: '+15% de dano nos bombardeios e defesa antiaérea mais forte', base: 7000 },
 ];
 const TECH_MAX = 10;
-const techCost = (c, k) => Math.round(TECH.find(t => t.k === k).base * 1.7 ** c.tech[k] / 100) * 100;
+// recursos no mapa: 🛢 petróleo (dinheiro + força do exército), 🪙 ouro (muito dinheiro), ⚙ ferro (dinheiro + força), 🌾 comida (recrutamento)
+const RES_T = [null, { k: 'oil', i: '🛢', n: 'Petróleo' }, { k: 'gold', i: '🪙', n: 'Ouro' }, { k: 'iron', i: '⚙', n: 'Ferro' }, { k: 'food', i: '🌾', n: 'Comida' }];
+const RES_SPOTS = {
+  1: [[25, 48], [32, 45], [31, 50], [29, 48], [24, 54], [8, -65], [61, 72], [64, 75], [31, -100], [70, -150], [6, 6], [28, 18], [46, 53], [56, -113], [-22, -42], [19, -94], [28, 3], [41, 50], [-8, 14], [37, 112], [2, 103], [39, 68]],
+  2: [[-26, 28], [-30, 121], [60, 130], [37, 117], [-7, -78], [6, -2], [40, -117], [49, -80], [-19, -44], [64, -140], [-6, 142], [62, 150]],
+  3: [[-22, 118], [-20, -44], [-6, -50], [21, 85], [52, 37], [48, 33], [68, 20], [53, -67], [40, 112], [47, -92], [52, 61]],
+  4: [[41, -93], [-34, -62], [49, 32], [27, 79], [33, 115], [-23, -51], [47, 2], [52, 10], [30, 31], [24, 90], [-33, 145], [50, -100], [15, 102], [20, -100], [9, 7], [43, 13]],
+};
+let RES = [], resAt = new Map();
+function genResources() {
+  RES = []; resAt = new Map();
+  const add = (c, t) => { if (c >= 0 && c < NC && land[c] && !resAt.has(c)) { resAt.set(c, t); RES.push({ c, t }); } };
+  const nearLand = (x, y) => { for (let r = 0; r < 6; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) { const xx = x + dx, yy = y + dy; if (xx >= 0 && yy >= 0 && xx < GW && yy < GH && land[yy * GW + xx]) return yy * GW + xx; } return -1; };
+  if (worldMode === 'real') {
+    for (const t of [1, 2, 3, 4]) for (const [lat, lon] of RES_SPOTS[t]) {
+      const x = Math.floor((lon + 180) / WORLD.step), y = Math.floor((WORLD.lat0 - lat) / WORLD.step), c0 = nearLand(x, y);
+      if (c0 < 0) continue;
+      const k = 2 + ri(0, 2);
+      for (let i = 0; i < k; i++) add(nearLand(c0 % GW + ri(-3, 3), ((c0 / GW) | 0) + ri(-3, 3)), t);
+    }
+  }
+  const landCells = []; for (let i = 0; i < NC; i++) if (land[i]) landCells.push(i);
+  const extra = worldMode === 'real' ? [0, 20, 12, 20, 45] : [0, 14, 8, 14, 30];
+  for (const t of [1, 2, 3, 4]) for (let i = 0; i < extra[t]; i++) add(landCells[ri(0, landCells.length - 1)], t);
+}
+function resTick() {
+  for (const c of C) c.res = { oil: 0, gold: 0, iron: 0, food: 0 };
+  for (const r of RES) { const o = owner[r.c]; if (o >= 0 && C[o].alive) C[o].res[RES_T[r.t].k]++; }
+}
+const resMil = c => c.res ? 1 + Math.min(.2, .02 * c.res.oil) + Math.min(.1, .01 * c.res.iron) : 1;
+// bloqueio naval: navios de guerra cercam o litoral do inimigo (corta comércio, −20% de renda, afunda navios que saem)
+let blockSet = null;
+const blockCost = c => 40 + (c.eq ? c.eq.ship : 0) * 2;
+function canBlockade(b, t) { return C[b].eq && C[b].eq.ship >= 5 && coastList.some(x => owner[x] === t); }
+function startBlockade(w, b) {
+  const t = enemyIn(w, b), pts = [], own = [];
+  for (const x of coastList) if (owner[x] === t) own.push(x);
+  for (let k = 0; k < Math.min(10, own.length); k++) {
+    const c = own[Math.floor((k + .5) * own.length / Math.min(10, own.length))], x = c % GW, y = (c / GW) | 0;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [2, 0], [-2, 0], [0, 2], [0, -2]]) { const xx = x + dx, yy = y + dy; if (xx >= 0 && yy >= 0 && xx < GW && yy < GH && !land[yy * GW + xx]) { pts.push(yy * GW + xx); break; } }
+  }
+  w.blockBy = b; w.blockPts = pts;
+  if (b === P) toast(`⚓ Bloqueio naval contra ${C[t].name}: comércio cortado e −20% de renda pra eles.`, 'good');
+  else if (t === P) toast(`⚓ ${C[b].name} bloqueou o seu litoral! Seu comércio parou.`, 'bad');
+}
+function stopBlockade(w, why) {
+  const b = w.blockBy; if (b == null || b < 0) return; w.blockBy = -1; w.blockPts = null;
+  if (b === P) toast(`⚓ Bloqueio contra ${C[enemyIn(w, b)].name} encerrado${why ? ': ' + why : ''}.`);
+  else if (enemyIn(w, b) === P) toast(`⚓ O bloqueio de ${C[b].name} acabou${why ? ': ' + why : ''}.`, 'good');
+}
+function blockTick() {
+  blockSet = new Uint8Array(N);
+  for (const w of wars) {
+    if (w.blockBy == null || w.blockBy < 0) continue;
+    const b = w.blockBy, t = enemyIn(w, b), B = C[b], T = C[t];
+    if (!B.alive || !T.alive) { w.blockBy = -1; continue; }
+    B.money -= blockCost(B);
+    if (B.money < 0 || B.eq.ship < 3) { stopBlockade(w, B.money < 0 ? 'sem dinheiro' : 'navios demais afundados'); continue; }
+    if (R() < eqB(T, 'sub') * .25) { B.eq.ship--; if (b === P) toast(`🌊 Um submarino de ${T.name} afundou um navio do seu bloqueio (${B.eq.ship} restantes).`, 'bad'); else if (t === P) toast(`🌊 Seu submarino afundou um navio do bloqueio de ${B.name}!`, 'good'); }
+    blockSet[t] = 1;
+  }
+  // navios que saem de um país bloqueado podem ser afundados
+  const sunk = new Set();
+  for (const u of units) if (u.kind === 'boat' && blockSet[u.from] && u.prog < 12 && R() < .08) {
+    sunk.add(u); const [bx, by] = boatPos(u, u.prog); wrecks.push({ x: bx, y: by, t: performance.now(), a: u.from, b: u.from, ang: 0 });
+    C[u.from].casualties += u.troops;
+    if (u.from === P) toast(`⚓ O bloqueio inimigo afundou seu navio (−${fmt(u.troops)} soldados).`, 'bad');
+    else if (wars.some(w => w.blockBy === P && enemyIn(w, P) === u.from)) toast(`⚓ Seu bloqueio afundou um navio de ${C[u.from].name}!`, 'good');
+  }
+  if (sunk.size) units = units.filter(u => !sunk.has(u));
+}
+function drawBlockades(now, z) {
+  const b = clamp(z * 1.3, 7, 16);
+  for (const w of wars) {
+    if (w.blockBy == null || w.blockBy < 0 || !w.blockPts) continue;
+    const k = C[w.blockBy];
+    w.blockPts.forEach((c, i) => {
+      const x = cam.x + (c % GW + .5) * z, y = cam.y + (((c / GW) | 0) + .5) * z + Math.sin(now / 400 + i) * 1.2;
+      if (x < -30 || y < -30 || x > VW + 30 || y > VH + 30) return;
+      ctx.fillStyle = '#39424e'; ctx.strokeStyle = '#000'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(x - b * .8, y); ctx.lineTo(x + b * .9, y); ctx.lineTo(x + b * .55, y + b * .35); ctx.lineTo(x - b * .6, y + b * .35); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.fillRect(x - b * .25, y - b * .3, b * .45, b * .3);
+      ctx.fillStyle = '#000'; ctx.fillRect(x - b * .05 - 1, y - b * 1.05 - 1, b * .7 + 2, b * .47 + 2); drawFlag(ctx, k.flag, x - b * .05, y - b * 1.05, b * .7, b * .47);
+    });
+  }
+}
+// rendição: o perdedor entrega território (o mais perto do vencedor) e dinheiro; "total" = entrega tudo
+function surrenderTo(loser, winner, w, total, frac = .5, moneyFrac = .4) {
+  const L = C[loser], Wn = C[winner];
+  const cells = []; for (let i = 0; i < NC; i++) if (owner[i] === loser) cells.push(i);
+  if (total) { for (const c of cells) { captureCell(c, winner, loser); core[c] = winner; } }
+  else {
+    cells.sort((a, b) => ((a % GW - Wn.lx) ** 2 + (((a / GW) | 0) - Wn.ly) ** 2) - ((b % GW - Wn.lx) ** 2 + (((b / GW) | 0) - Wn.ly) ** 2));
+    const n = Math.ceil(cells.length * frac);
+    for (const c of cells.slice(0, n)) { if (c === L.cap) continue; captureCell(c, winner, loser); core[c] = winner; }
+    for (let i = 0; i < NC; i++) if (owner[i] === winner && core[i] === loser) core[i] = winner;
+  }
+  const m = Math.max(0, L.money * moneyFrac); L.money -= m; Wn.money += m;
+  dirty = true;
+  if (wars.includes(w)) endWar(w, 'surrender');
+  return m;
+}
+// inflação: tudo que se compra fica mais caro (pm = multiplicador de preço)
+const pm = c => 1 + (c && c.infl || 0) / 100;
+const techCost = (c, k) => Math.round(TECH.find(t => t.k === k).base * 1.7 ** c.tech[k] * pm(c) / 100) * 100;
 // clique: valor e custo crescem a cada nível
 const clickVal = c => Math.round(10 * 1.55 ** c.clickLv);
 const clickCost = c => Math.round(200 * 1.75 ** c.clickLv / 10) * 10;
@@ -548,6 +661,7 @@ function genWorld(n) {
   cnt = assign();
   const names = genNames(seeds.length);
   makeCountries(seeds.map((cap, i) => ({ name: names[i], flag: genFlag(), cap, mult: 1, nuclear: false })));
+  genResources(); resTick();
 }
 
 // força militar relativa (1 = padrão por província) e potências nucleares de hoje
@@ -708,6 +822,7 @@ function genReal(split = -1, sc = scen) {
   for (let i = 0; i < NC; i++) { const o = owner[i]; if (o < 0) continue; owner[i] = o === split ? (stMap.get(stateGrid[i]) ?? first) : remap[o]; }
   makeCountries(list);
   if (S0) applyScenario(S0, list);
+  genResources(); resTick();
   if (split >= 0) {
     for (const a of C) if (a.isState) {
       a.aggr = .5 + R() * .45;
@@ -806,7 +921,7 @@ const DRAFT = [
 const MERC_PRICE = 1.8, MERC_DAYS = 90;
 const mercTotal = c => c.mercs ? c.mercs.reduce((s, m) => s + m.n, 0) : 0;
 function actMerc(n) {
-  const c = C[P], cost = Math.round(n * MERC_PRICE);
+  const c = C[P], cost = Math.round(n * MERC_PRICE * pm(c));
   if (c.money < cost) { toast('💸 Dinheiro insuficiente.', 'bad'); return; }
   c.money -= cost; c.troops += n; c.mercs.push({ n, until: day + MERC_DAYS });
   toast(`⚔ ${fmt(n)} mercenários contratados por ${fmtM(cost)}. Ficam ${MERC_DAYS} dias.`, 'good');
@@ -902,6 +1017,7 @@ function endWar(w, why) {
   if (C[w.a].alive && C[w.b].alive) setRel(w.a, w.b, -30);
   if (focus && (focus.enemy === w.a || focus.enemy === w.b) && (w.a === P || w.b === P)) focus = null;
   rebuildWarMat();
+  if (why === 'surrender') addLog(`Rendição: guerra entre ${C[w.a].name} e ${C[w.b].name} acabou`);
   if (why === 'peace' || why === 'parent') {
     if (w.a === P || w.b === P) toast(`🕊 Paz assinada com ${C[enemyIn(w, P)].name}.`, 'good');
     else if (!w.parent) addLog(`Paz entre ${C[w.a].name} e ${C[w.b].name}`);
@@ -1009,7 +1125,7 @@ function battle(w, ca, cb, sea) {
   const M = stanceMods(w);
   // força na frente: o exército do país dividido pelo tamanho de todas as frentes em que ele luta
   const pa = (A.troops / Math.max(frontTot[w.a] || 0, 4)) ** .6, pb = (B.troops / Math.max(frontTot[w.b] || 0, 4)) ** .6;
-  const sa = (pa + 4) * (.55 + R() * .9) * ba * (1 + .1 * A.tech.atk) * (1 + .06 * A.mil.trn) * (A.empire ? 1.1 : 1) * (1 + eqB(A, 'tank')) * M.sa, sb = (pb + 4) * (.55 + R() * .9) * bb * (1 + .1 * B.tech.atk) * (1 + .06 * B.mil.trn) * (B.empire ? 1.1 : 1) * (1 + eqB(B, 'tank')) * M.sb;
+  const sa = (pa + 4) * (.55 + R() * .9) * ba * (1 + .1 * A.tech.atk) * (1 + .06 * A.mil.trn) * (A.empire ? 1.1 : 1) * (1 + eqB(A, 'tank')) * resMil(A) * M.sa, sb = (pb + 4) * (.55 + R() * .9) * bb * (1 + .1 * B.tech.atk) * (1 + .06 * B.mil.trn) * (B.empire ? 1.1 : 1) * (1 + eqB(B, 'tank')) * resMil(B) * M.sb;
   const base = (da + db) * .09 * (.5 + R()) + 4;
   const aWins = sa > sb;
   let la = base * (aWins ? .6 : 1.3) / (1 + .1 * A.tech.def) * (1 + eqB(B, 'art')), lb = base * (aWins ? 1.3 : .6) / (1 + .1 * B.tech.def) * (1 + eqB(A, 'art'));
@@ -1061,7 +1177,7 @@ function amphibious(w) {
 function tick() {
   day++;
   for (const c of C) if (c.alive && c.troops > maxT(c) * 2.2 + mercTotal(c)) c.troops = maxT(c) * 2.2 + mercTotal(c);
-  for (const c of C) if (c.alive) c.troops = Math.max(0, c.troops + c.cells * CFG.REGEN * c.mult * (1 + .15 * c.tech.log) * (1 + .1 * c.mil.base) * TAX[c.tax].regen * (c.troops < maxT(c) ? DRAFT[c.draft || 0].regen : 1) * (1 - Math.max(0, c.troops - mercTotal(c)) / maxT(c)));
+  for (const c of C) if (c.alive) c.troops = Math.max(0, c.troops + c.cells * CFG.REGEN * c.mult * (1 + .15 * c.tech.log) * (1 + .1 * c.mil.base) * TAX[c.tax].regen * (c.res ? 1 + Math.min(.3, .03 * c.res.food) : 1) * (c.troops < maxT(c) ? DRAFT[c.draft || 0].regen : 1) * (1 - Math.max(0, c.troops - mercTotal(c)) / maxT(c)));
   scanBorders();
   frontTot = new Float32Array(N); for (const w of wars) { frontTot[w.a] += w.fa.length; frontTot[w.b] += w.fa.length; }
   allInW = wars.find(w => w.allIn && (w.a === P || w.b === P)) || null;
@@ -1139,10 +1255,13 @@ function tick() {
   if (day % 6 === 0) updateDivs();
   if (day % REC_EVERY === 0) recordFrame();
   marketTick();
+  if (day % 5 === 0) resTick();
+  blockTick();
   const atWar = new Uint8Array(N); for (const w of wars) { atWar[w.a] = 1; atWar[w.b] = 1; }
   for (const c of C) {
     if (!c.alive) continue;
-    payLoans(c); mercTick(c);
+    payLoans(c); mercTick(c); inflTick(c);
+    if (c.id !== P && c.money < 500 && atWar[c.id] && R() < .1) { const v = Math.max(1000, (c.inc || 1000) * 5); c.money += v; c.infl = (c.infl || 0) + v / Math.max(2000, baseIncome(c) * 20) * 10; }
     // IA: alistamento conforme a guerra (até a morte ou perdendo = total)
     if (c.id !== P && day % 10 === c.id % 10) {
       const ws = warsOf(c.id), hard = ws.some(w => w.mode === 'morte') || ws.some(w => C[enemyIn(w, c.id)].troops > c.troops * 1.3);
@@ -1188,6 +1307,21 @@ function tick() {
   }
 }
 function aiThink(c) {
+  for (const w of warsOf(c.id)) {
+    if (w.parent && w.a === c.id) continue;
+    const e = enemyIn(w, c.id), me0 = w.a === c.id ? w.a0 : w.b0, lost = 1 - c.cells / Math.max(me0, 1);
+    if (lost < .5 || c.troops > C[e].troops * .35) continue;
+    if (e === P) {
+      if (hasReq('surr' + w.id) || R() > .3) continue;
+      const total = w.mode === 'morte';
+      addReq(total ? `🏳 ${c.name} se rende sem condições: entrega TODO o território e ${fmtM(c.money * .4)}.` : `🏳 ${c.name} quer se render: entrega metade do território que sobrou (o mais perto de você) e ${fmtM(c.money * .4)}.`, 'surr' + w.id,
+        () => { if (wars.includes(w) && c.alive) { const m = surrenderTo(c.id, P, w, total); toast(total ? `🏳 ${c.name} se rendeu e foi anexado por você!` : `🏳 ${c.name} se rendeu! Você ganhou território e ${fmtM(m)}.`, 'good'); } },
+        () => {});
+    } else if (w.mode === 'ataque' && R() < .2) {
+      surrenderTo(c.id, e, w, false, .35, .3);
+      toast(`🏳 ${c.name} se rendeu a ${C[e].name} e entregou território.`, P >= 0 && (adj[c.id * N + P] || adj[e * N + P]) ? '' : 'g');
+    }
+  }
   if (P >= 0 && C[P].alive && c.id !== P && c.money < 1500 && warsOf(c.id).length && warMat[c.id * N + P] < 0 && rel[c.id * N + P] > 5 && C[P].money > 20000 && R() < .08 && !hasReq('loan' + c.id) && c.loans.length < 2) {
     const amt = Math.round(Math.min(C[P].money * .2, 50000) / 1000) * 1000, rate = clamp(.12 + R() * .12, .05, .3);
     addReq(`🏦 ${c.name} pede ${fmtM(amt)} emprestados e devolve ${fmtM(amt * (1 + rate))} em ${LOAN_DAYS} dias (${Math.round(rate * 100)}% de juros).`, 'loan' + c.id,
@@ -1195,6 +1329,7 @@ function aiThink(c) {
       () => relAdd(P, c.id, -4));
   }
   aiAskHelp(c);
+  if (scenAir && R() < .1) for (const w of warsOf(c.id)) { const e = enemyIn(w, c.id); if ((w.blockBy == null || w.blockBy < 0) && canBlockade(c.id, e) && c.money > 5000) { startBlockade(w, c.id); break; } }
   if (R() < .05 && c.trades.length < 4) {
     const o = ri(0, N - 1);
     if (o !== c.id && o !== P && C[o].alive && warMat[c.id * N + o] < 0 && rel[c.id * N + o] > 15 && !hasTrade(c.id, o)) setTrade(c.id, o, true);
@@ -1307,9 +1442,19 @@ const TAX = [{ n: 'Baixos', inc: .8, regen: 1.15, d: '−20% de renda, +15% de r
   { n: 'Altos', inc: 1.25, regen: .82, d: '+25% de renda, −18% de recrutamento (povo insatisfeito)' }];
 const baseIncome = c => (c.cells * 2.2 + 40) * c.econ;
 const tradeGain = o => 30 + .04 * baseIncome(C[o]);
+function actPrint(v) {
+  const c = C[P]; c.money += v; c.infl = (c.infl || 0) + v / Math.max(2000, baseIncome(c) * 20) * 10;
+  toast(`🖨 Você imprimiu ${fmtM(v)}. Inflação agora: ${c.infl.toFixed(1).replace('.', ',')}%.`, c.infl > 50 ? 'bad' : '');
+}
+function inflTick(c) {
+  if (!c.infl) return;
+  c.infl = Math.max(0, c.infl * .995 - .02);
+  if (c.infl > 100) { c.troops *= .999; if (c.id === P && day % 30 === 0) toast('🔥 Hiperinflação! O dinheiro não vale nada e soldados estão desertando.', 'bad'); }
+}
 function income(c) {
-  let v = baseIncome(c) * (1 + .12 * c.tech.eco) * (1 + .08 * c.proj.usina) * (warsOf(c.id).length ? .9 : 1) * TAX[c.tax].inc * DRAFT[c.draft || 0].inc * (c.boom && day < c.boom.until ? c.boom.m : 1) * (c.empire ? 1.1 : 1);
-  for (const o of c.trades) if (C[o].alive && warMat[c.id * N + o] < 0) v += tradeGain(o) * (1 + .3 * c.proj.porto);
+  let v = baseIncome(c) / (1 + (c.infl || 0) / 150) * (blockSet && blockSet[c.id] ? .8 : 1) * (1 + .12 * c.tech.eco) * (1 + .08 * c.proj.usina) * (warsOf(c.id).length ? .9 : 1) * TAX[c.tax].inc * DRAFT[c.draft || 0].inc * (c.boom && day < c.boom.until ? c.boom.m : 1) * (c.empire ? 1.1 : 1);
+  if (!(blockSet && blockSet[c.id])) for (const o of c.trades) if (C[o].alive && warMat[c.id * N + o] < 0) v += tradeGain(o) * (1 + .3 * c.proj.porto);
+  if (c.res) v += c.res.oil * 15 + c.res.gold * 30 + c.res.iron * 10 + c.res.food * 8;
   return v;
 }
 // poder militar: tropas × tecnologia × treinamento (+10% para potências nucleares)
@@ -1324,20 +1469,20 @@ const EQ = [
 const eqB = (c, k) => { const e = EQ.find(x => x.k === k), n = c.eq ? (c.eq[k] || 0) : 0; return e.max * (1 - Math.exp(-n / e.half)); };
 const eqUpkeep = c => c.eq ? EQ.reduce((s, e) => s + c.eq[e.k] * e.up, 0) : 0;
 function actEq(k, n) {
-  const c = C[P], e = EQ.find(x => x.k === k), cost = e.cost * n;
+  const c = C[P], e = EQ.find(x => x.k === k), cost = Math.round(e.cost * n * pm(c));
   if (c.money < cost) { toast('💸 Dinheiro insuficiente.', 'bad'); return; }
   c.money -= cost; c.eq[k] += n;
   toast(`${e.i} +${n} ${e.n.toLowerCase()} (${c.eq[k]} no total): +${Math.round(eqB(c, k) * 100)}% de ${e.d}.`, 'good');
 }
 function milPower(c) {
   const T = c.tech;
-  return (1 + eqB(c, 'tank')) * (1 + eqB(c, 'art') * .5) * (1 + eqB(c, 'jet') * .5) * (1 + eqB(c, 'ship') * .3) * (1 + eqB(c, 'sub') * .25) * c.troops * (1 + .1 * T.atk) * (1 + .07 * T.def) * (1 + .05 * T.air) * (1 + .03 * T.nav) * (1 + .06 * c.mil.trn) * (c.nuclear ? 1.1 : 1) * (c.empire ? 1.1 : 1);
+  return resMil(c) * (1 + eqB(c, 'tank')) * (1 + eqB(c, 'art') * .5) * (1 + eqB(c, 'jet') * .5) * (1 + eqB(c, 'ship') * .3) * (1 + eqB(c, 'sub') * .25) * c.troops * (1 + .1 * T.atk) * (1 + .07 * T.def) * (1 + .05 * T.air) * (1 + .03 * T.nav) * (1 + .06 * c.mil.trn) * (c.nuclear ? 1.1 : 1) * (c.empire ? 1.1 : 1);
 }
 const MIL = [
   { k: 'base', i: '🏰', n: 'Bases militares', d: '+15% de capacidade de tropas e +10% de recrutamento', base: 10000 },
   { k: 'trn', i: '🎖', n: 'Treinamento', d: '+6% de força em combate (soldados de elite)', base: 9000 },
 ];
-const milCost = (c, k) => Math.round(MIL.find(t => t.k === k).base * 1.6 ** c.mil[k] / 100) * 100;
+const milCost = (c, k) => Math.round(MIL.find(t => t.k === k).base * 1.6 ** c.mil[k] * pm(c) / 100) * 100;
 function actMil(k) {
   const c = C[P]; if (c.mil[k] >= TECH_MAX) return;
   const cost = milCost(c, k); if (c.money < cost) { toast('💸 Dinheiro insuficiente.', 'bad'); return; }
@@ -1466,7 +1611,7 @@ const PROJ = [
   { k: 'banco', i: '🏛', n: 'Banco central', d: '−15% de juros nos empréstimos e o caixa rende 0,02% ao dia', base: 15000 },
 ];
 const PROJ_MAX = 5;
-const projCost = (c, k) => Math.round(PROJ.find(t => t.k === k).base * 1.8 ** c.proj[k] / 100) * 100;
+const projCost = (c, k) => Math.round(PROJ.find(t => t.k === k).base * 1.8 ** c.proj[k] * pm(c) / 100) * 100;
 function actProj(k) {
   const c = C[P]; if (c.proj[k] >= PROJ_MAX) return;
   const cost = projCost(c, k); if (c.money < cost) { toast('💸 Dinheiro insuficiente.', 'bad'); return; }
@@ -1492,11 +1637,12 @@ const fmtM = n => { const a = Math.abs(n), sg = n < 0 ? '−' : ''; return sg + 
 const buyCap = c => maxT(c) * 2;
 function actBuy(n) {
   const c = C[P], room = Math.max(0, buyCap(c) - c.troops);
-  const amount = Math.floor(Math.min(n === 'max' ? c.money / CFG.TROOP_PRICE : n, room));
+  const price = CFG.TROOP_PRICE * pm(c);
+  const amount = Math.floor(Math.min(n === 'max' ? c.money / price : n, room));
   if (amount <= 0) { toast(room <= 0 ? '🪖 Limite de tropas atingido (2× a capacidade).' : '💸 Dinheiro insuficiente.', 'bad'); return; }
-  if (amount * CFG.TROOP_PRICE > c.money + .5) { toast('💸 Dinheiro insuficiente.', 'bad'); return; }
-  c.money -= amount * CFG.TROOP_PRICE; c.troops += amount;
-  toast(`🪖 +${fmt(amount)} soldados comprados por ${fmtM(amount * CFG.TROOP_PRICE)}.`, 'good');
+  if (amount * price > c.money + .5) { toast('💸 Dinheiro insuficiente.', 'bad'); return; }
+  c.money -= amount * price; c.troops += amount;
+  toast(`🪖 +${fmt(amount)} soldados comprados por ${fmtM(amount * price)}.`, 'good');
 }
 function actGift(o) {
   if (C[P].money < CFG.GIFT || day < C[o].aidCD) return;
@@ -2014,6 +2160,15 @@ function draw() {
       ctx.restore();
     }
   }
+  if (opts.res !== false && z >= 2.6 && phase !== 'replay') {
+    const fs = clamp(z * 1.25, 8, 16); ctx.font = `${fs}px system-ui, "Apple Color Emoji","Segoe UI Emoji",sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (const r of RES) {
+      const x = sx(r.c % GW), y = sy((r.c / GW) | 0); if (x < -20 || y < -20 || x > VW + 20 || y > VH + 20) continue;
+      ctx.fillStyle = 'rgba(0,0,0,.45)'; ctx.beginPath(); ctx.arc(x, y, fs * .62, 0, 7); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.fillText(RES_T[r.t].i, x, y + 1);
+    }
+  }
+  drawBlockades(now, z);
   drawTorps(now, z);
   drawWrecks(now, z);
   drawReplayHUD(now);
@@ -2059,6 +2214,8 @@ function infoHTML() {
     <span class="mut">Dinheiro</span><b>${fmtM(c.money)}</b>
     <span class="mut">Saldo por dia</span><b style="color:${c.net >= 0 ? '#5fd39a' : '#ff7a7a'}">${c.net >= 0 ? '+' : ''}${fmtM(c.net)}</b>
     <span class="mut">Nota de crédito</span><b>${ratingOf(c)}</b>
+    ${c.res ? `<span class="mut">Recursos</span><b class="tl">🛢${c.res.oil} 🪙${c.res.gold} ⚙${c.res.iron} 🌾${c.res.food}</b>` : ''}
+    ${c.infl > .5 ? `<span class="mut">Inflação</span><b style="color:${c.infl > 50 ? '#ff7a7a' : 'var(--gold)'}">${c.infl.toFixed(1).replace('.', ',')}%</b>` : ''}
     <span class="mut">Arsenal</span><b class="tl">${EQ.map(e => `${e.i}${c.eq ? c.eq[e.k] : 0}`).join(' ')}</b>
     <span class="mut">Tecnologia</span><b class="tl">${TECH.map(t => `${t.i}${c.tech[t.k]}`).join(' ')}</b>
     <span class="mut">Agressividade</span><b>${c.aggr > .65 ? 'Alta' : c.aggr > .4 ? 'Média' : 'Baixa'}</b>
@@ -2072,6 +2229,7 @@ function infoHTML() {
 function actionsHTML() {
   if (phase === 'select') {
     let h = '';
+    h += `<button data-act="spectate" class="spec">👁 Modo espectador (só assistir o mundo)</button>`;
     if (autoMeta) h += `<button class="big cont" data-act="continue">▶ Continuar jogo salvo<small>${esc(autoMeta.country)} · ${esc(autoMeta.date)}</small></button>`;
     if (sel >= 0 && C[sel].alive) {
       h += `<button class="big" data-act="play">▶ Jogar com ${C[sel].isState ? 'o estado' : 'o país'} ${esc(C[sel].name)}</button>`;
@@ -2103,8 +2261,8 @@ function actionsHTML() {
             <span class="tc">${maxed ? 'MÁX' : fmtM(cost)}</span></button>`;
         }).join('') + `<div class="sect">🛒 Arsenal</div>`
         + EQ.filter(e => scenAir || (e.k !== 'jet' && e.k !== 'sub')).map(e => `<div class="eq"><div class="eq-h"><span>${e.i} <b>${e.n}</b> · ${me.eq[e.k]}</span><span class="up">+${Math.round(eqB(me, e.k) * 100)}%<small> / máx. ${Math.round(e.max * 100)}%</small></span></div>
-          <div class="hint">${e.d} · ${fmtM(e.cost)} cada · manutenção ${fmtM(e.up)}/dia cada</div>
-          <div class="row"><button data-act="eq" data-k="${e.k}" data-n="1"${me.money < e.cost ? ' disabled' : ''}>+1<small>${fmtM(e.cost)}</small></button><button data-act="eq" data-k="${e.k}" data-n="5"${me.money < e.cost * 5 ? ' disabled' : ''}>+5<small>${fmtM(e.cost * 5)}</small></button><button data-act="eq" data-k="${e.k}" data-n="20"${me.money < e.cost * 20 ? ' disabled' : ''}>+20<small>${fmtM(e.cost * 20)}</small></button></div></div>`).join('')
+          <div class="hint">${e.d} · ${fmtM((e.cost * pm(me)))} cada · manutenção ${fmtM(e.up)}/dia cada</div>
+          <div class="row"><button data-act="eq" data-k="${e.k}" data-n="1"${me.money < (e.cost * pm(me)) ? ' disabled' : ''}>+1<small>${fmtM((e.cost * pm(me)))}</small></button><button data-act="eq" data-k="${e.k}" data-n="5"${me.money < (e.cost * pm(me)) * 5 ? ' disabled' : ''}>+5<small>${fmtM((e.cost * pm(me)) * 5)}</small></button><button data-act="eq" data-k="${e.k}" data-n="20"${me.money < (e.cost * pm(me)) * 20 ? ' disabled' : ''}>+20<small>${fmtM((e.cost * pm(me)) * 20)}</small></button></div></div>`).join('')
         + `<div class="hint">O poder militar soma tropas, tecnologia, treinamento e armas nucleares. Veja o top no 🏆 Ranking.</div>`;
     }
     if (ptab === 'fin') {
@@ -2113,6 +2271,10 @@ function actionsHTML() {
           <div><small>Investido</small><b>${fmtM(tot)}</b><span class="${tot >= cost ? 'up' : 'dn'}">${cost ? `${tot >= cost ? '+' : ''}${((tot / cost - 1) * 100).toFixed(1)}%` : '—'}</span></div>
           <div><small>Patrimônio</small><b>${fmtM(me.money + tot - debtOf(me))}</b></div></div>
         <div class="hint">Nota boa = juros menores e mais países aceitam te emprestar. Dívida alta e parcelas atrasadas derrubam a nota.</div></div>
+        <div class="sect">🖨 Imprimir dinheiro</div>
+        <div class="clk"><div class="econ"><span>Inflação <b style="color:${(me.infl || 0) > 50 ? '#ff7a7a' : (me.infl || 0) > 15 ? 'var(--gold)' : '#5fd39a'}">${(me.infl || 0).toFixed(1).replace('.', ',')}%</b></span><span>Preços <b>×${pm(me).toFixed(2).replace('.', ',')}</b></span></div>
+        <div class="row">${[10000, 50000, 200000].map(v => `<button data-act="print" data-n="${v}">+${fmtM(v)}<small>+${(v / Math.max(2000, baseIncome(me) * 20) * 10).toFixed(1).replace('.', ',')}% inflação</small></button>`).join('')}</div>
+        <div class="hint">Dinheiro na hora, mas tudo fica mais caro e a renda cai. Acima de 100% vira hiperinflação e soldados desertam. A inflação baixa sozinha com o tempo.</div></div>
         <div class="sect">📊 Mercado financeiro</div>`
         + MKT.map(a => {
           const m = market[a.k], h = m.hist, ch = h.length > 1 ? (m.price / h[Math.max(0, h.length - 16)] - 1) * 100 : 0, val = invValue(me, a.k), pl = val - me.invCost[a.k];
@@ -2161,7 +2323,7 @@ function actionsHTML() {
         <button class="tech" data-act="clickup"${me.money < cost ? ' disabled' : ''}><span class="ti">👆</span><span class="tb"><b>Melhorar clique</b> <span class="lv">Nv ${me.clickLv} → ${me.clickLv + 1}</span><small>Cada toque passa a valer ${fmtM(next)} (+${fmtM(next - v)})</small></span><span class="tc">${fmtM(cost)}</span></button>
         <div class="hint">Quanto mais você investe, mais cada toque rende — e mais caro fica o próximo nível.</div>`;
     }
-    let h = tabs + `<div class="shop"><div class="shop-h">🪖 Comprar soldados <span class="mut">($${CFG.TROOP_PRICE} cada · manutenção $${Math.round(CFG.UPKEEP * 1000)}/mil/dia)</span></div>
+    let h = tabs + `<div class="shop"><div class="shop-h">🪖 Comprar soldados <span class="mut">(${fmtM(CFG.TROOP_PRICE * pm(me))} cada · manutenção $${Math.round(CFG.UPKEEP * 1000)}/mil/dia)</span></div>
       <div class="row"><button data-act="buy" data-n="1000"${full || me.money < 1000 * CFG.TROOP_PRICE ? ' disabled' : ''}>+1 mil<small>${fmtM(1000 * CFG.TROOP_PRICE)}</small></button>
       <button data-act="buy" data-n="10000"${full || me.money < 10000 * CFG.TROOP_PRICE ? ' disabled' : ''}>+10 mil<small>${fmtM(10000 * CFG.TROOP_PRICE)}</small></button>
       <button data-act="buy" data-n="max"${full || me.money < 100 ? ' disabled' : ''}>Máximo<small>${full ? 'limite' : 'todo o dinheiro'}</small></button></div></div>`;
@@ -2186,10 +2348,16 @@ function actionsHTML() {
   const w = warOf(P, sel);
   if (w) {
     const airB = !scenAir ? '' : `<button data-act="air"${day < C[P].raidReady || C[P].money < CFG.RAID_COST ? ' disabled' : ''}>✈ ${cd(C[P].raidReady, `Bombardeio aéreo (${fmtM(CFG.RAID_COST)}) — toque no alvo`)}</button>`;
-    const ctl = `<div class="sect">🎮 Controle da guerra</div>${stanceButtons(w)}<div class="hint">${STANCES.find(x => x[0] === (w.stance || 'auto'))[3]}</div>`;
+    const isBlk = w.blockBy === P, enemyBlk = w.blockBy === sel;
+    const blk = isBlk ? `<button data-act="unblock" class="block on">⚓ Bloqueio ATIVO (−${fmtM(blockCost(C[P]))}/dia) · toque para encerrar</button>`
+      : enemyBlk ? `<div class="hint">⚓ ${esc(C[sel].name)} está bloqueando o seu litoral. Compre submarinos para afundar os navios dele.</div>`
+      : canBlockade(P, sel) ? `<button data-act="block" class="block">⚓ Bloqueio naval (−${fmtM(blockCost(C[P]))}/dia): corta o comércio dele e −20% de renda</button>`
+      : `<div class="hint">⚓ Bloqueio naval: precisa de 5 navios de guerra no Arsenal${coastList.some(x => owner[x] === sel) ? '' : ' (e o inimigo precisa ter litoral)'}.</div>`;
+    const surr = w.mode === 'ataque' ? `<button data-act="surrender" class="danger">🏳 Render-se (entrega 30% do seu território mais perto e 25% do dinheiro)</button>` : '';
+    const ctl = `<div class="sect">🎮 Controle da guerra</div>${stanceButtons(w)}<div class="hint">${STANCES.find(x => x[0] === (w.stance || 'auto'))[3]}</div>` + blk;
     const ship = ctl + airB + `<button data-act="ship"${day < (w.shipCD || 0) ? ' disabled' : ''}>🚢 ${cd(w.shipCD || 0, 'Enviar invasão (navio ou marcha)')}</button>`
       + (w.fa.length ? '' : `<div class="hint">Sem fronteira com ${esc(C[sel].name)}: mande navios, ou tropas por terra se não houver mar.</div>`);
-    if (w.mode === 'ataque') return ship + `<button class="peace" data-act="peace"${day < w.peaceCD ? ' disabled' : ''}>🕊 ${cd(w.peaceCD, 'Propor paz')}</button>`
+    if (w.mode === 'ataque') return ship + surr + `<button class="peace" data-act="peace"${day < w.peaceCD ? ' disabled' : ''}>🕊 ${cd(w.peaceCD, 'Propor paz')}</button>`
       + `<button class="peace" data-act="peacepay"${day < w.peaceCD || C[P].money < peacePrice(sel) ? ' disabled' : ''}>🕊💸 ${cd(w.peaceCD, `Paz pagando ${fmtM(peacePrice(sel))} (mais chance)`)}</button>`
       + alliesOf(P).filter(a => warMat[a * N + sel] < 0 && !isAllied(a, sel)).map(a => `<button data-act="help" data-a="${a}" data-e="${sel}">📣 Pedir ajuda a ${esc(C[a].name)}</button>`).join('')
       + `<div class="hint">🎯 Toque no território de ${esc(C[sel].name)} para focar o ataque.</div>`;
@@ -2284,7 +2452,7 @@ function updateUI() {
   if (showM) { const c = C[P], h = `💰 ${fmtM(c.money)} <small class="${c.net >= 0 ? 'up' : 'dn'}">${c.net >= 0 ? '+' : ''}${fmtM(c.net)}/dia</small>`; if (mb.innerHTML !== h) mb.innerHTML = h; }
   setIf('pinfo', 'info', infoHTML());
   setIf('pact', 'act', actionsHTML());
-  setIf('pswitch', 'sw', phase === 'game' && P >= 0 && sel >= 0 && sel !== P && C[sel] && C[sel].alive ? `<button data-act="switch" class="switch">🔄 Trocar para ${esc(C[sel].name)}</button><div class="hint">Você passa a jogar com esse país, no mesmo mundo e na mesma data.</div>` : '');
+  setIf('pswitch', 'sw', phase === 'game' && sel >= 0 && sel !== P && C[sel] && C[sel].alive ? `<button data-act="switch" class="switch">${P >= 0 ? '🔄 Trocar para' : '▶ Jogar com'} ${esc(C[sel].name)}</button><div class="hint">${P >= 0 ? 'Você passa a jogar com esse país, no mesmo mundo e na mesma data.' : 'Sai do modo espectador e assume esse país.'}</div>` : '');
   const cas = casHTML(); setIf('cas', 'cas', cas); $('cas').style.display = cas ? 'block' : 'none';
   setIf('log', 'log', phase === 'game' && sel === P ? logs.slice(0, 6).map(l => `<div>${esc(l)}</div>`).join('') : '');
   if (reqsChanged) {
@@ -2298,9 +2466,17 @@ $('panel').addEventListener('click', e => {
   const act = b.dataset.act;
   if (act === 'play') { P = sel; phase = 'game'; startRecording(); lastAuto = performance.now(); showIntro(C[P].name); if (VW < 760 || worldMode === 'real') { cam.z = worldMode === 'real' ? Math.max(cam.fit * 2.6, 6) : cam.fit * 2.2; cam.x = VW / 2 - (C[P].lx + .5) * cam.z; cam.y = VH * .3 - (C[P].ly + .5) * cam.z; } toast(`Você governa ${C[P].name}. Boa sorte!`, 'good'); }
   else if (act === 'newmap') newWorld();
+  else if (act === 'surrender') { const w = warOf(P, sel); if (w && w.mode === 'ataque') { const e = sel, m = surrenderTo(P, e, w, false, .3, .25); toast(`🏳 Você se rendeu a ${C[e].name}: entregou território e ${fmtM(m)}.`, 'bad'); } }
+  else if (act === 'block') { const w = warOf(P, sel); if (w && canBlockade(P, sel)) startBlockade(w, P); }
+  else if (act === 'unblock') { const w = warOf(P, sel); if (w) stopBlockade(w, ''); }
+  else if (act === 'print') actPrint(+b.dataset.n);
+  else if (act === 'spectate') {
+    P = -1; spectator = true; phase = 'game'; sel = -1; lastAuto = performance.now(); startRecording();
+    showIntro('MODO ESPECTADOR'); $('specbar').hidden = false;
+  }
   else if (act === 'switch') {
-    const old = C[P].name; P = sel; focus = null; nukeArmed = false; airArmed = false; ptab = 'army'; loanOpen = -1;
-    $('vs').hidden = true; showIntro(C[P].name); toast(`🔄 Você deixou ${old} e agora governa ${C[P].name}.`, 'good');
+    const old = P >= 0 ? C[P].name : null; P = sel; spectator = false; $('specbar').hidden = true; autoCam = false; camTarget = null; focus = null; nukeArmed = false; airArmed = false; ptab = 'army'; loanOpen = -1;
+    $('vs').hidden = true; showIntro(C[P].name); toast(old ? `🔄 Você deixou ${old} e agora governa ${C[P].name}.` : `▶ Agora você governa ${C[P].name}.`, 'good');
   }
   else if (act === 'continue') { loadGame(latestSlot || 'auto'); return; }
   else if (act === 'split') { const o = C[sel].orig, lx = C[sel].lx, ly = C[sel].ly; regenKeepCam(o); cam.z = Math.max(cam.z, cam.fit * 3); cam.x = VW / 2 - (lx + .5) * cam.z; cam.y = VH * (VW < 760 ? .3 : .5) - (ly + .5) * cam.z; }
@@ -2404,6 +2580,8 @@ $('cfg').addEventListener('click', () => {
     <label><input type="radio" name="fx" value="cinza"${opts.fx === 'cinza' ? ' checked' : ''}> Frente cinza (só o território avançando e recuando)</label>
     <label><input type="radio" name="fx" value="listras"${opts.fx === 'listras' ? ' checked' : ''}> Listras (só listras avançando e recuando na frente)</label>
     <label><input type="radio" name="fx" value="neon"${opts.fx === 'neon' ? ' checked' : ''}> Neon: seu time azul × inimigos vermelhos, mapa satélite e bordas brilhando</label></div>
+    <div class="opt"><b>Recursos</b>
+    <label><input type="checkbox" id="o-res"${opts.res !== false ? ' checked' : ''}> Mostrar recursos no mapa (🛢 petróleo, 🪙 ouro, ⚙ ferro, 🌾 comida)</label></div>
     <div class="opt"><b>Sistema de guerra</b>
     <label><input type="radio" name="wm" value="classico"${opts.warMode !== 'suave' ? ' checked' : ''}> Clássico (combates espalhados pela frente toda)</label>
     <label><input type="radio" name="wm" value="suave"${opts.warMode === 'suave' ? ' checked' : ''}> Suave (ofensivas: ataca um ponto, avança como uma onda e depois vai para outro lugar; território muda de cor devagar)</label></div>
@@ -2436,6 +2614,7 @@ $('mtext').addEventListener('change', e => {
   else if (e.target.id === 'o-flags') opts.flags = e.target.checked;
   else if (e.target.name === 'map') opts.map = e.target.value;
   else if (e.target.name === 'ft') opts.flagTerr = e.target.value;
+  else if (e.target.id === 'o-res') opts.res = e.target.checked;
   else if (e.target.name === 'wm') opts.warMode = e.target.value;
   else if (e.target.name === 'fxl') { opts.fxLevel = e.target.value; updateUI(); }
   else if (e.target.id === 'o-divs') opts.divs = e.target.checked;
@@ -2633,17 +2812,17 @@ async function unpackSave(p) {
 }
 function snapshotGame() {
   return {
-    v: 1, market, scen, mode: worldMode, split: splitOrig, gw: GW, gh: GH, s: S, nCount, day, P, warSeq,
+    v: 1, market, scen, res: RES, mode: worldMode, split: splitOrig, gw: GW, gh: GH, s: S, nCount, day, P, warSeq,
     land: worldMode === 'real' ? null : rle(land), owner: rle(owner), core: rle(core),
     C: C.map(c => ({ n: c.baseName || c.name, col: c.col.map(v => Math.round(v)), fo: (c.flagBase || c.flag).img ? c.orig : -1, band: !!(c.flagBase || c.flag).band, fl: (c.flagBase || c.flag).img ? null : (c.flagBase || c.flag), emp: !!c.empire, es: c.empSince ?? null, c0: c.cells0,
       alive: c.alive, cells: c.cells, mult: c.mult, nuclear: c.nuclear, troops: Math.round(c.troops), cas: Math.round(c.casualties), cap: c.cap, aggr: c.aggr,
       lx: c.lx, ly: c.ly, rcd: c.recruitCD, acd: c.allyCD, dcd: c.aidCD, econ: c.econ, money: Math.round(c.money), tech: c.tech,
       clv: c.clickLv, ctot: Math.round(c.clickTotal), rr: c.raidReady, orig: c.orig, st: c.isState, par: c.parent,
-      inv: c.inv, ic: c.invCost, proj: c.proj, eq: c.eq, draft: c.draft || 0, mercs: c.mercs || [],
+      inv: c.inv, ic: c.invCost, proj: c.proj, eq: c.eq, draft: c.draft || 0, mercs: c.mercs || [], infl: c.infl || 0,
       mil: c.mil, loans: c.loans, trades: c.trades, tax: c.tax, boom: c.boom, tcd: c.tradeCD, lcd: c.loanCD })),
     rel: Array.from(rel, v => Math.round(v)), allied: rle(allied),
     wars: wars.map(w => ({ id: w.id, a: w.a, b: w.b, mode: w.mode, start: w.start, parent: w.parent, helpFor: w.helpFor, casA: Math.round(w.casA), casB: Math.round(w.casB),
-      a0: w.a0, b0: w.b0, peaceCD: w.peaceCD, shipCD: w.shipCD || 0, stance: w.stance || 'auto', allIn: !!w.allIn, mom: w.mom || 0, hist: w.hist || [] })),
+      a0: w.a0, b0: w.b0, peaceCD: w.peaceCD, shipCD: w.shipCD || 0, stance: w.stance || 'auto', allIn: !!w.allIn, blockBy: w.blockBy ?? -1, blockPts: w.blockPts || null, mom: w.mom || 0, hist: w.hist || [] })),
     units: units.map(u => ({ reinf: !!u.reinf, war: u.war, from: u.from, to: u.to, kind: u.kind, path: u.path, prog: u.prog, troops: Math.round(u.troops), speed: u.speed, ph: u.ph })),
     logs: logs.slice(0, 20),
   };
@@ -2660,7 +2839,7 @@ function restoreGame(sv) {
     alive: d.alive, cells: d.cells, mult: d.mult, nuclear: d.nuclear, nukeReady: 0, troops: d.troops, casualties: d.cas, cap: d.cap, aggr: d.aggr,
     lx: d.lx, ly: d.ly, recruitCD: d.rcd, allyCD: d.acd, aidCD: d.dcd, econ: d.econ, money: d.money, net: 0,
     tech: { atk: 0, def: 0, eco: 0, log: 0, nav: 0, air: 0, ...d.tech }, clickLv: d.clv || 0, clickTotal: d.ctot || 0, raidReady: d.rr || 0,
-    eq: { tank: 0, art: 0, jet: 0, ship: 0, sub: 0, ...(d.eq || {}) }, draft: d.draft || 0, mercs: d.mercs || [],
+    eq: { tank: 0, art: 0, jet: 0, ship: 0, sub: 0, ...(d.eq || {}) }, draft: d.draft || 0, mercs: d.mercs || [], infl: d.infl || 0,
     inv: { bond: 0, stock: 0, crypto: 0, ...(d.inv || {}) }, invCost: { bond: 0, stock: 0, crypto: 0, ...(d.ic || {}) }, proj: { usina: 0, porto: 0, banco: 0, ...(d.proj || {}) },
     mil: { base: 0, trn: 0, ...(d.mil || {}) }, loans: d.loans || [], trades: d.trades || [], tax: d.tax ?? 1, boom: d.boom || null, tradeCD: d.tcd || 0, loanCD: d.lcd || 0,
     orig: d.orig, isState: d.st, parent: d.par || '',
@@ -2675,6 +2854,7 @@ function restoreGame(sv) {
   wars = sv.wars.map(w => ({ ...w, fa: [], fb: [], fs: [], aid: 0 })); warSeq = sv.warSeq; rebuildWarMat();
   units = sv.units || []; logs = sv.logs || [];
   if (sv.market) market = sv.market; else initMarket();
+  if (sv.res) { RES = sv.res; resAt = new Map(RES.map(r => [r.c, r.t])); } else genResources();
   anims = []; nukes = []; raids = []; reqs = []; focus = null; nukeArmed = false; airArmed = false; nukeReady = 0;
   day = sv.day; P = sv.P; sel = P; phase = 'game'; ended = false;
   sv.C.forEach((d, i) => {
@@ -2683,7 +2863,7 @@ function restoreGame(sv) {
     if (b && b.histEmpire) { const c = C[i]; c.empire = true; c.histEmpire = true; c.name = b.name; c.flag = b.flag; c.flagURL = b.flagURL; c.empPix = b.empPix; c.empW = b.empW; c.empH = b.empH; c.empSince = d.es ?? 0; }
     else { C[i].empSince = d.es ?? null; makeEmpire(C[i], true); }
   });
-  scanBorders(); computeLabels(); updateDivs();
+  scanBorders(); computeLabels(); updateDivs(); resTick();
   fillSearch();
   if (C[P]) { cam.z = Math.max(cam.fit * 2.6, 6); cam.x = VW / 2 - (C[P].lx + .5) * cam.z; cam.y = VH * (VW < 760 ? .3 : .5) - (C[P].ly + .5) * cam.z; }
   startRecording();
@@ -2883,6 +3063,22 @@ function showEmpireBanner(c) {
 // ---------- replay: grava como as fronteiras mudam e passa de novo (dá pra salvar como vídeo) ----------
 const REC_EVERY = 3, REC_MAX = 5000;
 let rec = null, rp = null;
+let spectator = false, autoCam = false, camTarget = null, camPick = 0;
+// câmera automática do espectador: vai mostrando a guerra mais movimentada
+function autoCamStep(t) {
+  if (!autoCam || phase !== 'game') return;
+  if (t - camPick > 7000 || !camTarget) {
+    camPick = t; let best = null, bs = -1;
+    for (const w of wars) { if (!w.fa.length) continue; const sc = Math.abs(w.mom || 0) * 10 + w.fa.length * .2 + R() * 5; if (sc > bs) { bs = sc; best = w; } }
+    if (best) {
+      let mx = 0, my = 0; const L = best.fa.length; for (let j = 0; j < L; j += Math.max(1, (L / 40) | 0)) { mx += best.fa[j] % GW; my += (best.fa[j] / GW) | 0; }
+      const n = Math.ceil(L / Math.max(1, (L / 40) | 0)); mx /= n; my /= n;
+      const z = clamp(cam.fit * 4, 4, 14); camTarget = { x: VW / 2 - (mx + .5) * z, y: VH * .45 - (my + .5) * z, z };
+    }
+  }
+  if (camTarget) { cam.x += (camTarget.x - cam.x) * .04; cam.y += (camTarget.y - cam.y) * .04; cam.z += (camTarget.z - cam.z) * .04; }
+}
+$('autocam').addEventListener('click', () => { autoCam = !autoCam; camTarget = null; $('autocam').textContent = `🎥 Câmera automática: ${autoCam ? 'ligada' : 'desligada'}`; $('autocam').classList.toggle('on', autoCam); });
 function startRecording() { rec = { base: owner.slice(), last: owner.slice(), frames: [{ d: day, ch: new Int32Array(0) }] }; }
 function recordFrame() {
   if (!rec || rec.frames.length >= REC_MAX || rec.last.length !== NC) return;
@@ -2977,6 +3173,7 @@ $('rpbar').addEventListener('click', e => {
   else if (k === 'start') { rpSeek(0); rpLabels(); }
   else if (k === 'spd') rp.speed = { 1: 2, 2: 4, 4: 8, 8: 1 }[rp.speed];
   else if (k === 'hide') { $('rpbar').hidden = true; }
+  else if (k === 'board') { opts.rpBoard = opts.rpBoard === false; saveOpts(); }
   else if (k === 'rec') rpRecord();
   else if (k === 'exit') { exitReplay(); return; }
   rpUI();
@@ -2993,6 +3190,22 @@ function drawReplayHUD(now) {
   const t = fmtDateBig(fr.d); ctx.strokeText(t, 16, 16 + (env0 || 0)); ctx.fillStyle = '#fff'; ctx.fillText(t, 16, 16 + (env0 || 0));
   ctx.font = `${fs * .42}px "Archivo Black", system-ui, sans-serif`; ctx.textAlign = 'right'; ctx.textBaseline = 'bottom';
   ctx.lineWidth = 4; ctx.strokeText('GUERRA GLOBAL', VW - 14, VH - 12); ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.fillText('GUERRA GLOBAL', VW - 14, VH - 12);
+  if (opts.rpBoard !== false) {
+    // placar: os 5 maiores países naquele momento
+    const top = C.filter(c => c.alive && c.cells > 0).sort((a, b) => b.cells - a.cells).slice(0, 5), alive = C.filter(c => c.alive && c.cells > 0).length;
+    const bw = clamp(VW * .3, 170, 260), rh = clamp(VW * .028, 18, 26), bx = VW - bw - 12, by = 14;
+    ctx.fillStyle = 'rgba(8,12,18,.78)'; ctx.fillRect(bx, by, bw, rh * (top.length + 1.4));
+    ctx.font = `${rh * .5}px "Archivo Black", system-ui, sans-serif`; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#f2c443';
+    ctx.fillText(`MAIORES PAÍSES · ${alive} vivos`, bx + 8, by + rh * .6);
+    top.forEach((c, i) => {
+      const y = by + rh * (1.4 + i) + rh / 2, fw = rh * 1.1, fh = rh * .72;
+      ctx.fillStyle = '#000'; ctx.fillRect(bx + 7, y - fh / 2 - 1, fw + 2, fh + 2); drawFlag(ctx, c.flag, bx + 8, y - fh / 2, fw, fh);
+      ctx.font = `700 ${rh * .55}px system-ui, sans-serif`; ctx.fillStyle = '#fff'; ctx.textAlign = 'left';
+      let nm = c.name; while (ctx.measureText(nm).width > bw - fw - 70 && nm.length > 4) nm = nm.slice(0, -2);
+      ctx.fillText(nm === c.name ? nm : nm + '…', bx + fw + 16, y);
+      ctx.textAlign = 'right'; ctx.fillStyle = '#bcd6ff'; ctx.fillText(fmt(c.cells), bx + bw - 8, y);
+    });
+  }
   const pr = rp.cur / Math.max(1, rec.frames.length - 1);
   ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.fillRect(0, VH - 4, VW, 4); ctx.fillStyle = '#f2c443'; ctx.fillRect(0, VH - 4, VW * pr, 4);
   ctx.restore();
@@ -3428,7 +3641,7 @@ function frame(t) {
   if (dirty && t - lastRO > 60) { renderOff(); dirty = false; lastRO = t; }
   if (phase === 'game' && P >= 0 && C[P].alive && !ended && t - lastAuto > 30000) { lastAuto = t; saveGame('auto', true); }
   updateNukes(t); updateRaids(t);
-  rpStep(dt);
+  rpStep(dt); autoCamStep(t);
   draw();
   uiT += dt; if (uiT > 250) { uiT = 0; updateUI(); nukeButton(); airButton(); }
   requestAnimationFrame(frame);
