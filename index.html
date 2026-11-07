@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>PhoneCheck — Diagnóstico do dispositivo</title>
+  <meta name="description" content="Verifique a saúde do seu celular direto no navegador: tela, conexão, sensores, câmera, microfone e mais. Rápido, privado e sem instalar nada.">
+  <meta name="theme-color" content="#07090c">
+  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+  <script>
+    // Aplica o tema salvo antes da renderização para evitar flash.
+    try { const t = localStorage.getItem('phonecheck.theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+  </script>
+</head>
+<body>
+  <div class="bg-fx" aria-hidden="true">
+    <div class="bg-grid"></div>
+    <div class="bg-glow g1"></div>
+    <div class="bg-glow g2"></div>
+  </div>
+
+  <header class="topbar">
+    <button class="brand" id="brand-home" aria-label="PhoneCheck — página inicial">
+      <span class="brand-mark" data-icon="logo"></span>
+      <span class="brand-name">Phone<b>Check</b></span>
+    </button>
+    <nav class="top-actions">
+      <button class="icon-btn" id="btn-history" title="Histórico" aria-label="Histórico de verificações"><span data-icon="history"></span><span class="icon-btn-label">Histórico</span></button>
+      <button class="icon-btn" id="btn-sound" title="Efeitos sonoros" aria-label="Ativar efeitos sonoros" aria-pressed="false"><span data-icon="volumeOff"></span></button>
+      <button class="icon-btn" id="btn-theme" title="Alternar tema" aria-label="Alternar tema claro e escuro"><span data-icon="moon"></span></button>
+    </nav>
+  </header>
+
+  <main id="app">
+    <!-- ============ HOME ============ -->
+    <section class="screen is-active" id="screen-home" aria-labelledby="home-title">
+      <div class="hero">
+        <div class="hero-copy">
+          <span class="eyebrow"><span class="pulse-dot"></span> Diagnóstico 100% no navegador</span>
+          <h1 id="home-title">Verifique a <span class="grad">saúde</span> do seu dispositivo</h1>
+          <p class="lead">Em cerca de um minuto, o PhoneCheck analisa tela, conexão, sistema, desempenho, sensores, câmera e microfone — e entrega um relatório visual do que está funcionando e do que precisa de atenção.</p>
+          <div class="cta-row">
+            <button class="btn btn-primary btn-xl" id="btn-start">
+              <span data-icon="play"></span> Iniciar verificação
+            </button>
+            <button class="btn btn-ghost btn-xl" id="btn-camera"><span data-icon="camera"></span> Leitor de câmera</button>
+            <span class="cta-note"><span data-icon="lock"></span> Nada é enviado ou armazenado fora do seu aparelho</span>
+          </div>
+          <ul class="hero-stats">
+            <li><strong id="stat-total-tests">20</strong><span>verificações</span></li>
+            <li><strong>~1 min</strong><span>duração média</span></li>
+            <li><strong>0</strong><span>dados coletados</span></li>
+          </ul>
+        </div>
+
+        <div class="hero-visual" aria-hidden="true">
+          <div class="orbit o1"></div>
+          <div class="orbit o2"></div>
+          <div class="phone">
+            <div class="phone-notch"></div>
+            <div class="phone-screen">
+              <div class="ps-grid"></div>
+              <div class="ps-scanline"></div>
+              <div class="ps-content">
+                <div class="ps-ring"><span data-icon="shieldCheck"></span></div>
+                <div class="ps-bars">
+                  <i style="--w:82%"></i><i style="--w:64%"></i><i style="--w:91%"></i><i style="--w:47%"></i>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="float-chip c1"><span data-icon="check"></span> Tela</div>
+          <div class="float-chip c2"><span data-icon="check"></span> Conexão</div>
+          <div class="float-chip c3 info"><span class="mini-spin"></span> Sensores</div>
+          <div class="float-chip c4"><span data-icon="check"></span> Toque</div>
+        </div>
+      </div>
+
+      <div class="feature-grid">
+        <article class="feature glass">
+          <span class="feature-ico" data-icon="monitor"></span>
+          <h3>Tela e toque</h3>
+          <p>Resolução, densidade, taxa de atualização medida, teste de pixels e mapa de toque na superfície inteira.</p>
+        </article>
+        <article class="feature glass">
+          <span class="feature-ico blue" data-icon="wifi"></span>
+          <h3>Conectividade</h3>
+          <p>Conexão real com a internet, latência e velocidade de download aproximada.</p>
+        </article>
+        <article class="feature glass">
+          <span class="feature-ico" data-icon="cpu"></span>
+          <h3>Desempenho</h3>
+          <p>Núcleos, memória informada pelo navegador, GPU e um benchmark de processamento.</p>
+        </article>
+        <article class="feature glass">
+          <span class="feature-ico blue" data-icon="camera"></span>
+          <h3>Câmera, áudio e sensores</h3>
+          <p>Somente com sua autorização: câmera, microfone, alto-falante, vibração e movimento.</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- ============ SCAN ============ -->
+    <section class="screen" id="screen-scan" aria-labelledby="scan-title" hidden>
+      <div class="scan-head">
+        <div>
+          <span class="eyebrow blue"><span class="pulse-dot blue"></span> <span id="scan-phase">Verificação automática</span></span>
+          <h2 id="scan-title">Diagnóstico em andamento</h2>
+        </div>
+        <div class="scan-overall">
+          <div class="overall-top"><span id="scan-count">Teste 0 de 0</span><b id="scan-pct">0%</b></div>
+          <div class="bar"><div class="bar-fill" id="scan-bar"></div></div>
+        </div>
+      </div>
+
+      <div class="scan-layout">
+        <div class="hero-panel glass" id="hero-panel" aria-live="polite">
+          <!-- preenchido pelo JS -->
+        </div>
+        <div class="test-list glass">
+          <div class="list-head">
+            <span>Componentes</span>
+            <button class="link-btn" id="btn-skip-interactive" hidden>Pular testes interativos</button>
+          </div>
+          <ol id="test-list"></ol>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ CAMERA READER ============ -->
+    <section class="screen" id="screen-camera" aria-labelledby="camera-title" hidden>
+      <div class="results-head">
+        <div>
+          <span class="eyebrow blue"><span data-icon="camera"></span> Leitor de câmera</span>
+          <h2 id="camera-title">Teste da câmera</h2>
+          <p class="muted">Aponte para um objeto com detalhes e fique parado por 3 segundos. A imagem é analisada no aparelho e não é gravada.</p>
+        </div>
+        <div class="results-actions">
+          <button class="btn btn-ghost" id="btn-camera-back"><span data-icon="arrowLeft"></span> Voltar</button>
+        </div>
+      </div>
+      <div class="cam-layout">
+        <div class="cam-card glass">
+          <div class="cam-stage" id="cam-stage"></div>
+          <div class="cam-controls">
+            <div class="seg" role="radiogroup" aria-label="Escolher câmera">
+              <button type="button" role="radio" aria-checked="true" class="is-active" data-facing="environment">Traseira</button>
+              <button type="button" role="radio" aria-checked="false" data-facing="user">Frontal</button>
+            </div>
+            <button class="btn btn-primary" id="btn-cam-go"><span data-icon="camera"></span> Abrir câmera</button>
+          </div>
+        </div>
+        <aside class="cam-side glass" aria-live="polite">
+          <h3 id="cam-side-title">O que é verificado</h3>
+          <div id="cam-checks"></div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- ============ RESULTS ============ -->
+    <section class="screen" id="screen-results" aria-labelledby="results-title" hidden>
+      <div class="results-head">
+        <div>
+          <span class="eyebrow"><span data-icon="shieldCheck"></span> <span id="results-eyebrow">Diagnóstico concluído</span></span>
+          <h2 id="results-title">Relatório do dispositivo</h2>
+          <p class="muted" id="results-meta"></p>
+        </div>
+        <div class="results-actions">
+          <button class="btn btn-ghost" id="btn-repeat"><span data-icon="refresh"></span> Repetir</button>
+          <button class="btn btn-ghost" id="btn-pdf"><span data-icon="download"></span> PDF</button>
+          <button class="btn btn-primary" id="btn-share"><span data-icon="share"></span> Compartilhar</button>
+        </div>
+      </div>
+
+      <div class="success-banner glass" id="success-banner">
+        <span class="sb-check"><svg viewBox="0 0 52 52" aria-hidden="true"><circle cx="26" cy="26" r="24"/><path d="M15 27l7 7 15-16"/></svg></span>
+        <div class="sb-text">
+          <strong id="sb-title">Verificado com sucesso!</strong>
+          <span id="sb-sub"></span>
+        </div>
+      </div>
+
+      <div class="summary-grid">
+        <div class="gauge-card glass">
+          <div class="gauge" id="gauge">
+            <svg viewBox="0 0 200 200" aria-hidden="true">
+              <defs>
+                <linearGradient id="gaugeGrad" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0%" stop-color="var(--gauge-a)"/>
+                  <stop offset="100%" stop-color="var(--gauge-b)"/>
+                </linearGradient>
+              </defs>
+              <circle class="gauge-track" cx="100" cy="100" r="86"/>
+              <circle class="gauge-ticks" cx="100" cy="100" r="72"/>
+              <circle class="gauge-value" id="gauge-value" cx="100" cy="100" r="86"/>
+            </svg>
+            <div class="gauge-center">
+              <strong id="gauge-pct">0%</strong>
+              <span id="gauge-label">—</span>
+            </div>
+          </div>
+          <p class="gauge-caption">Percentual de testes <b>aprovados</b> entre os executados. Não representa a saúde física real do aparelho.</p>
+        </div>
+
+        <div class="stats-col">
+          <div class="stat-grid">
+            <div class="stat glass"><span class="stat-ico blue" data-icon="activity"></span><strong id="st-run">0</strong><span>Testes realizados</span></div>
+            <div class="stat glass"><span class="stat-ico green" data-icon="check"></span><strong id="st-pass">0</strong><span>Aprovados</span></div>
+            <div class="stat glass"><span class="stat-ico yellow" data-icon="alert"></span><strong id="st-warn">0</strong><span>Precisam de atenção</span></div>
+            <div class="stat glass"><span class="stat-ico gray" data-icon="minus"></span><strong id="st-na">0</strong><span>Não disponíveis / pulados</span></div>
+          </div>
+          <div class="cat-card glass">
+            <div class="card-title"><span>Resultado por categoria</span>
+              <span class="legend"><i class="lg pass"></i>Aprovado <i class="lg warn"></i>Atenção <i class="lg fail"></i>Falha <i class="lg na"></i>N/D</span>
+            </div>
+            <div id="cat-chart" class="cat-chart"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="report-head">
+        <h3>Relatório completo</h3>
+        <div class="filters" role="tablist" aria-label="Filtrar resultados">
+          <button class="chip is-active" data-filter="all" role="tab" aria-selected="true">Todos</button>
+          <button class="chip" data-filter="pass" role="tab" aria-selected="false">Aprovados</button>
+          <button class="chip" data-filter="attention" role="tab" aria-selected="false">Atenção</button>
+          <button class="chip" data-filter="na" role="tab" aria-selected="false">N/D</button>
+        </div>
+      </div>
+      <div class="report-grid" id="report-grid"></div>
+    </section>
+
+    <!-- ============ HISTORY ============ -->
+    <section class="screen" id="screen-history" aria-labelledby="history-title" hidden>
+      <div class="results-head">
+        <div>
+          <span class="eyebrow blue"><span data-icon="history"></span> Salvo apenas neste navegador</span>
+          <h2 id="history-title">Histórico de verificações</h2>
+        </div>
+        <div class="results-actions">
+          <button class="btn btn-ghost" id="btn-history-back"><span data-icon="arrowLeft"></span> Voltar</button>
+          <button class="btn btn-danger-ghost" id="btn-history-clear"><span data-icon="trash"></span> Limpar</button>
+        </div>
+      </div>
+      <div id="history-list" class="history-list"></div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <p><span data-icon="lock"></span> O PhoneCheck roda inteiramente no seu navegador. Nenhum dado pessoal é coletado ou transmitido. O teste de velocidade baixa dados anônimos de um servidor público (Cloudflare).</p>
+    <p class="muted">Os resultados refletem o que o navegador permite acessar e não substituem uma avaliação técnica do hardware.</p>
+  </footer>
+
+  <div class="overlay" id="overlay" hidden></div>
+  <div class="toast-wrap" id="toasts" aria-live="polite"></div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

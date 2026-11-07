@@ -1,0 +1,10 @@
+{
+  "name": "PhoneCheck — Diagnóstico do dispositivo",
+  "short_name": "PhoneCheck",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#06080b",
+  "theme_color": "#06080b",
+  "lang": "pt-BR",
+  "icons": [{ "src": "assets/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}
