@@ -4,7 +4,10 @@ import { NA, yesNo, fmtNum, delay, withTimeout } from '../utils.js';
 import { icon } from '../icons.js';
 
 const r = (status, summary, details = [], note = '') => ({ status, summary, details, note });
+const EMBED_NOTE = 'A prévia incorporada bloqueia este recurso. Abra o site publicado (HTTPS) no celular para testá-lo.';
+const embedBlocked = (env) => (env.embedded ? r('unavailable', 'Bloqueado nesta prévia', [], EMBED_NOTE) : null);
 const needsMedia = (env) => {
+  if (env.embedded) return embedBlocked(env);
   if (!env.secure) return r('unavailable', 'Requer conexão segura (HTTPS)', [], 'O navegador só libera câmera e microfone em páginas HTTPS.');
   if (!navigator.mediaDevices?.getUserMedia) return r('unavailable', 'Não suportado pelo navegador', []);
   return null;
@@ -176,6 +179,7 @@ const vibration = {
   id: 'vibration', name: 'Vibração', category: 'Hardware', icon: 'vibrate', interactive: true,
   prompt: { title: 'Testar o motor de vibração', text: 'O aparelho vai vibrar em um padrão curto. Segure-o na mão para sentir.', action: 'Vibrar agora' },
   precheck: (env) => {
+    if (env.embedded) return embedBlocked(env);
     if (!('vibrate' in navigator)) return r('unavailable', 'Não suportado pelo navegador', [], 'O Safari (iPhone/iPad) não permite que sites acionem a vibração.');
     if (env.device.type === 'desktop') return r('unavailable', 'Sem motor de vibração', [], 'Computadores normalmente não possuem vibração.');
     return null;
@@ -201,6 +205,7 @@ const sensors = {
   id: 'sensors', name: 'Sensores de movimento', category: 'Sensores', icon: 'compass', interactive: true,
   prompt: { title: 'Testar sensores', text: 'Depois de permitir, incline e gire o aparelho por alguns segundos. Verificamos acelerômetro, giroscópio e orientação.', action: 'Permitir sensores' },
   precheck: (env) => {
+    if (env.embedded) return embedBlocked(env);
     if (!('DeviceMotionEvent' in window) && !('DeviceOrientationEvent' in window)) return r('unavailable', 'Sem API de sensores', []);
     if (!env.secure) return r('unavailable', 'Requer conexão segura (HTTPS)', []);
     return null;

@@ -192,7 +192,7 @@ async function ping(url) {
 
 const network = {
   id: 'network', name: 'Conexão com a internet', category: 'Conectividade', icon: 'wifi',
-  async run({ progress, shared }) {
+  async run({ env, progress, shared }) {
     const c = navigator.connection;
     const typeMap = { wifi: 'Wi-Fi', cellular: 'Dados móveis', ethernet: 'Cabo (Ethernet)', none: 'Nenhuma', bluetooth: 'Bluetooth', wimax: 'WiMAX', other: 'Outra', unknown: 'Desconhecida' };
     const base = [
@@ -208,6 +208,7 @@ const network = {
       try { await ping(url); host = url; break; } catch { /* tenta o próximo */ }
     }
     progress?.(0.3);
+    if (!host && env.embedded) return r('unavailable', 'Bloqueado nesta prévia', base, 'A prévia incorporada não permite conexões externas. Abra o site publicado para medir.');
     if (!host) return r('fail', 'Internet inacessível', base, 'Não foi possível alcançar servidores públicos. Verifique Wi-Fi/dados ou bloqueadores.');
     for (let i = 0; i < 4; i++) {
       try { times.push(await ping(host)); } catch { /* ignora amostra */ }
@@ -246,7 +247,7 @@ const speed = {
   minDuration: 400,
   async run({ progress, results }) {
     const net = results.network;
-    if (net && net.status === 'fail') return r('unavailable', 'Sem internet para medir', [], 'O teste de conexão falhou.');
+    if (net && net.status !== 'pass' && net.status !== 'warn') return r('unavailable', net?.status === 'fail' ? 'Sem internet para medir' : 'Bloqueado nesta prévia', [], net.status === 'fail' ? 'O teste de conexão falhou.' : 'A conexão não pôde ser verificada neste ambiente.');
     const c = navigator.connection;
     const sizes = c?.saveData ? [250000, 1000000] : [250000, 1000000, 5000000, 15000000];
     let best = null; let total = 0; const start = performance.now();

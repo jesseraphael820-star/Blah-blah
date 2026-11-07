@@ -26,7 +26,7 @@ function applyTheme(theme) {
   document.documentElement.dataset.theme = theme;
   $('#btn-theme').innerHTML = icon(theme === 'dark' ? 'sun' : 'moon');
   $('#btn-theme').setAttribute('aria-label', theme === 'dark' ? 'Ativar tema claro' : 'Ativar tema escuro');
-  document.querySelector('meta[name="theme-color"]').setAttribute('content', theme === 'dark' ? '#07090c' : '#f3f6f9');
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'dark' ? '#07090c' : '#f3f6f9');
 }
 
 function applySound() {
@@ -173,17 +173,17 @@ function cancelDiagnosis() {
 }
 
 // ------------------------------------------------------------------ eventos
-function goHome() {
+async function goHome() {
   if (state.running) {
-    if (!confirm('Cancelar a verificação em andamento?')) return;
+    if (!await ui.confirmDialog('Cancelar verificação?', 'O diagnóstico em andamento será interrompido e não será salvo.', 'Cancelar verificação', true)) return;
     cancelDiagnosis();
   }
   ui.showScreen('home');
 }
 
-function openHistory() {
+async function openHistory() {
   if (state.running) {
-    if (!confirm('Cancelar a verificação em andamento e abrir o histórico?')) return;
+    if (!await ui.confirmDialog('Abrir o histórico?', 'O diagnóstico em andamento será interrompido e não será salvo.', 'Abrir histórico', true)) return;
     cancelDiagnosis();
   }
   ui.renderHistory(history.all());
@@ -220,6 +220,8 @@ function bind() {
     const btn = e.currentTarget; btn.disabled = true; btn.classList.add('is-loading');
     try { await exportPDF(state.report); ui.toast('Relatório PDF gerado', 'pass'); } catch (err) {
       console.error(err);
+      if (err?.code === 'declined') return;
+      if (window.PHONECHECK_EMBED) { ui.toast('Não foi possível salvar o PDF nesta visualização.', 'warn'); return; }
       ui.toast('Não foi possível gerar o PDF. Usando a impressão do navegador.', 'warn');
       setTimeout(() => window.print(), 400);
     } finally { btn.disabled = false; btn.classList.remove('is-loading'); }
@@ -234,9 +236,9 @@ function bind() {
 
   $$('.filters .chip').forEach((c) => c.addEventListener('click', () => ui.applyFilter(c.dataset.filter)));
 
-  $('#btn-history-clear').addEventListener('click', () => {
+  $('#btn-history-clear').addEventListener('click', async () => {
     if (!history.all().length) return;
-    if (!confirm('Apagar todo o histórico de verificações deste navegador?')) return;
+    if (!await ui.confirmDialog('Apagar histórico?', 'Todas as verificações salvas neste navegador serão removidas.', 'Apagar tudo', true)) return;
     history.clear();
     ui.renderHistory([]);
     ui.toast('Histórico apagado');

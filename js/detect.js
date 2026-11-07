@@ -142,6 +142,7 @@ export async function collectEnv() {
       arch: hints?.architecture ? `${hints.architecture}${hints.bitness ? ` ${hints.bitness} bits` : ''}` : '',
     },
     secure: window.isSecureContext,
+    embedded: window.PHONECHECK_EMBED === true,
   };
 }
 

@@ -33,6 +33,23 @@ export function toast(msg, tone = 'info') {
   setTimeout(() => el.remove(), 3700);
 }
 
+// ---------------------------------------------------------------- diálogo de confirmação
+export function confirmDialog(title, text, okLabel = 'Confirmar', danger = false) {
+  return new Promise((resolve) => {
+    const wrap = document.createElement('div');
+    wrap.className = 'dialog-wrap';
+    wrap.innerHTML = `<div class="dialog glass" role="alertdialog" aria-modal="true" aria-labelledby="dlg-t">
+      <h3 id="dlg-t">${esc(title)}</h3><p>${esc(text)}</p>
+      <div class="hp-actions"><button class="btn btn-ghost" data-v="0">Voltar</button><button class="btn ${danger ? 'btn-danger' : 'btn-primary'}" data-v="1">${esc(okLabel)}</button></div></div>`;
+    const close = (v) => { wrap.classList.add('out'); setTimeout(() => wrap.remove(), 200); document.removeEventListener('keydown', onKey); resolve(v); };
+    const onKey = (e) => { if (e.key === 'Escape') close(false); };
+    wrap.addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) close(b.dataset.v === '1'); else if (e.target === wrap) close(false); });
+    document.addEventListener('keydown', onKey);
+    document.body.appendChild(wrap);
+    wrap.querySelector('[data-v="1"]').focus();
+  });
+}
+
 // ---------------------------------------------------------------- lista de testes
 export function renderTestList(tests) {
   const ol = $('#test-list');

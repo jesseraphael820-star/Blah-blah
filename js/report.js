@@ -117,7 +117,14 @@ export async function exportPDF(report) {
     doc.text(`${i}/${pages}`, W - M, 290, { align: 'right' });
   }
   const stamp = new Date(report.createdAt).toISOString().slice(0, 16).replace(/[:T]/g, '-');
-  doc.save(`phonecheck-relatorio-${stamp}.pdf`);
+  const filename = `phonecheck-relatorio-${stamp}.pdf`;
+  if (window.claude?.use) {
+    const downloads = await window.claude.use('downloads');
+    if (!downloads) throw new Error('Downloads indisponíveis nesta visualização');
+    await downloads.save({ filename, data: doc.output('blob') });
+    return;
+  }
+  doc.save(filename);
 }
 
 export function shareText(report) {
@@ -135,7 +142,7 @@ export function shareText(report) {
 export async function shareReport(report) {
   const text = shareText(report);
   const url = /^https?:/.test(location.href) ? location.origin + location.pathname : undefined;
-  if (navigator.share) {
+  if (navigator.share && !window.PHONECHECK_EMBED) {
     try { await navigator.share({ title: 'Resultado PhoneCheck', text, url }); return 'shared'; } catch (e) { if (e?.name === 'AbortError') return 'cancelled'; }
   }
   try { await navigator.clipboard.writeText(url ? `${text}\n${url}` : text); return 'copied'; } catch { return 'failed'; }
