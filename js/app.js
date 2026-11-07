@@ -161,6 +161,7 @@ async function startDiagnosis() {
   sound.play('done');
   await delay(350);
   ui.renderResults(report);
+  await ui.showSuccess(report.summary);
   ui.showScreen('results');
 }
 

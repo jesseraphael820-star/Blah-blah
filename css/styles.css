@@ -419,7 +419,7 @@ main { width: 100%; max-width: 1200px; margin: 0 auto; padding: clamp(20px, 4vw,
 /* ---------------------------------------------------------------- resultados */
 .results-head { display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 18px; margin-bottom: 22px; }
 .results-head h2 { font-size: clamp(26px, 3.6vw, 36px); font-weight: 800; margin: 12px 0 6px; }
-.results-head .muted { display: flex; align-items: center; gap: 6px; font-size: 14px; flex-wrap: wrap; }
+.results-head .muted { font-size: 14px; }
 .results-actions { display: flex; gap: 10px; flex-wrap: wrap; }
 .summary-grid { display: grid; grid-template-columns: 360px 1fr; gap: 18px; }
 .gauge-card { padding: 28px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
@@ -508,6 +508,42 @@ main { width: 100%; max-width: 1200px; margin: 0 auto; padding: clamp(20px, 4vw,
 .empty { padding: 48px 24px; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 10px; }
 .empty > .ico { width: 44px; height: 44px; color: var(--muted); }
 .empty p { color: var(--muted); max-width: 380px; margin-bottom: 10px; }
+
+/* ---------------------------------------------------------------- sucesso */
+.success-wrap {
+  position: fixed; inset: 0; z-index: 160; display: grid; place-items: center; cursor: pointer;
+  padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+  background: radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--green) 16%, var(--bg)), color-mix(in srgb, var(--bg) 92%, transparent) 60%);
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+  animation: fadeIn .3s ease both;
+}
+.success-wrap.out { animation: fadeOut .38s ease forwards; }
+.success-wrap.out .sc-inner { transform: scale(.96); transition: transform .38s ease; }
+.sc-inner { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 12px; max-width: 440px; }
+.sc-inner h2 { font-size: clamp(30px, 6vw, 44px); font-weight: 800; color: var(--green); text-shadow: 0 0 30px var(--green-glow); animation: fadeUp .5s .55s ease both; text-wrap: balance; }
+.sc-inner p { color: var(--text-2); font-size: 16px; animation: fadeUp .5s .7s ease both; }
+.sc-inner .btn { margin-top: 14px; animation: fadeUp .5s .85s ease both; }
+.sc-mark { position: relative; width: 180px; height: 180px; display: grid; place-items: center; margin-bottom: 8px; }
+.sc-check { width: 140px; height: 140px; }
+.sc-check circle { stroke-width: 2; }
+.sc-ring { position: absolute; inset: 20px; border-radius: 50%; border: 2px solid var(--green); opacity: 0; animation: ring 1.6s .25s ease-out infinite; }
+.sc-ring.r2 { animation-delay: 1.05s; }
+@keyframes ring { from { transform: scale(.8); opacity: .8; } to { transform: scale(1.6); opacity: 0; } }
+.sc-sparks { position: absolute; inset: 50%; }
+.sc-sparks i { position: absolute; width: 6px; height: 6px; margin: -3px; border-radius: 50%; background: var(--green); box-shadow: 0 0 10px var(--green); opacity: 0; animation: spark .9s calc(.45s + var(--t)) cubic-bezier(.1,.7,.3,1) both; }
+.sc-sparks i:nth-child(3n) { background: var(--blue); box-shadow: 0 0 10px var(--blue); }
+@keyframes spark { 0% { opacity: 1; transform: rotate(var(--a)) translateY(0) scale(1); } 100% { opacity: 0; transform: rotate(var(--a)) translateY(calc(var(--d) * -1)) scale(.4); } }
+
+.success-banner { display: flex; align-items: center; gap: 16px; padding: 16px 20px; margin-bottom: 18px; border-color: color-mix(in srgb, var(--green) 35%, transparent); background: linear-gradient(100deg, var(--green-soft), var(--surface) 70%); }
+.sb-check { flex: none; width: 46px; height: 46px; }
+.sb-check svg { width: 100%; height: 100%; filter: drop-shadow(0 0 10px var(--green-glow)); }
+.sb-check circle { fill: var(--green-soft); stroke: var(--green); stroke-width: 2.5; stroke-dasharray: 151; }
+.sb-check path { fill: none; stroke: var(--green); stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 40; }
+.success-banner.play .sb-check circle { stroke-dashoffset: 151; animation: draw .5s .2s ease-out forwards; }
+.success-banner.play .sb-check path { stroke-dashoffset: 40; animation: draw .35s .55s ease-out forwards; }
+.sb-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.sb-text strong { font-size: 18px; color: var(--green); }
+.sb-text span { color: var(--text-2); font-size: 14px; }
 
 /* ---------------------------------------------------------------- diálogo */
 .btn-danger { background: var(--red); color: #fff; }

@@ -190,6 +190,38 @@ export function makeAsk(askEl) {
   });
 }
 
+// ---------------------------------------------------------------- tela de sucesso
+function successSub(s) {
+  const base = `${s.pass} de ${s.executed} teste${s.executed === 1 ? '' : 's'} aprovado${s.pass === 1 ? '' : 's'}`;
+  return s.attention ? `${base} · ${s.attention} ${s.attention === 1 ? 'item precisa' : 'itens precisam'} de atenção` : `${base} · nenhum item precisa de atenção`;
+}
+
+export function showSuccess(summary) {
+  return new Promise((resolve) => {
+    const wrap = document.createElement('div');
+    wrap.className = 'success-wrap';
+    wrap.setAttribute('role', 'status');
+    const sparks = Array.from({ length: 14 }, (_, i) => `<i style="--a:${(i / 14) * 360}deg;--d:${110 + (i % 3) * 26}px;--t:${i % 2 ? 0 : 80}ms"></i>`).join('');
+    wrap.innerHTML = `<div class="sc-inner">
+      <div class="sc-mark"><span class="sc-ring r1"></span><span class="sc-ring r2"></span><div class="sc-sparks">${sparks}</div>
+        <svg viewBox="0 0 52 52" class="check-draw sc-check" aria-hidden="true"><circle cx="26" cy="26" r="24"/><path d="M15 27l7 7 15-16"/></svg></div>
+      <h2>Verificado com sucesso!</h2>
+      <p>${esc(successSub(summary))}</p>
+      <button class="btn btn-primary" type="button">${icon('shieldCheck')} Ver relatório</button>
+    </div>`;
+    let done = false;
+    const close = () => {
+      if (done) return; done = true;
+      wrap.classList.add('out');
+      setTimeout(() => { wrap.remove(); resolve(); }, 380);
+    };
+    wrap.addEventListener('click', close);
+    document.body.appendChild(wrap);
+    wrap.querySelector('button').focus({ preventScroll: true });
+    setTimeout(close, prefersReducedMotion() ? 1500 : 3200);
+  });
+}
+
 // ---------------------------------------------------------------- resultados
 function countUp(el, to, ms = 1400) {
   if (prefersReducedMotion()) { el.textContent = `${to}%`; return; }
@@ -215,6 +247,9 @@ export function renderResults(report, { fromHistory = false } = {}) {
   const s = report.summary;
   const { date, time, long } = fmtDateTime(report.createdAt);
   $('#results-eyebrow').textContent = fromHistory ? 'Verificação salva no histórico' : 'Diagnóstico concluído';
+  $('#sb-title').textContent = fromHistory ? 'Verificação concluída com sucesso' : 'Verificado com sucesso!';
+  $('#sb-sub').textContent = `${successSub(s)} · ${date} às ${time}`;
+  const sb = $('#success-banner'); sb.classList.remove('play'); void sb.offsetWidth; sb.classList.add('play');
   $('#results-meta').innerHTML = `${icon('history')} ${esc(long)} às ${esc(time)} · ${esc(report.deviceLabel)} · ${esc(report.osLabel)}`;
 
   // Gauge
