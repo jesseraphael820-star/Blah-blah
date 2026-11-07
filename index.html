@@ -48,6 +48,7 @@
             <button class="btn btn-primary btn-xl" id="btn-start">
               <span data-icon="play"></span> Iniciar verificação
             </button>
+            <button class="btn btn-ghost btn-xl" id="btn-camera"><span data-icon="camera"></span> Leitor de câmera</button>
             <span class="cta-note"><span data-icon="lock"></span> Nada é enviado ou armazenado fora do seu aparelho</span>
           </div>
           <ul class="hero-stats">
@@ -128,6 +129,36 @@
           </div>
           <ol id="test-list"></ol>
         </div>
+      </div>
+    </section>
+
+    <!-- ============ CAMERA READER ============ -->
+    <section class="screen" id="screen-camera" aria-labelledby="camera-title" hidden>
+      <div class="results-head">
+        <div>
+          <span class="eyebrow blue"><span data-icon="camera"></span> Leitor de câmera</span>
+          <h2 id="camera-title">Teste da câmera</h2>
+          <p class="muted">Aponte para um objeto com detalhes e fique parado por 3 segundos. A imagem é analisada no aparelho e não é gravada.</p>
+        </div>
+        <div class="results-actions">
+          <button class="btn btn-ghost" id="btn-camera-back"><span data-icon="arrowLeft"></span> Voltar</button>
+        </div>
+      </div>
+      <div class="cam-layout">
+        <div class="cam-card glass">
+          <div class="cam-stage" id="cam-stage"></div>
+          <div class="cam-controls">
+            <div class="seg" role="radiogroup" aria-label="Escolher câmera">
+              <button type="button" role="radio" aria-checked="true" class="is-active" data-facing="environment">Traseira</button>
+              <button type="button" role="radio" aria-checked="false" data-facing="user">Frontal</button>
+            </div>
+            <button class="btn btn-primary" id="btn-cam-go"><span data-icon="camera"></span> Abrir câmera</button>
+          </div>
+        </div>
+        <aside class="cam-side glass" aria-live="polite">
+          <h3 id="cam-side-title">O que é verificado</h3>
+          <div id="cam-checks"></div>
+        </aside>
       </div>
     </section>
 

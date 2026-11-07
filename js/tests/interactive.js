@@ -1,7 +1,8 @@
 // Testes interativos: só começam depois que o usuário toca em "Permitir/Iniciar".
 // Câmera e microfone pedem permissão do navegador; nenhum dado sai do aparelho.
-import { NA, yesNo, fmtNum, delay, withTimeout } from '../utils.js';
+import { NA, yesNo, fmtNum, delay } from '../utils.js';
 import { icon } from '../icons.js';
+import { openCamera, runCameraReader, stopStream as stopCam } from '../camera-reader.js';
 
 const r = (status, summary, details = [], note = '') => ({ status, summary, details, note });
 const EMBED_NOTE = 'A prévia incorporada bloqueia este recurso. Abra o site publicado (HTTPS) no celular para testá-lo.';
@@ -30,48 +31,19 @@ const stopStream = (s) => s?.getTracks().forEach((t) => t.stop());
 // ---------------------------------------------------------------------------
 const camera = {
   id: 'camera', name: 'Câmera', category: 'Multimídia', icon: 'camera', interactive: true,
-  prompt: { title: 'Testar a câmera', text: 'Vamos abrir a câmera por alguns segundos para verificar se ela gera imagem. Nada é gravado ou enviado.', action: 'Permitir câmera' },
+  prompt: { title: 'Leitor de câmera', text: 'Vamos abrir a câmera. Aponte para um objeto com detalhes e fique parado por alguns segundos enquanto analisamos a imagem. Nada é gravado ou enviado.', action: 'Abrir câmera' },
   precheck: needsMedia,
   async run({ env, stage }) {
     let stream;
     try {
-      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: env.device.type === 'desktop' ? 'user' : 'environment' }, audio: false });
+      stream = await openCamera(env.device.type === 'desktop' ? 'user' : 'environment');
     } catch (e) { return mediaError(e, env, 'câmera'); }
     try {
-      stage.innerHTML = `<div class="cam-preview"><video playsinline muted autoplay></video><div class="cam-scan"></div><span class="live-tag"><i></i>AO VIVO</span></div><p class="stage-hint">Analisando a imagem…</p>`;
-      const video = stage.querySelector('video');
-      video.srcObject = stream;
-      await video.play().catch(() => {});
-      await withTimeout(new Promise((res) => {
-        if (video.videoWidth) res();
-        video.addEventListener('loadeddata', res, { once: true });
-      }), 5000).catch(() => {});
-      await delay(1800);
-      const w = video.videoWidth, h = video.videoHeight;
-      let luma = NaN;
-      if (w && h) {
-        const c = document.createElement('canvas'); c.width = 64; c.height = 48;
-        const g = c.getContext('2d', { willReadFrequently: true });
-        g.drawImage(video, 0, 0, 64, 48);
-        const d = g.getImageData(0, 0, 64, 48).data; let sum = 0;
-        for (let i = 0; i < d.length; i += 4) sum += 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
-        luma = sum / (d.length / 4);
-      }
-      const track = stream.getVideoTracks()[0];
-      const set = track?.getSettings?.() || {};
+      const out = await runCameraReader(stage, stream);
       let cams = NA;
       try { cams = String((await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'videoinput').length); } catch { /* ignore */ }
-      const details = [
-        ['Resolução capturada', w ? `${w} × ${h}` : NA],
-        ['Quadros por segundo', set.frameRate ? `${Math.round(set.frameRate)} fps` : NA],
-        ['Câmeras detectadas', cams],
-        ['Lente testada', set.facingMode === 'environment' ? 'Traseira' : set.facingMode === 'user' ? 'Frontal' : 'Padrão'],
-        ['Brilho médio da imagem', Number.isFinite(luma) ? `${Math.round((luma / 255) * 100)}%` : NA],
-      ];
-      if (!w) return r('fail', 'Câmera sem imagem', details, 'A câmera abriu, mas não enviou quadros.');
-      if (luma < 8) return r('warn', 'Imagem muito escura', details, 'A lente pode estar coberta ou o ambiente muito escuro. Repita em local iluminado.');
-      return r('pass', `${w} × ${h} — funcionando corretamente`, details);
-    } finally { stopStream(stream); }
+      return r(out.status, out.summary, [...out.details, ['Câmeras detectadas', cams]], out.note);
+    } finally { stopCam(stream); }
   },
 };
 

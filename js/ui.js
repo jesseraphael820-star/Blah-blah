@@ -11,6 +11,7 @@ export function showScreen(name) {
   const to = $(`#screen-${name}`);
   current = name;
   document.body.dataset.screen = name;
+  document.dispatchEvent(new CustomEvent('screenchange', { detail: name }));
   const swap = () => {
     from.hidden = true; from.classList.remove('is-active', 'is-leaving');
     to.hidden = false;
@@ -335,6 +336,42 @@ export function renderHistory(list) {
       </div>
     </article>`;
   }).join('');
+}
+
+// ---------------------------------------------------------------- leitor de câmera
+const CAM_ITEMS = [
+  ['camera', 'Imagem recebida', 'A câmera entrega quadros ao vivo'],
+  ['timer', 'Taxa de quadros', 'Quantos quadros por segundo chegam'],
+  ['monitor', 'Resolução', 'Tamanho real da imagem capturada'],
+  ['sun', 'Exposição', 'Imagem nem preta nem estourada'],
+  ['eye', 'Foco e nitidez', 'Detalhes visíveis, lente limpa'],
+  ['activity', 'Ruído do sensor', 'Granulado com o aparelho parado'],
+  ['grid', 'Cores', 'Os três canais de cor respondem'],
+  ['refresh', 'Imagem ao vivo', 'A imagem não está congelada'],
+];
+
+export function cameraIdle(blockedText) {
+  $('#cam-stage').innerHTML = `<div class="cam-idle ${blockedText ? 'blocked' : ''}">
+    <div class="ci-icon">${icon('camera')}<span class="ci-scan"></span></div>
+    <p>${esc(blockedText || 'Toque em "Abrir câmera" e permita o acesso quando o navegador pedir.')}</p></div>`;
+  $('#cam-side-title').textContent = 'O que é verificado';
+  $('#cam-checks').innerHTML = `<ul class="cam-list">${CAM_ITEMS.map(([ic, n, d]) => `<li><span class="cl-ico">${icon(ic)}</span><div><b>${esc(n)}</b><span>${esc(d)}</span></div></li>`).join('')}</ul>`;
+}
+
+export function cameraResult(out) {
+  const st = STATUS[out.status];
+  const title = out.status === 'pass' ? 'Câmera funcionando normalmente' : out.status === 'warn' ? 'Câmera funciona, com ressalvas' : 'Problema detectado na câmera';
+  $('#cam-side-title').textContent = 'Resultado';
+  const icoFor = (name) => (CAM_ITEMS.find((c) => c[1] === name) || ['info'])[0];
+  $('#cam-checks').innerHTML = `<div class="cam-verdict tone-${st.tone}"><span class="badge-ico tone-${st.tone}">${icon(st.icon)}</span><div><b>${esc(title)}</b><span>${esc(out.note)}</span></div></div>
+    <ul class="cam-list done">${out.checks.map((c, i) => {
+      const t = STATUS[c.status];
+      return `<li style="--i:${i}" class="tone-${t.tone}"><span class="cl-ico">${icon(icoFor(c.name))}</span><div><b>${esc(c.name)}</b><span>${esc(c.hint || t.label)}</span></div><em>${esc(c.value)}</em><span class="badge-ico tone-${t.tone}">${icon(t.icon)}</span></li>`;
+    }).join('')}</ul>`;
+}
+
+export function cameraError(text) {
+  $('#cam-stage').innerHTML = `<div class="cam-idle blocked"><div class="ci-icon">${icon('alert')}</div><p>${esc(text)}</p></div>`;
 }
 
 export { hydrateIcons, fmtNum };

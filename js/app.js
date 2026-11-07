@@ -9,6 +9,7 @@ import { sound } from './sound.js';
 import { history } from './history.js';
 import { exportPDF, shareReport } from './report.js';
 import * as ui from './ui.js';
+import { openCamera, runCameraReader, stopStream } from './camera-reader.js';
 
 const TESTS = [...autoTests, ...interactiveTests];
 const MIN_AUTO_MS = 850;
@@ -173,6 +174,63 @@ function cancelDiagnosis() {
   const ov = $('#overlay'); ov.hidden = true; ov.innerHTML = ''; ov.className = 'overlay';
 }
 
+// ------------------------------------------------------------------ leitor de câmera
+const cam = { facing: 'environment', stream: null, ctrl: null, busy: false };
+
+function camBlockedReason() {
+  if (window.PHONECHECK_EMBED) return 'A prévia incorporada bloqueia a câmera. Abra o site publicado (HTTPS) no celular para usar o leitor.';
+  if (!window.isSecureContext) return 'A câmera só funciona em páginas HTTPS.';
+  if (!navigator.mediaDevices?.getUserMedia) return 'Este navegador não permite acessar a câmera.';
+  return '';
+}
+
+function stopReader() {
+  cam.ctrl?.abort();
+  stopStream(cam.stream);
+  cam.stream = null; cam.ctrl = null; cam.busy = false;
+}
+
+function openCameraScreen() {
+  if (state.running) return;
+  stopReader();
+  const blocked = camBlockedReason();
+  ui.cameraIdle(blocked);
+  $('#btn-cam-go').disabled = !!blocked;
+  $('#btn-cam-go').innerHTML = `${icon('camera')} Abrir câmera`;
+  ui.showScreen('camera');
+}
+
+async function startReader() {
+  if (cam.busy) stopReader();
+  cam.busy = true;
+  const btn = $('#btn-cam-go');
+  btn.disabled = true;
+  sound.play('start');
+  let stream;
+  try {
+    stream = await openCamera(cam.facing);
+  } catch (e) {
+    cam.busy = false; btn.disabled = false;
+    const name = e?.name || '';
+    ui.cameraError(name === 'NotAllowedError' ? 'Permissão negada. Libere a câmera nas configurações do navegador e tente de novo.'
+      : name === 'NotFoundError' || name === 'OverconstrainedError' ? 'Nenhuma câmera encontrada neste aparelho.'
+      : name === 'NotReadableError' ? 'A câmera não respondeu. Ela pode estar em uso por outro app.'
+      : 'Não foi possível abrir a câmera.');
+    return;
+  }
+  if (!cam.busy) { stopStream(stream); return; }
+  cam.stream = stream;
+  cam.ctrl = new AbortController();
+  const out = await runCameraReader($('#cam-stage'), stream, { signal: cam.ctrl.signal });
+  stopStream(stream);
+  if (cam.stream !== stream || out.metrics?.reason === 'aborted') return;
+  cam.stream = null; cam.ctrl = null; cam.busy = false;
+  ui.cameraResult(out);
+  sound.play(out.status === 'pass' ? 'done' : out.status === 'warn' ? 'warn' : 'fail');
+  btn.disabled = false;
+  btn.innerHTML = `${icon('refresh')} Testar de novo`;
+}
+
 // ------------------------------------------------------------------ eventos
 async function goHome() {
   if (state.running) {
@@ -193,6 +251,16 @@ async function openHistory() {
 
 function bind() {
   $('#btn-start').addEventListener('click', startDiagnosis);
+  $('#btn-camera').addEventListener('click', openCameraScreen);
+  $('#btn-camera-back').addEventListener('click', () => ui.showScreen('home'));
+  $('#btn-cam-go').addEventListener('click', startReader);
+  $$('#screen-camera .seg button').forEach((b) => b.addEventListener('click', () => {
+    cam.facing = b.dataset.facing;
+    $$('#screen-camera .seg button').forEach((x) => { const on = x === b; x.classList.toggle('is-active', on); x.setAttribute('aria-checked', String(on)); });
+    if (cam.busy) startReader();
+  }));
+  document.addEventListener('screenchange', (e) => { if (e.detail !== 'camera') stopReader(); });
+  document.addEventListener('visibilitychange', () => { if (document.hidden && cam.busy) openCameraScreen(); });
   $('#btn-repeat').addEventListener('click', startDiagnosis);
   $('#brand-home').addEventListener('click', goHome);
   $('#btn-history').addEventListener('click', openHistory);
