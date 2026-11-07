@@ -1,0 +1,779 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>McDonald's — Restaurante local (proposta)</title>
+<meta name="description" content="Proposta de site para restaurante McDonald's local: cardápio, ofertas, pedido pelo WhatsApp, horários e serviços.">
+<meta name="theme-color" content="#DA291C">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800;900&family=Archivo+Narrow:wght@600;700&display=swap" rel="stylesheet">
+<style>
+/* Layout: faixas cheias (vermelho / creme / amarelo) com conteúdo em coluna de 1180px */
+:root {
+  --red: #DA291C;
+  --red-deep: #B71C12;
+  --yellow: #FFC72C;
+  --yellow-soft: #FFE8A3;
+  --ink: #27251F;
+  --ink-2: #4A4740;
+  --muted: #77736A;
+  --cream: #FFF8EC;
+  --paper: #FFFFFF;
+  --line: #EFE4D0;
+  --green: #1F8A4C;
+  --shadow: 0 10px 30px rgba(39, 37, 31, .10);
+  --shadow-lg: 0 24px 60px rgba(39, 37, 31, .18);
+  --display: "Archivo", "Arial Black", system-ui, sans-serif;
+  --body: "Archivo", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --narrow: "Archivo Narrow", "Archivo", system-ui, sans-serif;
+  --r: 22px;
+  color-scheme: light;
+}
+*, *::before, *::after { box-sizing: border-box; }
+html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--cream); color: var(--ink); font: 400 16px/1.55 var(--body); overflow-x: hidden; -webkit-font-smoothing: antialiased; }
+img, svg { max-width: 100%; display: block; }
+button, input, select, textarea { font: inherit; color: inherit; }
+h1, h2, h3, h4 { margin: 0; font-family: var(--display); letter-spacing: -0.02em; line-height: 1.05; text-wrap: balance; }
+p { margin: 0; }
+a { color: inherit; }
+[hidden] { display: none !important; }
+.wrap { width: 100%; max-width: 1180px; margin: 0 auto; padding-left: max(20px, env(safe-area-inset-left, 0px)); padding-right: max(20px, env(safe-area-inset-right, 0px)); }
+:focus-visible { outline: 3px solid var(--yellow); outline-offset: 3px; border-radius: 8px; }
+
+/* ---------- faixa de proposta ---------- */
+.pitch { background: var(--ink); color: #fff; font-size: 13.5px; }
+.pitch .wrap { display: flex; align-items: center; gap: 12px; padding-block: 9px; }
+.pitch b { color: var(--yellow); }
+.pitch span { flex: 1; min-width: 0; }
+.pitch button { background: none; border: 1px solid rgba(255,255,255,.3); color: #fff; border-radius: 99px; padding: 4px 12px; cursor: pointer; font-size: 12.5px; }
+
+/* ---------- topo ---------- */
+.top { position: sticky; top: 0; z-index: 30; background: var(--red); color: #fff; box-shadow: 0 2px 0 rgba(0,0,0,.08); }
+.top .wrap { display: flex; align-items: center; gap: 20px; height: 70px; }
+.brand { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+.brand-word { font-family: var(--display); font-weight: 900; font-size: 26px; letter-spacing: -0.03em; color: var(--yellow); }
+.brand-loc { font-family: var(--narrow); font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: .12em; background: rgba(0,0,0,.18); padding: 4px 8px; border-radius: 6px; }
+.nav { display: flex; gap: 4px; margin-left: auto; }
+.nav a { text-decoration: none; font-weight: 700; padding: 10px 14px; border-radius: 99px; transition: background .2s; }
+.nav a:hover { background: rgba(255,255,255,.14); }
+.cart-btn { position: relative; display: inline-flex; align-items: center; gap: 8px; height: 46px; padding: 0 18px; border-radius: 99px; border: 0; background: var(--yellow); color: var(--ink); font-weight: 800; cursor: pointer; transition: transform .15s; }
+.cart-btn:active { transform: scale(.96); }
+.cart-btn svg { width: 20px; height: 20px; }
+.cart-count { min-width: 22px; height: 22px; border-radius: 99px; background: var(--ink); color: #fff; font-size: 12px; display: grid; place-items: center; padding: 0 6px; font-variant-numeric: tabular-nums; }
+.cart-count.bump { animation: bump .4s ease; }
+@keyframes bump { 40% { transform: scale(1.35); } }
+.menu-toggle { display: none; margin-left: auto; background: rgba(0,0,0,.15); border: 0; color: #fff; width: 46px; height: 46px; border-radius: 12px; cursor: pointer; }
+
+/* ---------- hero ---------- */
+.hero { background: var(--red); color: #fff; position: relative; overflow: hidden; }
+.hero::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 70px; background: var(--cream); clip-path: ellipse(60% 100% at 50% 100%); }
+.hero .wrap { display: grid; grid-template-columns: 1.05fr .95fr; gap: 40px; align-items: center; padding-block: 56px 110px; position: relative; z-index: 1; }
+.status { display: inline-flex; align-items: center; gap: 8px; background: rgba(0,0,0,.2); padding: 7px 14px; border-radius: 99px; font-weight: 700; font-size: 14px; }
+.status i { width: 9px; height: 9px; border-radius: 50%; background: #6DFF9E; box-shadow: 0 0 0 0 rgba(109,255,158,.7); animation: live 1.6s infinite; }
+.status.closed i { background: var(--yellow); animation: none; }
+@keyframes live { 70% { box-shadow: 0 0 0 9px rgba(109,255,158,0); } 100% { box-shadow: 0 0 0 0 rgba(109,255,158,0); } }
+.hero h1 { font-size: clamp(40px, 5.4vw, 70px); font-weight: 900; margin: 20px 0 18px; letter-spacing: -0.04em; }
+.hero h1 em { font-style: normal; color: var(--yellow); }
+.hero p.lead { font-size: clamp(17px, 1.6vw, 20px); max-width: 520px; color: rgba(255,255,255,.92); }
+.hero-ctas { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 30px; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 9px; height: 54px; padding: 0 26px; border-radius: 99px; border: 0; font-weight: 800; font-size: 16px; cursor: pointer; text-decoration: none; transition: transform .15s, box-shadow .2s, background .2s; white-space: nowrap; }
+.btn:active { transform: scale(.97); }
+.btn svg { width: 20px; height: 20px; }
+.btn-yellow { background: var(--yellow); color: var(--ink); box-shadow: 0 8px 0 -2px #D9A514; }
+.btn-yellow:hover { transform: translateY(-2px); }
+.btn-ghost { background: transparent; color: #fff; border: 2px solid rgba(255,255,255,.6); }
+.btn-ghost:hover { background: rgba(255,255,255,.1); }
+.btn-red { background: var(--red); color: #fff; }
+.btn-red:hover { background: var(--red-deep); }
+.btn-ink { background: var(--ink); color: #fff; }
+.hero-facts { display: flex; flex-wrap: wrap; gap: 26px; margin-top: 36px; }
+.hero-facts div { display: flex; flex-direction: column; }
+.hero-facts b { font-family: var(--display); font-size: 26px; font-weight: 900; color: var(--yellow); }
+.hero-facts span { font-size: 13.5px; color: rgba(255,255,255,.8); }
+.hero-art { position: relative; display: grid; place-items: center; min-height: 420px; }
+.sun { position: absolute; width: min(460px, 92%); aspect-ratio: 1; border-radius: 50%; background: radial-gradient(circle, var(--yellow) 0 56%, transparent 57%), repeating-conic-gradient(from 0deg, rgba(255,199,44,.35) 0 6deg, transparent 6deg 18deg); animation: spin 60s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.hero-burger { position: relative; width: min(380px, 80%); filter: drop-shadow(0 30px 30px rgba(0,0,0,.28)); animation: float 5s ease-in-out infinite; }
+@keyframes float { 50% { transform: translateY(-12px) rotate(-1.5deg); } }
+.price-tag { position: absolute; right: 4%; top: 12%; background: var(--paper); color: var(--ink); border-radius: 18px; padding: 12px 16px; box-shadow: var(--shadow-lg); transform: rotate(6deg); text-align: center; }
+.price-tag small { display: block; font-family: var(--narrow); font-weight: 700; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--red); }
+.price-tag b { font-family: var(--display); font-weight: 900; font-size: 30px; font-variant-numeric: tabular-nums; }
+.fries-mini { position: absolute; left: 2%; bottom: 4%; width: 120px; transform: rotate(-10deg); filter: drop-shadow(0 16px 16px rgba(0,0,0,.25)); }
+
+/* ---------- seções ---------- */
+section { padding-block: 72px; }
+.sec-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 20px; flex-wrap: wrap; margin-bottom: 28px; }
+.eyebrow { font-family: var(--narrow); font-weight: 700; text-transform: uppercase; letter-spacing: .14em; font-size: 13px; color: var(--red); }
+.sec-head h2 { font-size: clamp(32px, 4.4vw, 52px); font-weight: 900; margin-top: 8px; }
+.sec-head p { color: var(--ink-2); max-width: 460px; }
+
+/* ofertas */
+.offers { display: grid; grid-template-columns: 1.3fr 1fr 1fr; gap: 18px; }
+.offer { border-radius: var(--r); padding: 26px; position: relative; overflow: hidden; min-height: 250px; display: flex; flex-direction: column; justify-content: space-between; gap: 18px; box-shadow: var(--shadow); transition: transform .25s; }
+.offer:hover { transform: translateY(-4px); }
+.offer.big { background: var(--yellow); }
+.offer.red { background: var(--red); color: #fff; }
+.offer.ink { background: var(--ink); color: #fff; }
+.offer .tag { align-self: flex-start; font-family: var(--narrow); font-weight: 700; font-size: 12px; letter-spacing: .1em; text-transform: uppercase; padding: 5px 10px; border-radius: 6px; background: rgba(0,0,0,.12); }
+.offer.big .tag { background: var(--ink); color: var(--yellow); }
+.offer h3 { font-size: 28px; font-weight: 900; }
+.offer p { opacity: .85; }
+.offer .row { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
+.offer .price { font-family: var(--display); font-weight: 900; font-size: 36px; font-variant-numeric: tabular-nums; }
+.offer .price s { font-size: 16px; opacity: .6; margin-right: 6px; font-weight: 600; }
+.offer .art { position: absolute; right: 14px; top: 14px; width: 92px; pointer-events: none; }
+.offer.big .art { width: 150px; right: 22px; top: 22px; }
+.offer > div, .offer .tag { position: relative; z-index: 1; }
+.offer h3, .offer p { padding-right: 90px; }
+.offer.big h3, .offer.big p { padding-right: 150px; }
+.offer .row { flex-wrap: wrap; }
+.add-chip { display: inline-flex; align-items: center; gap: 6px; height: 42px; padding: 0 16px; border-radius: 99px; border: 0; cursor: pointer; font-weight: 800; background: var(--paper); color: var(--ink); transition: transform .15s; }
+.add-chip:active { transform: scale(.95); }
+.add-chip svg { width: 16px; height: 16px; }
+.offer.big .add-chip { background: var(--ink); color: #fff; }
+
+/* cardápio */
+#cardapio { background: var(--paper); border-radius: 40px 40px 0 0; }
+.tabs { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 6px; margin-bottom: 26px; scrollbar-width: none; }
+.tabs::-webkit-scrollbar { display: none; }
+.tab { flex: none; display: inline-flex; align-items: center; gap: 8px; height: 46px; padding: 0 18px; border-radius: 99px; border: 2px solid var(--line); background: var(--paper); font-weight: 700; cursor: pointer; transition: all .2s; }
+.tab svg { width: 22px; height: 22px; }
+.tab.active { background: var(--ink); border-color: var(--ink); color: #fff; }
+.menu-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 16px; }
+.item { background: var(--cream); border-radius: var(--r); padding: 18px; display: flex; flex-direction: column; gap: 10px; border: 1px solid var(--line); transition: transform .25s, box-shadow .25s; animation: rise .45s calc(var(--i) * 40ms) ease both; }
+.item:hover { transform: translateY(-4px); box-shadow: var(--shadow); }
+@keyframes rise { from { opacity: 0; transform: translateY(14px); } }
+.item .pic { height: 150px; display: grid; place-items: center; background: radial-gradient(circle at 50% 60%, var(--yellow-soft), transparent 70%); border-radius: 16px; }
+.item .pic svg { height: 120px; width: auto; transition: transform .35s cubic-bezier(.2,1.4,.4,1); }
+.item:hover .pic svg { transform: scale(1.08) rotate(-3deg); }
+.item h4 { font-size: 19px; font-weight: 800; }
+.item p { font-size: 14px; color: var(--muted); flex: 1; }
+.item .meta { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.item .price { font-family: var(--display); font-weight: 900; font-size: 22px; font-variant-numeric: tabular-nums; }
+.item .kcal { font-size: 12px; color: var(--muted); }
+.plus { width: 44px; height: 44px; border-radius: 50%; border: 0; background: var(--red); color: #fff; display: grid; place-items: center; cursor: pointer; transition: transform .15s, background .2s; flex: none; }
+.plus:hover { background: var(--red-deep); }
+.plus:active { transform: scale(.9); }
+.plus svg { width: 20px; height: 20px; }
+.badge-new { align-self: flex-start; font-family: var(--narrow); font-weight: 700; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; background: var(--red); color: #fff; padding: 3px 8px; border-radius: 6px; margin-bottom: -4px; }
+.note { margin-top: 18px; font-size: 13px; color: var(--muted); }
+
+/* restaurante */
+.store { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.card { background: var(--paper); border-radius: var(--r); padding: 26px; box-shadow: var(--shadow); }
+.card h3 { font-size: 24px; font-weight: 800; margin-bottom: 14px; }
+.addr { display: grid; gap: 14px; }
+.addr-row { display: flex; gap: 14px; align-items: flex-start; }
+.addr-row .ic { width: 44px; height: 44px; border-radius: 14px; background: var(--yellow-soft); display: grid; place-items: center; flex: none; color: var(--red); }
+.addr-row .ic svg { width: 22px; height: 22px; }
+.addr-row b { display: block; }
+.addr-row span { color: var(--ink-2); font-size: 15px; }
+.hours { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.hours td { padding: 10px 6px; border-bottom: 1px dashed var(--line); }
+.hours td:last-child { text-align: right; font-weight: 700; }
+.hours tr.today td { color: var(--red); font-weight: 800; }
+.hours tr.today td:first-child::after { content: " · hoje"; font-weight: 600; font-size: 13px; }
+.services { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 6px; }
+.svc { display: inline-flex; align-items: center; gap: 8px; padding: 10px 14px; border-radius: 14px; background: var(--cream); border: 1px solid var(--line); font-weight: 700; font-size: 14.5px; }
+.svc svg { width: 20px; height: 20px; color: var(--red); }
+.map { margin-top: 18px; border-radius: 18px; overflow: hidden; position: relative; height: 200px; background:
+  linear-gradient(90deg, transparent 48%, #fff 48% 52%, transparent 52%),
+  linear-gradient(0deg, transparent 30%, #fff 30% 34%, transparent 34%),
+  linear-gradient(20deg, transparent 62%, #fff 62% 65%, transparent 65%),
+  #E9E3D2; display: grid; place-items: center; text-decoration: none; }
+.map .pin { width: 54px; height: 54px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); background: var(--red); display: grid; place-items: center; box-shadow: var(--shadow-lg); animation: drop 2s ease-in-out infinite; }
+.map .pin svg { transform: rotate(45deg); width: 24px; height: 24px; color: var(--yellow); }
+@keyframes drop { 50% { transform: rotate(-45deg) translate(4px, -4px); } }
+.map .map-label { position: absolute; bottom: 12px; left: 12px; background: var(--paper); padding: 8px 12px; border-radius: 10px; font-weight: 700; font-size: 14px; box-shadow: var(--shadow); }
+
+/* faixa amarela: aniversário + trabalhe conosco */
+.band { background: var(--yellow); }
+.band .wrap { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.band .card { box-shadow: none; display: flex; flex-direction: column; gap: 14px; }
+.band .card p { color: var(--ink-2); }
+.band .card .btn { align-self: flex-start; margin-top: auto; }
+.band .card.party { background: var(--red); color: #fff; }
+.band .card.party p { color: rgba(255,255,255,.9); }
+.steps { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+.steps li { display: flex; gap: 10px; align-items: center; font-weight: 600; }
+.steps li::before { content: ""; width: 10px; height: 10px; border-radius: 3px; background: var(--yellow); flex: none; transform: rotate(45deg); }
+
+/* faq */
+.faq { display: grid; gap: 10px; max-width: 860px; }
+.faq details { background: var(--paper); border-radius: 16px; padding: 4px 20px; border: 1px solid var(--line); }
+.faq summary { cursor: pointer; list-style: none; padding: 16px 0; font-weight: 800; font-size: 17px; display: flex; justify-content: space-between; gap: 12px; }
+.faq summary::-webkit-details-marker { display: none; }
+.faq summary::after { content: "+"; font-size: 24px; line-height: 1; color: var(--red); transition: transform .2s; }
+.faq details[open] summary::after { transform: rotate(45deg); }
+.faq details p { padding-bottom: 18px; color: var(--ink-2); }
+
+/* rodapé */
+footer { background: var(--ink); color: rgba(255,255,255,.85); padding-block: 48px max(32px, env(safe-area-inset-bottom, 0px)); }
+footer .wrap { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 30px; }
+footer h4 { color: #fff; font-size: 16px; margin-bottom: 12px; }
+footer ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+footer a { text-decoration: none; } footer a:hover { color: var(--yellow); }
+footer .legal { grid-column: 1 / -1; border-top: 1px solid rgba(255,255,255,.12); padding-top: 18px; font-size: 13px; color: rgba(255,255,255,.6); }
+
+/* ---------- carrinho ---------- */
+.scrim { position: fixed; inset: 0; background: rgba(39,37,31,.45); z-index: 60; opacity: 0; pointer-events: none; transition: opacity .25s; }
+.scrim.open { opacity: 1; pointer-events: auto; }
+.drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(440px, 100%); background: var(--paper); z-index: 61; transform: translateX(100%); transition: transform .35s cubic-bezier(.2,.8,.2,1); display: flex; flex-direction: column; box-shadow: var(--shadow-lg);
+  padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); padding-right: env(safe-area-inset-right, 0px); }
+.drawer.open { transform: none; }
+.dr-head { display: flex; justify-content: space-between; align-items: center; padding: 20px 22px; border-bottom: 1px solid var(--line); }
+.dr-head h3 { font-size: 24px; font-weight: 900; }
+.x { width: 42px; height: 42px; border-radius: 50%; border: 0; background: var(--cream); cursor: pointer; display: grid; place-items: center; }
+.x svg { width: 20px; height: 20px; }
+.dr-body { flex: 1; overflow: auto; padding: 18px 22px; display: grid; gap: 18px; align-content: start; }
+.empty { text-align: center; padding: 40px 10px; color: var(--muted); display: grid; gap: 12px; justify-items: center; }
+.empty svg { width: 110px; opacity: .9; }
+.line { display: grid; grid-template-columns: 56px 1fr auto; gap: 12px; align-items: center; }
+.line .thumb { width: 56px; height: 56px; border-radius: 14px; background: var(--cream); display: grid; place-items: center; }
+.line .thumb svg { height: 42px; width: auto; }
+.line b { display: block; font-size: 15px; }
+.line small { color: var(--muted); font-variant-numeric: tabular-nums; }
+.qty { display: inline-flex; align-items: center; gap: 4px; background: var(--cream); border-radius: 99px; padding: 3px; }
+.qty button { width: 32px; height: 32px; border-radius: 50%; border: 0; background: var(--paper); cursor: pointer; font-weight: 800; font-size: 16px; }
+.qty span { min-width: 22px; text-align: center; font-weight: 800; font-variant-numeric: tabular-nums; }
+fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: 8px; }
+legend { font-weight: 800; margin-bottom: 8px; }
+.opts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.opt { position: relative; }
+.opt input { position: absolute; opacity: 0; }
+.opt label { display: grid; justify-items: center; gap: 4px; padding: 12px 6px; border-radius: 14px; border: 2px solid var(--line); cursor: pointer; font-weight: 700; font-size: 13.5px; text-align: center; transition: all .2s; }
+.opt label svg { width: 24px; height: 24px; color: var(--red); }
+.opt input:checked + label { border-color: var(--red); background: #FFF1EF; }
+.opt input:focus-visible + label { outline: 3px solid var(--yellow); }
+.field { display: grid; gap: 6px; }
+.field label { font-weight: 700; font-size: 14px; }
+.field input, .field textarea { border: 2px solid var(--line); border-radius: 12px; padding: 12px 14px; background: var(--paper); resize: vertical; }
+.field input:focus, .field textarea:focus { border-color: var(--red); outline: none; }
+.dr-foot { border-top: 1px solid var(--line); padding: 18px 22px; display: grid; gap: 12px; }
+.total { display: flex; justify-content: space-between; align-items: baseline; font-variant-numeric: tabular-nums; }
+.total b { font-family: var(--display); font-size: 30px; font-weight: 900; }
+.wa { background: #1FA855; color: #fff; width: 100%; }
+.wa:hover { background: #178C46; }
+.wa[aria-disabled="true"] { opacity: .5; pointer-events: none; }
+.dr-foot small { color: var(--muted); text-align: center; font-size: 12.5px; }
+
+.toast { position: fixed; left: 50%; bottom: max(24px, env(safe-area-inset-bottom, 0px)); transform: translate(-50%, 30px); background: var(--ink); color: #fff; padding: 12px 18px; border-radius: 14px; font-weight: 700; z-index: 80; opacity: 0; transition: all .3s; display: flex; gap: 10px; align-items: center; box-shadow: var(--shadow-lg); max-width: calc(100% - 32px); }
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+.toast i { width: 22px; height: 22px; border-radius: 50%; background: var(--yellow); color: var(--ink); display: grid; place-items: center; font-style: normal; font-size: 13px; }
+
+/* ---------- responsivo ---------- */
+@media (max-width: 980px) {
+  .hero .wrap { grid-template-columns: 1fr; padding-block: 40px 100px; }
+  .hero-art { min-height: 340px; order: -1; }
+  .offers { grid-template-columns: 1fr 1fr; }
+  .offer.big { grid-column: 1 / -1; }
+  .store, .band .wrap { grid-template-columns: 1fr; }
+  footer .wrap { grid-template-columns: 1fr 1fr; }
+  footer .wrap > div:first-child { grid-column: 1 / -1; }
+}
+@media (max-width: 760px) {
+  .nav { position: fixed; top: 70px; left: 0; right: 0; flex-direction: column; background: var(--red-deep); padding: 10px max(20px, env(safe-area-inset-left, 0px)) 18px; transform: translateY(-120%); transition: transform .3s; z-index: -1; }
+  .nav.open { transform: none; }
+  .nav a { padding: 14px; }
+  .menu-toggle { display: grid; place-items: center; }
+  .cart-btn .lbl { display: none; }
+  .brand-loc { display: none; }
+}
+@media (max-width: 560px) {
+  section { padding-block: 54px; }
+  .offers { grid-template-columns: 1fr; }
+  .offer .art, .offer.big .art { width: 84px; }
+  .offer h3, .offer p, .offer.big h3, .offer.big p { padding-right: 84px; }
+  .offer h3 { font-size: 24px; }
+  .hero-ctas .btn { flex: 1 1 100%; }
+  .hero-art { min-height: 250px; }
+  .sun { width: 74%; }
+  .hero-burger { width: 62%; }
+  .hero .wrap { gap: 20px; }
+  .fries-mini { width: 86px; }
+  .price-tag b { font-size: 24px; }
+  .opts { grid-template-columns: 1fr 1fr 1fr; }
+  footer .wrap { grid-template-columns: 1fr; }
+  .pitch .wrap { font-size: 12.5px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+</style>
+</head>
+<body>
+
+<div class="pitch" id="pitch">
+  <div class="wrap">
+    <span><b>Proposta de site</b> · conceito apresentado ao restaurante. Não é o site oficial do McDonald's.</span>
+    <button type="button" id="pitch-close">Ocultar</button>
+  </div>
+</div>
+
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="#inicio" aria-label="Início">
+      <span class="brand-word">McDonald's</span>
+      <span class="brand-loc" data-cfg="cityShort">Sua cidade</span>
+    </a>
+    <nav class="nav" id="nav" aria-label="Principal">
+      <a href="#ofertas">Ofertas</a>
+      <a href="#cardapio">Cardápio</a>
+      <a href="#restaurante">Restaurante</a>
+      <a href="#festas">Festas</a>
+      <a href="#duvidas">Dúvidas</a>
+    </nav>
+    <button class="cart-btn" id="cart-open" type="button" aria-label="Abrir pedido">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><path d="M3 6h18M16 10a4 4 0 0 1-8 0"/></svg>
+      <span class="lbl">Meu pedido</span>
+      <span class="cart-count" id="cart-count">0</span>
+    </button>
+    <button class="menu-toggle" id="menu-toggle" type="button" aria-label="Abrir menu" aria-expanded="false">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+    </button>
+  </div>
+</header>
+
+<main>
+  <!-- HERO -->
+  <section class="hero" id="inicio">
+    <div class="wrap">
+      <div>
+        <span class="status" id="status"><i></i><span id="status-text">Verificando horário…</span></span>
+        <h1>Seu McDonald's, <em>a poucos minutos</em> de você.</h1>
+        <p class="lead">Veja o cardápio, monte seu pedido e mande direto pelo WhatsApp. Retire no balcão, passe no drive-thru ou receba em casa.</p>
+        <div class="hero-ctas">
+          <a class="btn btn-yellow" href="#cardapio">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+            Montar meu pedido
+          </a>
+          <a class="btn btn-ghost" href="#restaurante">Como chegar</a>
+        </div>
+        <div class="hero-facts">
+          <div><b>Drive-thru</b><span>sem descer do carro</span></div>
+          <div><b data-cfg="deliveryTime">25–40 min</b><span>tempo médio de entrega</span></div>
+          <div><b>McCafé</b><span>café e doces na loja</span></div>
+        </div>
+      </div>
+      <div class="hero-art" aria-hidden="true">
+        <div class="sun"></div>
+        <svg class="hero-burger" viewBox="0 0 240 200" data-art="burger"></svg>
+        <svg class="fries-mini" viewBox="0 0 120 150" data-art="fries"></svg>
+        <div class="price-tag"><small>Combo do dia</small><b id="hero-price">R$ 29,90</b></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- OFERTAS -->
+  <section id="ofertas">
+    <div class="wrap">
+      <div class="sec-head">
+        <div><span class="eyebrow">Só nesta loja</span><h2>Ofertas da semana</h2></div>
+        <p>Promoções da loja da sua cidade. Adicione ao pedido com um toque.</p>
+      </div>
+      <div class="offers" id="offers"></div>
+    </div>
+  </section>
+
+  <!-- CARDÁPIO -->
+  <section id="cardapio">
+    <div class="wrap">
+      <div class="sec-head">
+        <div><span class="eyebrow">Cardápio</span><h2>Escolha o seu favorito</h2></div>
+        <p>Toque no <b>+</b> para adicionar. Você revisa tudo antes de enviar.</p>
+      </div>
+      <div class="tabs" role="tablist" aria-label="Categorias" id="tabs"></div>
+      <div class="menu-grid" id="menu-grid"></div>
+      <p class="note">Preços e itens ilustrativos para a proposta. Na versão final, o restaurante define cardápio e valores. Informação nutricional aproximada.</p>
+    </div>
+  </section>
+
+  <!-- RESTAURANTE -->
+  <section id="restaurante">
+    <div class="wrap">
+      <div class="sec-head">
+        <div><span class="eyebrow">O restaurante</span><h2>Venha nos visitar</h2></div>
+      </div>
+      <div class="store">
+        <div class="card">
+          <h3>Endereço e contato</h3>
+          <div class="addr">
+            <div class="addr-row"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s7-6.2 7-12a7 7 0 1 0-14 0c0 5.8 7 12 7 12z"/><circle cx="12" cy="10" r="2.5"/></svg></span>
+              <div><b data-cfg="address">Av. Principal, 1000 — Centro</b><span data-cfg="city">Sua cidade – UF</span></div></div>
+            <div class="addr-row"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z"/></svg></span>
+              <div><b>Telefone</b><span data-cfg="phone">(00) 0000-0000</span></div></div>
+            <div class="addr-row"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-12.3 7.4L3 21l2.1-5.6A8.4 8.4 0 1 1 21 11.5z"/></svg></span>
+              <div><b>WhatsApp para pedidos</b><span data-cfg="whatsDisplay">(00) 00000-0000</span></div></div>
+          </div>
+          <a class="map" id="map-link" href="#" target="_blank" rel="noopener">
+            <span class="pin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><circle cx="12" cy="12" r="4"/></svg></span>
+            <span class="map-label">Abrir no mapa ↗</span>
+          </a>
+        </div>
+        <div class="card">
+          <h3>Horário de funcionamento</h3>
+          <table class="hours" id="hours"></table>
+          <h3 style="margin-top:26px">Serviços</h3>
+          <div class="services" id="services"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FAIXA AMARELA -->
+  <section class="band" id="festas">
+    <div class="wrap">
+      <div class="card party">
+        <span class="eyebrow" style="color:var(--yellow)">Aniversários</span>
+        <h3 style="font-size:32px">Festa no McDonald's</h3>
+        <p>Espaço decorado, lanche para a criançada e monitores para animar. Reserve com antecedência pelo WhatsApp.</p>
+        <ul class="steps"><li>Até 20 convidados</li><li>Kit lanche + bolo</li><li>2 horas de festa com recreação</li></ul>
+        <a class="btn btn-yellow" id="party-link" href="#" target="_blank" rel="noopener">Quero reservar</a>
+      </div>
+      <div class="card">
+        <span class="eyebrow">Trabalhe conosco</span>
+        <h3 style="font-size:32px">Seu primeiro emprego pode começar aqui</h3>
+        <p>Vagas para atendimento, cozinha e gerência. Horário flexível, treinamento e plano de carreira.</p>
+        <ul class="steps"><li>Jovem aprendiz a partir de 14 anos</li><li>Treinamento remunerado</li><li>Benefícios e refeição no turno</li></ul>
+        <a class="btn btn-red" id="jobs-link" href="#" target="_blank" rel="noopener">Enviar currículo</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section id="duvidas">
+    <div class="wrap">
+      <div class="sec-head"><div><span class="eyebrow">Dúvidas</span><h2>Perguntas frequentes</h2></div></div>
+      <div class="faq">
+        <details><summary>Como funciona o pedido pelo WhatsApp?</summary><p>Monte seu pedido no site, escolha retirar no balcão, no drive-thru ou receber em casa e toque em "Enviar pelo WhatsApp". A mensagem já vai pronta com itens e total. A loja confirma o pedido e o tempo de preparo.</p></details>
+        <details><summary>Quais formas de pagamento são aceitas?</summary><p>Dinheiro, Pix e cartões de crédito, débito e vale-refeição na loja e na entrega.</p></details>
+        <details><summary>Vocês entregam no meu bairro?</summary><p>Entregamos em um raio de aproximadamente 6 km. Informe seu endereço no pedido e confirmamos na hora.</p></details>
+        <details><summary>Tem opções sem glúten ou vegetarianas?</summary><p>Temos opções vegetarianas e informações de alergênicos disponíveis no balcão. Pergunte à equipe ao fazer o pedido.</p></details>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div>
+      <span class="brand-word">McDonald's</span>
+      <p style="margin-top:10px;max-width:40ch" data-cfg="footerText">Restaurante da sua cidade. Lanches, McCafé, drive-thru e delivery.</p>
+    </div>
+    <div><h4>Navegar</h4><ul><li><a href="#ofertas">Ofertas</a></li><li><a href="#cardapio">Cardápio</a></li><li><a href="#restaurante">Restaurante</a></li><li><a href="#festas">Festas</a></li></ul></div>
+    <div><h4>Contato</h4><ul><li data-cfg="phone">(00) 0000-0000</li><li data-cfg="whatsDisplay">(00) 00000-0000</li><li data-cfg="address">Av. Principal, 1000 — Centro</li></ul></div>
+    <p class="legal">Proposta de site independente, criada para apresentação ao restaurante. McDonald's e os nomes dos produtos são marcas de seus respectivos donos. Preços ilustrativos.</p>
+  </div>
+</footer>
+
+<!-- CARRINHO -->
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-label="Seu pedido" aria-hidden="true">
+  <div class="dr-head">
+    <h3>Seu pedido</h3>
+    <button class="x" id="cart-close" type="button" aria-label="Fechar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+  </div>
+  <div class="dr-body" id="dr-body"></div>
+  <div class="dr-foot">
+    <div class="total"><span>Total</span><b id="total">R$ 0,00</b></div>
+    <a class="btn wa" id="send" href="#" target="_blank" rel="noopener" aria-disabled="true">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm5.3 14.1c-.2.6-1.3 1.2-1.8 1.2-.5.1-1 .2-3.3-.7-2.8-1.1-4.6-4-4.7-4.2-.1-.2-1.1-1.5-1.1-2.9s.7-2 1-2.3c.3-.3.6-.3.8-.3h.6c.2 0 .4 0 .6.5l.9 2.1c.1.2.1.4 0 .6l-.4.6-.4.5c-.1.2-.3.3-.1.6.2.3.8 1.4 1.8 2.2 1.2 1.1 2.2 1.4 2.5 1.6.3.1.5.1.7-.1l.9-1.1c.2-.3.4-.2.7-.1l2 1c.3.1.5.2.5.3.1.2.1.7-.2 1.4z"/></svg>
+      Enviar pelo WhatsApp
+    </a>
+    <small>O pedido é confirmado pela loja no WhatsApp. Nenhum pagamento é feito no site.</small>
+  </div>
+</aside>
+
+<div class="toast" id="toast" role="status"><i>✓</i><span id="toast-text"></span></div>
+
+<script>
+/* =========================================================
+   CONFIGURAÇÃO DA LOJA — edite aqui para a versão final
+   ========================================================= */
+const CONFIG = {
+  cityShort: 'Sua cidade',
+  city: 'Sua cidade – UF',
+  address: 'Av. Principal, 1000 — Centro',
+  phone: '(00) 0000-0000',
+  whatsapp: '5500000000000',          // DDI + DDD + número, só dígitos
+  whatsDisplay: '(00) 00000-0000',
+  mapsQuery: "McDonald's Av. Principal 1000 Centro",
+  deliveryTime: '25–40 min',
+  deliveryFee: 6.99,
+  jobsUrl: 'https://wa.me/5500000000000?text=Ol%C3%A1!%20Quero%20enviar%20meu%20curr%C3%ADculo.',
+  footerText: 'Restaurante da sua cidade. Lanches, McCafé, drive-thru e delivery.',
+  // 0 = domingo ... 6 = sábado. Horário de fechamento depois da meia-noite: use 24+ (ex.: "25:00" = 1h).
+  hours: { 0: ['10:00', '24:00'], 1: ['10:00', '23:00'], 2: ['10:00', '23:00'], 3: ['10:00', '23:00'], 4: ['10:00', '23:00'], 5: ['10:00', '25:00'], 6: ['10:00', '25:00'] },
+  services: ['Drive-thru', 'Delivery', 'McCafé', 'Wi-Fi grátis', 'Estacionamento', 'Acessibilidade', 'Festas'],
+};
+
+/* ---------- ilustrações (SVG desenhado à mão) ---------- */
+const ART = {
+  burger: `<ellipse cx="120" cy="186" rx="96" ry="10" fill="rgba(0,0,0,.12)"/>
+    <path d="M28 150h184c0 18-14 30-32 30H60c-18 0-32-12-32-30z" fill="#E59A3D"/>
+    <path d="M22 132c30 10 60-6 98 4s68-6 98-4c4 0 6 6 2 9-30 16-170 16-200 0-4-3-2-9 2-9z" fill="#5BA13A"/>
+    <rect x="24" y="112" width="192" height="26" rx="13" fill="#6B3418"/>
+    <path d="M30 104l12 18 12-14 14 18 14-16 14 18 14-16 14 18 14-16 14 18 14-16 14 18 14-16 10 14 6-24z" fill="#FFC72C"/>
+    <rect x="24" y="86" width="192" height="24" rx="12" fill="#7A3C1C"/>
+    <path d="M22 82C22 36 66 14 120 14s98 22 98 68c0 6-4 8-10 8H32c-6 0-10-2-10-8z" fill="#F2A541"/>
+    <path d="M40 74c4-28 34-46 80-46" stroke="#FBD08A" stroke-width="8" stroke-linecap="round" fill="none" opacity=".7"/>
+    <g fill="#FFF3D6"><ellipse cx="80" cy="40" rx="5" ry="3" transform="rotate(-20 80 40)"/><ellipse cx="112" cy="30" rx="5" ry="3"/><ellipse cx="146" cy="36" rx="5" ry="3" transform="rotate(20 146 36)"/><ellipse cx="96" cy="58" rx="5" ry="3"/><ellipse cx="132" cy="56" rx="5" ry="3" transform="rotate(10 132 56)"/><ellipse cx="168" cy="54" rx="5" ry="3" transform="rotate(25 168 54)"/><ellipse cx="66" cy="60" rx="5" ry="3" transform="rotate(-30 66 60)"/></g>`,
+  fries: `<g fill="#FFC72C" stroke="#E8A912" stroke-width="2"><rect x="30" y="8" width="12" height="80" rx="3" transform="rotate(-10 36 48)"/><rect x="46" y="2" width="12" height="86" rx="3" transform="rotate(-3 52 45)"/><rect x="62" y="0" width="12" height="88" rx="3" transform="rotate(4 68 44)"/><rect x="78" y="6" width="12" height="82" rx="3" transform="rotate(10 84 47)"/><rect x="54" y="12" width="12" height="78" rx="3"/></g>
+    <path d="M18 60h84l-10 84c-1 4-4 6-8 6H36c-4 0-7-2-8-6z" fill="#DA291C"/>
+    <path d="M18 60h84l-2 16H20z" fill="#B71C12"/>
+    <path d="M44 104c6 8 26 8 32 0" stroke="#FFC72C" stroke-width="6" stroke-linecap="round" fill="none"/>`,
+  drink: `<path d="M66 4l-6 34" stroke="#27251F" stroke-width="6" stroke-linecap="round"/>
+    <path d="M18 36h84l-3 12H21z" fill="#F4F4F4" stroke="#DDD" stroke-width="2"/>
+    <path d="M22 48h76l-10 96c-.5 5-4 8-9 8H41c-5 0-8.5-3-9-8z" fill="#DA291C"/>
+    <path d="M28 82h64l-2 26H30z" fill="#FFC72C"/>
+    <path d="M44 62c0 50 4 70 4 80" stroke="rgba(255,255,255,.35)" stroke-width="5" stroke-linecap="round" fill="none"/>`,
+  nuggets: `<path d="M10 70h100l-8 66c-.6 5-5 8-10 8H28c-5 0-9-3-10-8z" fill="#FFC72C"/>
+    <path d="M10 70h100v12H10z" fill="#E8A912"/>
+    <g fill="#E9A04A" stroke="#C97C2A" stroke-width="2"><path d="M18 62c-4-16 8-26 22-24 14 2 18 18 10 26-6 6-28 8-32-2z"/><path d="M50 56c-2-18 14-26 26-22 14 4 16 20 6 28-8 6-30 6-32-6z"/><path d="M80 62c-4-14 8-24 18-22 12 2 14 16 8 24-6 6-22 6-26-2z"/><path d="M34 40c-2-14 12-22 22-18 12 4 12 16 4 22-8 6-24 6-26-4z"/></g>`,
+  icecream: `<path d="M38 70l22 78 22-78z" fill="#E9B26A"/><path d="M38 70l22 78 22-78" stroke="#C98D3E" stroke-width="2" fill="none"/>
+    <path d="M44 84l30 10M42 100l26 8M48 116l18 6" stroke="#C98D3E" stroke-width="2"/>
+    <path d="M30 70c-4-14 8-22 16-20 0-12 10-20 18-18 4-10 16-10 20 0 10 2 14 12 10 20 8 2 12 12 6 18z" fill="#FFF8EC" stroke="#EADBC0" stroke-width="2"/>
+    <path d="M56 22c4-10 10-14 10-14" stroke="#EADBC0" stroke-width="5" stroke-linecap="round" fill="none"/>`,
+  sundae: `<path d="M22 64h76l-10 76c-.6 5-5 8-10 8H42c-5 0-9-3-10-8z" fill="#FFFFFF" stroke="#E7DCC8" stroke-width="2"/>
+    <path d="M26 92h68" stroke="#DA291C" stroke-width="8"/>
+    <path d="M18 64c0-18 16-28 30-26 6-14 30-14 36 0 14-2 22 10 18 26z" fill="#FFF8EC" stroke="#EADBC0" stroke-width="2"/>
+    <path d="M30 56c10 4 20-6 30 0s20-4 30 2" stroke="#6B3418" stroke-width="7" stroke-linecap="round" fill="none"/>
+    <path d="M60 40V10" stroke="#27251F" stroke-width="5" stroke-linecap="round"/><ellipse cx="60" cy="10" rx="9" ry="5" fill="#27251F"/>`,
+  coffee: `<path d="M24 50h68l-8 86c-.5 6-5 10-11 10H43c-6 0-10.5-4-11-10z" fill="#FFFFFF" stroke="#E7DCC8" stroke-width="2"/>
+    <path d="M20 40h76v12H20z" rx="4" fill="#27251F"/><path d="M28 34h60v8H28z" fill="#4A4740"/>
+    <path d="M30 84h56l-3 32H33z" fill="#7A4A2A"/>
+    <path d="M92 70c16 0 16 26 0 26" stroke="#E7DCC8" stroke-width="6" fill="none"/>
+    <path d="M46 26c0-8 8-8 8-16M62 26c0-8 8-8 8-16" stroke="#C9BBA0" stroke-width="4" stroke-linecap="round" fill="none"/>`,
+  pie: `<rect x="14" y="54" width="92" height="46" rx="12" fill="#E59A3D"/>
+    <rect x="14" y="54" width="92" height="46" rx="12" fill="none" stroke="#C97C2A" stroke-width="3"/>
+    <path d="M30 66l10 20M50 64l10 22M70 64l10 22M88 66l6 14" stroke="#C97C2A" stroke-width="4" stroke-linecap="round"/>
+    <path d="M10 104h100l-6 28c-1 4-4 6-8 6H24c-4 0-7-2-8-6z" fill="#DA291C"/>`,
+  happy: `<path d="M14 58h92v76c0 6-4 10-10 10H24c-6 0-10-4-10-10z" fill="#DA291C"/>
+    <path d="M14 58l14-34h64l14 34z" fill="#B71C12"/>
+    <path d="M40 24c0-18 40-18 40 0" stroke="#FFC72C" stroke-width="7" fill="none" stroke-linecap="round"/>
+    <circle cx="44" cy="92" r="6" fill="#FFC72C"/><circle cx="76" cy="92" r="6" fill="#FFC72C"/>
+    <path d="M40 110c10 14 30 14 40 0" stroke="#FFC72C" stroke-width="7" stroke-linecap="round" fill="none"/>`,
+  muffin: `<path d="M18 88h84l-10 50c-1 5-5 8-10 8H38c-5 0-9-3-10-8z" fill="#FFC72C"/>
+    <path d="M28 96l4 46M44 96l2 46M60 96v46M76 96l-2 46M92 96l-4 46" stroke="#E8A912" stroke-width="3"/>
+    <path d="M12 88c-4-26 20-44 48-44s52 18 48 44z" fill="#E59A3D"/>
+    <g fill="#FFF3D6"><circle cx="40" cy="66" r="4"/><circle cx="60" cy="58" r="4"/><circle cx="80" cy="68" r="4"/><circle cx="52" cy="78" r="4"/><circle cx="72" cy="80" r="4"/></g>`,
+};
+const artSvg = (name, vb = '0 0 120 150') => `<svg viewBox="${name === 'burger' ? '0 0 240 200' : vb}" aria-hidden="true">${ART[name]}</svg>`;
+document.querySelectorAll('[data-art]').forEach((el) => { el.innerHTML = ART[el.dataset.art]; });
+
+/* ---------- cardápio (preços ilustrativos) ---------- */
+const CATS = [
+  { id: 'sand', name: 'Sanduíches', art: 'burger' },
+  { id: 'acomp', name: 'Acompanhamentos', art: 'fries' },
+  { id: 'beb', name: 'Bebidas', art: 'drink' },
+  { id: 'sobre', name: 'Sobremesas', art: 'sundae' },
+  { id: 'cafe', name: 'McCafé', art: 'coffee' },
+  { id: 'kids', name: 'McLanche Feliz', art: 'happy' },
+];
+const MENU = [
+  { id: 'bigmac', cat: 'sand', name: 'Big Mac', desc: 'Dois hambúrgueres, alface, queijo, molho especial, cebola e picles no pão com gergelim.', price: 26.9, kcal: 504, art: 'burger' },
+  { id: 'quarter', cat: 'sand', name: 'Quarteirão com Queijo', desc: 'Hambúrguer de carne 100% bovina, duas fatias de queijo, cebola, picles, ketchup e mostarda.', price: 28.9, kcal: 518, art: 'burger' },
+  { id: 'mcchicken', cat: 'sand', name: 'McChicken', desc: 'Frango empanado e crocante, alface e maionese no pão com gergelim.', price: 22.9, kcal: 405, art: 'burger' },
+  { id: 'cheddar', cat: 'sand', name: 'Cheddar McMelt', desc: 'Hambúrguer, molho cremoso de cheddar e cebola grelhada no pão escuro.', price: 25.9, kcal: 490, art: 'burger', isNew: true },
+  { id: 'cheese', cat: 'sand', name: 'Cheeseburger', desc: 'Hambúrguer, queijo, picles, cebola, ketchup e mostarda.', price: 12.9, kcal: 302, art: 'burger' },
+  { id: 'nuggets', cat: 'acomp', name: 'McNuggets 10 un.', desc: 'Pedaços de frango empanados, com molho à sua escolha.', price: 24.9, kcal: 432, art: 'nuggets' },
+  { id: 'friesM', cat: 'acomp', name: 'McFritas Média', desc: 'Batatas fritas douradas e crocantes por fora, macias por dentro.', price: 12.9, kcal: 313, art: 'fries' },
+  { id: 'friesG', cat: 'acomp', name: 'McFritas Grande', desc: 'Para dividir (ou não).', price: 14.9, kcal: 419, art: 'fries' },
+  { id: 'coke', cat: 'beb', name: 'Refrigerante 500 ml', desc: 'Coca-Cola, Coca-Cola sem açúcar, Guaraná ou Fanta.', price: 10.9, kcal: 210, art: 'drink' },
+  { id: 'juice', cat: 'beb', name: 'Suco de laranja', desc: 'Suco de laranja 300 ml.', price: 9.9, kcal: 135, art: 'drink' },
+  { id: 'water', cat: 'beb', name: 'Água mineral', desc: 'Com ou sem gás, 500 ml.', price: 5.9, kcal: 0, art: 'drink' },
+  { id: 'mcflurry', cat: 'sobre', name: 'McFlurry', desc: 'Sorvete cremoso com pedaços de chocolate ou biscoito.', price: 15.9, kcal: 340, art: 'sundae' },
+  { id: 'sundae', cat: 'sobre', name: 'Sundae', desc: 'Sorvete de baunilha com cobertura de chocolate ou morango.', price: 11.9, kcal: 310, art: 'sundae' },
+  { id: 'casquinha', cat: 'sobre', name: 'Casquinha', desc: 'O clássico sorvete de baunilha na casquinha.', price: 4.9, kcal: 150, art: 'icecream' },
+  { id: 'torta', cat: 'sobre', name: 'Torta de Maçã', desc: 'Massa crocante recheada de maçã com canela.', price: 7.9, kcal: 230, art: 'pie' },
+  { id: 'espresso', cat: 'cafe', name: 'Café expresso', desc: 'Grãos 100% arábica, moídos na hora.', price: 6.9, kcal: 5, art: 'coffee' },
+  { id: 'cappu', cat: 'cafe', name: 'Cappuccino', desc: 'Café, leite vaporizado e espuma cremosa.', price: 11.9, kcal: 120, art: 'coffee' },
+  { id: 'muffin', cat: 'cafe', name: 'Muffin de chocolate', desc: 'Massa fofinha com gotas de chocolate.', price: 9.9, kcal: 390, art: 'muffin' },
+  { id: 'happy', cat: 'kids', name: 'McLanche Feliz', desc: 'Sanduíche, acompanhamento, bebida e um brinquedo surpresa.', price: 27.9, kcal: 470, art: 'happy' },
+];
+const OFFERS = [
+  { id: 'combo-dia', cls: 'big', tag: 'Combo do dia', title: 'Big Mac + McFritas Média + Bebida', text: 'O trio mais pedido da casa com preço especial todos os dias.', price: 29.9, from: 50.7, art: 'burger' },
+  { id: 'nug-dupla', cls: 'red', tag: 'Para dividir', title: '20 McNuggets', text: 'Com 4 molhos à escolha.', price: 39.9, from: 49.8, art: 'nuggets' },
+  { id: 'sobremesa-2', cls: 'ink', tag: 'Doce em dobro', title: '2 Sundaes', text: 'Leve dois, pague menos.', price: 17.9, from: 23.8, art: 'sundae' },
+];
+
+/* ---------- utilidades ---------- */
+const $ = (s) => document.querySelector(s);
+const brl = (v) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const plusIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>';
+let toastT;
+function toast(msg) { $('#toast-text').textContent = msg; $('#toast').classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => $('#toast').classList.remove('show'), 2200); }
+
+/* ---------- configuração aplicada à página ---------- */
+document.querySelectorAll('[data-cfg]').forEach((el) => { if (CONFIG[el.dataset.cfg] != null) el.textContent = CONFIG[el.dataset.cfg]; });
+const waLink = (text) => `https://wa.me/${CONFIG.whatsapp}?text=${encodeURIComponent(text)}`;
+$('#map-link').href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(CONFIG.mapsQuery)}`;
+$('#party-link').href = waLink('Olá! Gostaria de saber sobre reserva de festa de aniversário.');
+$('#jobs-link').href = CONFIG.jobsUrl;
+$('#hero-price').textContent = brl(OFFERS[0].price);
+
+/* ---------- horário + aberto agora ---------- */
+const DAYS = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+const toMin = (hhmm) => { const [h, m] = hhmm.split(':').map(Number); return h * 60 + m; };
+const fmtH = (hhmm) => { const [h, m] = hhmm.split(':').map(Number); return `${String(h % 24).padStart(2, '0')}h${m ? String(m).padStart(2, '0') : ''}`; };
+function renderHours() {
+  const today = new Date().getDay();
+  $('#hours').innerHTML = [1, 2, 3, 4, 5, 6, 0].map((d) => {
+    const h = CONFIG.hours[d];
+    return `<tr class="${d === today ? 'today' : ''}"><td>${DAYS[d]}</td><td>${h ? `${fmtH(h[0])} – ${fmtH(h[1])}` : 'Fechado'}</td></tr>`;
+  }).join('');
+}
+function updateStatus() {
+  const now = new Date(); const d = now.getDay(); const mins = now.getHours() * 60 + now.getMinutes();
+  const yest = CONFIG.hours[(d + 6) % 7];
+  const today = CONFIG.hours[d];
+  let open = false; let closeAt = null;
+  if (yest && toMin(yest[1]) > 1440 && mins < toMin(yest[1]) - 1440) { open = true; closeAt = yest[1]; }
+  if (today && mins >= toMin(today[0]) && mins < toMin(today[1])) { open = true; closeAt = today[1]; }
+  const el = $('#status');
+  el.classList.toggle('closed', !open);
+  if (open) $('#status-text').textContent = `Aberto agora · fecha às ${fmtH(closeAt)}`;
+  else $('#status-text').textContent = today && mins < toMin(today[0]) ? `Fechado · abre hoje às ${fmtH(today[0])}` : 'Fechado agora · abre amanhã';
+}
+renderHours(); updateStatus(); setInterval(updateStatus, 60000);
+
+const SVC_ICONS = {
+  'Drive-thru': '<path d="M5 17h14M6 17l1.5-6h9L18 17M8 11l1-4h6l1 4"/><circle cx="8" cy="18" r="1.5"/><circle cx="16" cy="18" r="1.5"/>',
+  'Delivery': '<circle cx="6" cy="17" r="3"/><circle cx="18" cy="17" r="3"/><path d="M9 17h6l-2-7H9M13 10l2-4h3M18 14l-3-4"/>',
+  'McCafé': '<path d="M4 9h13v5a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5z"/><path d="M17 10h1.5a2.5 2.5 0 0 1 0 5H17M8 3v3M12 3v3"/>',
+  'Wi-Fi grátis': '<path d="M5 12.6a11 11 0 0 1 14 0M8.5 16a6 6 0 0 1 7 0M2 9a16 16 0 0 1 20 0"/><path d="M12 20h.01"/>',
+  'Estacionamento': '<rect x="3" y="3" width="18" height="18" rx="3"/><path d="M9 17V7h4a3 3 0 0 1 0 6H9"/>',
+  'Acessibilidade': '<circle cx="12" cy="4" r="2"/><path d="M12 7v6h5l2 6M12 10H7M9 14a5 5 0 1 0 5 6"/>',
+  'Festas': '<path d="M12 3v3M5 21l5-12 5 5zM15 6l2-2M18 10h3M17 14l2 1"/>',
+};
+$('#services').innerHTML = CONFIG.services.map((s) => `<span class="svc"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${SVC_ICONS[s] || ''}</svg>${esc(s)}</span>`).join('');
+
+/* ---------- ofertas + cardápio ---------- */
+$('#offers').innerHTML = OFFERS.map((o) => `<article class="offer ${o.cls}">
+  <span class="tag">${esc(o.tag)}</span>
+  ${artSvg(o.art).replace('<svg', '<svg class="art"')}
+  <div><h3>${esc(o.title)}</h3><p style="margin-top:8px">${esc(o.text)}</p></div>
+  <div class="row"><span class="price"><s>${brl(o.from)}</s>${brl(o.price)}</span>
+  <button class="add-chip" type="button" data-add="${o.id}">${plusIcon} Adicionar</button></div></article>`).join('');
+
+let activeCat = 'sand';
+function renderTabs() {
+  $('#tabs').innerHTML = CATS.map((c) => `<button class="tab ${c.id === activeCat ? 'active' : ''}" role="tab" aria-selected="${c.id === activeCat}" data-cat="${c.id}">${artSvg(c.art)}${esc(c.name)}</button>`).join('');
+}
+function renderMenu() {
+  $('#menu-grid').innerHTML = MENU.filter((m) => m.cat === activeCat).map((m, i) => `<article class="item" style="--i:${i}">
+    <div class="pic">${artSvg(m.art)}</div>
+    ${m.isNew ? '<span class="badge-new">Novidade</span>' : ''}
+    <h4>${esc(m.name)}</h4><p>${esc(m.desc)}</p>
+    <div class="meta"><div><div class="price">${brl(m.price)}</div><span class="kcal">${m.kcal} kcal</span></div>
+    <button class="plus" type="button" data-add="${m.id}" aria-label="Adicionar ${esc(m.name)}">${plusIcon}</button></div></article>`).join('');
+}
+$('#tabs').addEventListener('click', (e) => { const b = e.target.closest('[data-cat]'); if (!b) return; activeCat = b.dataset.cat; renderTabs(); renderMenu(); });
+renderTabs(); renderMenu();
+
+/* ---------- pedido ---------- */
+const ALL = Object.fromEntries([...MENU, ...OFFERS.map((o) => ({ id: o.id, name: o.title, price: o.price, art: o.art }))].map((x) => [x.id, x]));
+let cart = {};
+try { cart = JSON.parse(localStorage.getItem('mcd-cart') || '{}') || {}; } catch { cart = {}; }
+const form = { mode: 'balcao', name: '', address: '', notes: '' };
+const save = () => { try { localStorage.setItem('mcd-cart', JSON.stringify(cart)); } catch { /* sem armazenamento */ } };
+
+function add(id) {
+  if (!ALL[id]) return;
+  cart[id] = (cart[id] || 0) + 1; save(); renderCart();
+  const c = $('#cart-count'); c.classList.remove('bump'); void c.offsetWidth; c.classList.add('bump');
+  toast(`${ALL[id].name} adicionado`);
+}
+document.addEventListener('click', (e) => { const b = e.target.closest('[data-add]'); if (b) add(b.dataset.add); });
+
+function totals() {
+  const sub = Object.entries(cart).reduce((s, [id, q]) => s + (ALL[id]?.price || 0) * q, 0);
+  const fee = form.mode === 'entrega' && sub > 0 ? CONFIG.deliveryFee : 0;
+  return { sub, fee, total: sub + fee, count: Object.values(cart).reduce((a, b) => a + b, 0) };
+}
+
+function renderCart() {
+  const t = totals();
+  $('#cart-count').textContent = t.count;
+  $('#total').textContent = brl(t.total);
+  const lines = Object.entries(cart).filter(([id]) => ALL[id]);
+  const body = $('#dr-body');
+  if (!lines.length) {
+    body.innerHTML = `<div class="empty">${artSvg('burger')}<b style="color:var(--ink);font-size:18px">Seu pedido está vazio</b><span>Escolha algo no cardápio para começar.</span><a class="btn btn-red" href="#cardapio" data-close>Ver cardápio</a></div>`;
+  } else {
+    body.innerHTML = `<div style="display:grid;gap:14px">${lines.map(([id, q]) => `<div class="line"><span class="thumb">${artSvg(ALL[id].art)}</span>
+      <div><b>${esc(ALL[id].name)}</b><small>${brl(ALL[id].price)} cada</small></div>
+      <div class="qty"><button type="button" data-dec="${id}" aria-label="Remover um">−</button><span>${q}</span><button type="button" data-inc="${id}" aria-label="Adicionar um">+</button></div></div>`).join('')}</div>
+      <fieldset><legend>Como você quer receber?</legend><div class="opts">
+        ${[['balcao', 'Retirar no balcão', '<path d="M3 10h18M5 10V20h14V10M8 6h8l2 4H6z"/>'], ['drive', 'Drive-thru', SVC_ICONS['Drive-thru']], ['entrega', 'Entrega', SVC_ICONS.Delivery]].map(([v, l, ic]) =>
+          `<div class="opt"><input type="radio" name="mode" id="mode-${v}" value="${v}" ${form.mode === v ? 'checked' : ''}><label for="mode-${v}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ic}</svg>${l}</label></div>`).join('')}
+      </div></fieldset>
+      <div class="field"><label for="f-name">Seu nome</label><input id="f-name" autocomplete="name" value="${esc(form.name)}" placeholder="Como devemos chamar você"></div>
+      <div class="field" ${form.mode === 'entrega' ? '' : 'hidden'}><label for="f-addr">Endereço de entrega</label><input id="f-addr" autocomplete="street-address" value="${esc(form.address)}" placeholder="Rua, número, bairro"></div>
+      <div class="field"><label for="f-notes">Observações</label><textarea id="f-notes" rows="2" placeholder="Ex.: sem picles, troco para R$ 50">${esc(form.notes)}</textarea></div>
+      <div style="display:grid;gap:6px;font-variant-numeric:tabular-nums;color:var(--ink-2)">
+        <div style="display:flex;justify-content:space-between"><span>Subtotal</span><span>${brl(t.sub)}</span></div>
+        ${t.fee ? `<div style="display:flex;justify-content:space-between"><span>Taxa de entrega</span><span>${brl(t.fee)}</span></div>` : ''}
+      </div>`;
+  }
+  updateSend();
+}
+
+function updateSend() {
+  const t = totals();
+  const lines = Object.entries(cart).filter(([id]) => ALL[id]);
+  const needsAddr = form.mode === 'entrega' && !form.address.trim();
+  const ok = lines.length && form.name.trim() && !needsAddr;
+  const send = $('#send');
+  send.setAttribute('aria-disabled', ok ? 'false' : 'true');
+  const modeLabel = { balcao: 'Retirar no balcão', drive: 'Drive-thru', entrega: 'Entrega' }[form.mode];
+  const msg = [
+    `Olá! Quero fazer um pedido pelo site:`, '',
+    ...lines.map(([id, q]) => `• ${q}x ${ALL[id].name} — ${brl(ALL[id].price * q)}`), '',
+    t.fee ? `Taxa de entrega: ${brl(t.fee)}` : null,
+    `Total: ${brl(t.total)}`,
+    `Receber: ${modeLabel}`,
+    form.mode === 'entrega' ? `Endereço: ${form.address.trim()}` : null,
+    `Nome: ${form.name.trim()}`,
+    form.notes.trim() ? `Obs.: ${form.notes.trim()}` : null,
+  ].filter((x) => x !== null).join('\n');
+  send.href = ok ? waLink(msg) : '#';
+  send.title = ok ? '' : !lines.length ? 'Adicione itens ao pedido' : !form.name.trim() ? 'Informe seu nome' : 'Informe o endereço de entrega';
+}
+
+$('#dr-body').addEventListener('click', (e) => {
+  const inc = e.target.closest('[data-inc]'); const dec = e.target.closest('[data-dec]');
+  if (inc) { cart[inc.dataset.inc]++; save(); renderCart(); }
+  if (dec) { const id = dec.dataset.dec; cart[id]--; if (cart[id] <= 0) delete cart[id]; save(); renderCart(); }
+  if (e.target.closest('[data-close]')) closeCart();
+});
+$('#dr-body').addEventListener('change', (e) => { if (e.target.name === 'mode') { form.mode = e.target.value; renderCart(); } });
+$('#dr-body').addEventListener('input', (e) => {
+  if (e.target.id === 'f-name') form.name = e.target.value;
+  if (e.target.id === 'f-addr') form.address = e.target.value;
+  if (e.target.id === 'f-notes') form.notes = e.target.value;
+  updateSend();
+});
+$('#send').addEventListener('click', (e) => {
+  if ($('#send').getAttribute('aria-disabled') === 'true') { e.preventDefault(); toast($('#send').title || 'Complete o pedido'); }
+});
+
+function openCart() { $('#drawer').classList.add('open'); $('#scrim').classList.add('open'); $('#drawer').setAttribute('aria-hidden', 'false'); setTimeout(() => $('#cart-close').focus(), 50); }
+function closeCart() { $('#drawer').classList.remove('open'); $('#scrim').classList.remove('open'); $('#drawer').setAttribute('aria-hidden', 'true'); }
+$('#cart-open').addEventListener('click', openCart);
+$('#cart-close').addEventListener('click', closeCart);
+$('#scrim').addEventListener('click', closeCart);
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeCart(); });
+renderCart();
+
+/* ---------- menu mobile + faixa ---------- */
+$('#menu-toggle').addEventListener('click', () => { const open = $('#nav').classList.toggle('open'); $('#menu-toggle').setAttribute('aria-expanded', String(open)); });
+$('#nav').addEventListener('click', (e) => { if (e.target.closest('a')) { $('#nav').classList.remove('open'); $('#menu-toggle').setAttribute('aria-expanded', 'false'); } });
+$('#pitch-close').addEventListener('click', () => { $('#pitch').hidden = true; });
+</script>
+</body>
+</html>
