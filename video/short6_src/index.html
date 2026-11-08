@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8">
+<style>
+html,body{margin:0;width:1080px;height:1920px;overflow:hidden;background:#000;font-family:"Inter Display","Inter",sans-serif}
+canvas#gl{position:absolute;inset:0;filter:contrast(1.12) saturate(1.15)}
+#ui{position:absolute;inset:0;color:#fff;pointer-events:none;overflow:hidden}
+.vig{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 50%,rgba(0,0,0,0) 45%,rgba(0,0,0,.75) 100%)}
+.hud{position:absolute;font:600 30px "JetBrains Mono",monospace;color:rgba(220,240,255,.85);letter-spacing:2px;text-shadow:0 0 8px rgba(120,200,255,.6)}
+.chap{position:absolute;left:0;right:0;top:230px;text-align:center}
+.chap .n{font:600 28px "JetBrains Mono",monospace;letter-spacing:12px;color:#ffb347}
+.chap .t{font:italic 700 92px "Liberation Serif","DejaVu Serif",serif;color:#fff;margin-top:14px;text-shadow:0 6px 30px rgba(0,0,0,.9)}
+.chap .l{width:120px;height:3px;background:#ffb347;margin:22px auto 0}
+.sub{position:absolute;left:70px;right:70px;top:1360px;text-align:center}
+.sub span.box{display:inline;background:rgba(0,0,0,.62);box-decoration-break:clone;-webkit-box-decoration-break:clone;padding:8px 18px;border-radius:14px;line-height:1.55;
+ font:900 64px "Inter Display";text-transform:uppercase;letter-spacing:-.5px}
+.w{display:inline-block;margin:0 .14em}
+.act{color:#ffe600;text-shadow:0 0 24px rgba(255,230,0,.55)}
+.dim{color:rgba(255,255,255,.95)}
+.glbar{position:absolute;left:0;right:0;mix-blend-mode:screen}
+</style></head><body>
+<canvas id="grain" width="270" height="480" style="position:absolute;inset:0;width:1080px;height:1920px;opacity:.13;mix-blend-mode:overlay;image-rendering:pixelated;z-index:3"></canvas>
+<script src="node_modules/three/build/three.min.js"></script>
+<div id="ui"></div>
+<script>
+const W=1080,H=1920;
+const renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});
+renderer.setSize(W,H);renderer.setPixelRatio(1);renderer.domElement.id='gl';
+document.body.insertBefore(renderer.domElement,document.body.firstChild);
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x000000);
+const cam=new THREE.PerspectiveCamera(50,W/H,.05,2000);
+scene.add(new THREE.AmbientLight(0xffffff,.25));
+const key=new THREE.PointLight(0xffb070,3,120,1.2);key.position.set(0,0,0);scene.add(key);const fill=new THREE.DirectionalLight(0xbfd8ff,1.1);fill.position.set(3,4,20);scene.add(fill);
+let seed=77;const rnd=()=>(seed=(seed*16807)%2147483647)/2147483647;
+
+// estrelas
+const stars=(()=>{const g=new THREE.BufferGeometry(),p=[],c=[];for(let i=0;i<5000;i++){const v=new THREE.Vector3(rnd()-.5,rnd()-.5,rnd()-.5).normalize().multiplyScalar(400+rnd()*400);p.push(v.x,v.y,v.z);const k=.6+rnd()*.4;c.push(k,k*(.85+rnd()*.15),k*(.8+rnd()*.3))}
+ g.setAttribute('position',new THREE.Float32BufferAttribute(p,3));g.setAttribute('color',new THREE.Float32BufferAttribute(c,3));
+ const s=new THREE.Points(g,new THREE.PointsMaterial({size:1.3,vertexColors:true}));scene.add(s);return s})();
+
+// disco de acreção (textura polar)
+function diskTex(){const cv=document.createElement('canvas');cv.width=cv.height=1024;const c=cv.getContext('2d');const cx=512;
+ const g=c.createRadialGradient(cx,cx,150,cx,cx,512);g.addColorStop(0,'rgba(255,255,240,1)');g.addColorStop(.18,'rgba(255,220,150,1)');g.addColorStop(.45,'rgba(255,140,40,.9)');g.addColorStop(.8,'rgba(170,50,10,.45)');g.addColorStop(1,'rgba(60,10,0,0)');
+ c.fillStyle=g;c.beginPath();c.arc(cx,cx,512,0,7);c.fill();
+ c.globalCompositeOperation='lighter';
+ for(let i=0;i<900;i++){const r=170+Math.pow(rnd(),1.3)*330,a0=rnd()*7,len=.2+rnd()*1.2;c.strokeStyle=`rgba(255,${150+rnd()*100},${60+rnd()*80},${.05+rnd()*.12})`;c.lineWidth=1+rnd()*4;c.beginPath();c.arc(cx,cx,r,a0,a0+len);c.stroke()}
+ c.globalCompositeOperation='destination-out';const h=c.createRadialGradient(cx,cx,0,cx,cx,170);h.addColorStop(0,'rgba(0,0,0,1)');h.addColorStop(.9,'rgba(0,0,0,1)');h.addColorStop(1,'rgba(0,0,0,0)');c.fillStyle=h;c.beginPath();c.arc(cx,cx,175,0,7);c.fill();
+ return new THREE.CanvasTexture(cv)}
+const dTex=diskTex();
+const bh=new THREE.Group();scene.add(bh);
+const disk=new THREE.Mesh(new THREE.PlaneGeometry(14,14),new THREE.MeshBasicMaterial({map:dTex,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide}));
+disk.rotation.x=-Math.PI/2;bh.add(disk);
+const halo=new THREE.Mesh(new THREE.PlaneGeometry(9.5,9.5),new THREE.MeshBasicMaterial({map:dTex,transparent:true,opacity:.85,blending:THREE.AdditiveBlending,depthWrite:false}));
+halo.position.z=-.3;bh.add(halo); // anel "lenteado" atrás
+const hole=new THREE.Mesh(new THREE.SphereGeometry(1.55,64,48),new THREE.MeshBasicMaterial({color:0x000000}));bh.add(hole);
+const photon=new THREE.Mesh(new THREE.TorusGeometry(1.62,.035,12,160),new THREE.MeshBasicMaterial({color:0xfff4d6}));bh.add(photon);
+const glow=new THREE.Mesh(new THREE.SphereGeometry(9,32,24),new THREE.MeshBasicMaterial({color:0xff7a1a,transparent:true,opacity:.06,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.BackSide}));bh.add(glow);
+
+// raios de luz
+const rays=[];const RN=240;for(let i=0;i<13;i++){const y0=-3.6+i*.6;const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.BufferAttribute(new Float32Array(RN*3),3));
+ const l=new THREE.Points(geo,new THREE.PointsMaterial({color:0xfff2a0,size:.09,transparent:true,opacity:.95}));l.userData={y0};l.position.z=1.7;scene.add(l);rays.push(l)}
+
+// astronauta
+const astro=new THREE.Group();scene.add(astro);
+{const wm=new THREE.MeshStandardMaterial({color:0xf2f2f2,roughness:.5});
+ const body=new THREE.Mesh(new THREE.CapsuleGeometry(.32,.7,8,16),wm);
+ const helm=new THREE.Mesh(new THREE.SphereGeometry(.3,24,16),wm);helm.position.y=.72;
+ const visor=new THREE.Mesh(new THREE.SphereGeometry(.22,24,16,0,Math.PI*2,0,Math.PI/2),new THREE.MeshStandardMaterial({color:0xd4a017,metalness:1,roughness:.15}));visor.position.set(0,.74,.14);visor.rotation.x=Math.PI/2;
+ const pack=new THREE.Mesh(new THREE.BoxGeometry(.5,.6,.25),new THREE.MeshStandardMaterial({color:0xcfd4da}));pack.position.set(0,.15,-.32);
+ const armL=new THREE.Mesh(new THREE.CapsuleGeometry(.1,.45,6,10),wm);armL.position.set(-.42,.15,0);armL.rotation.z=.5;
+ const armR=armL.clone();armR.position.x=.42;armR.rotation.z=-.5;
+ const legL=new THREE.Mesh(new THREE.CapsuleGeometry(.12,.5,6,10),wm);legL.position.set(-.15,-.65,0);const legR=legL.clone();legR.position.x=.15;
+ astro.add(body,helm,visor,pack,armL,armR,legL,legR);astro.traverse(o=>{if(o.material)o.material=o.material.clone()})}
+const astroMats=[];astro.traverse(o=>{if(o.material&&o.material.color)astroMats.push([o.material,o.material.color.clone()])});
+
+// relógios (Terra rápida x você lenta) -> HTML
+// ---------------- roteiro ----------------
+const S=[
+ {k:'hook',d:4.2,chap:null,sub:'VOCÊ ESTÁ CAINDO EM UM BURACO NEGRO'},
+ {k:'light',d:4.8,chap:['CAPÍTULO 1','O ponto sem volta'],sub:'DEPOIS DA BORDA, NEM A LUZ CONSEGUE ESCAPAR'},
+ {k:'time',d:4.8,chap:['CAPÍTULO 2','O tempo quebra'],sub:'PERTO DELE O TEMPO PASSA MAIS DEVAGAR QUE NA TERRA'},
+ {k:'spag',d:4.8,chap:['CAPÍTULO 3','Espaguetificação'],sub:'SEUS PÉS SÃO PUXADOS MAIS FORTE QUE A CABEÇA'},
+ {k:'outside',d:4.6,chap:['CAPÍTULO 4','Visto de fora'],sub:'QUEM TE OLHA DE FORA TE VÊ CONGELAR... E SUMIR'},
+ {k:'inside',d:4,chap:['CAPÍTULO 5','Lá dentro'],sub:'E O QUE TEM LÁ DENTRO? NINGUÉM SABE'},
+ {k:'end',d:5,chap:null,sub:'CALMA: O MAIS PRÓXIMO FICA A 1.560 ANOS-LUZ'},
+];
+let acc=0;for(const s of S){s.t0=acc;acc+=s.d}window.TOTAL=acc;window.CUTS=S.map(s=>s.t0);
+const clamp=(x,a=0,b=1)=>Math.min(b,Math.max(a,x));
+const ease=x=>{x=clamp(x);return 1-Math.pow(1-x,3)};
+const eio=x=>{x=clamp(x);return x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2};
+const ui=document.getElementById('ui');
+const gctx=document.getElementById('grain').getContext('2d');const gimg=gctx.createImageData(270,480);
+let gs=1;const grnd=()=>(gs=(gs*48271)%2147483647)/2147483647;
+function grain(t){gs=1+Math.floor(t*30)*7919;for(let i=0;i<gimg.data.length;i+=4){const v=grnd()*255;gimg.data[i]=gimg.data[i+1]=gimg.data[i+2]=v;gimg.data[i+3]=255}gctx.putImageData(gimg,0,0)}
+function karaoke(text,lt,d){const words=text.split(' ');const start=.35,end=Math.min(d-.6,start+words.length*.32);
+ const per=(end-start)/words.length;const cur=Math.floor((lt-start)/per);
+ if(lt<start)return'';
+ return `<div class="sub"><span class="box">${words.map((w,i)=>i>cur?'':`<span class="w ${i==cur?'act':'dim'}">${w}</span>`).join('')}</span></div>`}
+function chapter(c,lt,d){if(!c)return'';const o=clamp(lt/.4)*clamp((d-.3-lt)/.4);const y=(1-ease(lt/.6))*20;
+ return `<div class="chap" style="opacity:${o};transform:translateY(${y}px)"><div class="n">${c[0]}</div><div class="t">${c[1]}</div><div class="l"></div></div>`}
+const fmt=n=>Math.max(0,Math.round(n)).toLocaleString('pt-BR');
+
+function renderAt(t){
+ const s=S.find(s=>t>=s.t0&&t<s.t0+s.d)||S[S.length-1];const lt=t-s.t0,d=s.d;
+ disk.rotation.z=-t*.35;halo.rotation.z=t*.25;
+ bh.visible=true;rays.forEach(r=>r.visible=false);astro.visible=false;stars.visible=true;
+ astroMats.forEach(([m,c])=>m.color.copy(c));astro.scale.set(1,1,1);astro.rotation.set(0,0,0);
+ let h='',dist=0,tdil=null,shake=0;
+ bh.rotation.set(.18,0,0);
+ if(s.k=='hook'){const z=60-ease(lt/d)*30;cam.position.set(0,3.2-lt*.15,z);cam.lookAt(0,0,0);dist=12400-lt*900;
+  astro.visible=false;astro.position.set(1.1,-1.9+Math.sin(lt)*.1,z-7);astro.rotation.set(.3,Math.PI+.4,lt*.3);
+  h+=`<div class="chap" style="top:250px;opacity:${clamp((lt-.1)/.4)}"><div class="n">E SE...</div><div class="t" style="font-size:80px">um buraco negro<br>te engolisse?</div></div>`;
+ }
+ if(s.k=='light'){cam.position.set(0,.4,22);cam.lookAt(0,0,0);bh.rotation.set(.05,0,0);dist=4000-lt*600;
+  const nShow=Math.floor(clamp((lt-.3)/3)*RN);
+  rays.forEach((r,i)=>{r.visible=true;const p=r.geometry.attributes.position;let px=-9,py=r.userData.y0,vx=1,vy=0,dead=false;
+   for(let k=0;k<RN;k++){const dd=Math.hypot(px,py);if(dd<1.6)dead=true;
+    if(!dead){const f=.012/(dd*dd);vx+=-px/dd*f*9;vy+=-py/dd*f*9;const n=Math.hypot(vx,vy);vx/=n;vy/=n;px+=vx*.08;py+=vy*.08}
+    const kk=Math.min(k,nShow);if(k<=nShow)p.setXYZ(k,px,py,0);else p.setXYZ(k,p.getX(kk),p.getY(kk),0)}
+   p.needsUpdate=true});
+ }
+ if(s.k=='time'){const a=lt*.25;cam.position.set(Math.sin(a)*20,1,Math.cos(a)*20);cam.lookAt(0,0,0);dist=900-lt*120;
+  const earthYears=Math.floor(Math.pow(clamp((lt-.5)/3.6),2)*7)+0;const earthDays=Math.floor(((lt*300)%365));const you=Math.floor(lt/4.8*60);
+  tdil={you:`00:${String(you).padStart(2,'0')}`,earth:`${earthYears} ANOS ${earthDays} D`};
+  shake=2;
+ }
+ if(s.k=='spag'){cam.position.set(0,0,5.5);cam.lookAt(0,-.2,0);bh.position.set(0,-30,-25);dist=300-lt*55;
+  astro.visible=true;const k=eio((lt-.6)/3.4);astro.position.set(0,0,0);astro.scale.set(1-k*.6,1+k*3.2,1-k*.6);astro.rotation.set(0,Math.sin(lt*.6)*.3,0);
+  astroMats.forEach(([m,c])=>m.color.copy(c).lerp(new THREE.Color(0xff8a3d),k*.6));shake=2+k*8;
+ }
+ if(s.k!='spag')bh.position.set(0,0,0);
+ if(s.k=='outside'){cam.position.set(4,1.5,20);cam.lookAt(0,0,0);dist=2;
+  astro.visible=true;const k=ease(lt/1.6);astro.position.set(3.2-k*1.4,.4-k*.2,1.2);astro.scale.setScalar(.45);astro.rotation.set(.2,-.6,.4);
+  const red=clamp((lt-1.4)/2);astroMats.forEach(([m,c])=>{m.color.copy(c).lerp(new THREE.Color(0xff2000),red);m.transparent=true;m.opacity=1-clamp((lt-2.6)/1.2)});
+ }else astroMats.forEach(([m])=>{m.opacity=1;m.transparent=false});
+ if(s.k=='inside'){cam.position.set(0,0,3+(1-ease(lt/1.5))*8);cam.lookAt(0,0,0);bh.visible=lt<1.2;stars.visible=lt<1.2;dist=0;shake=lt<1.2?10:0}
+ if(s.k=='end'){const z=8+ease(lt/2.5)*52;cam.position.set(0,3.2*(z/60),z);cam.lookAt(0,0,0);dist=0}
+ if(shake){cam.position.x+=Math.sin(t*93)*shake*.004;cam.position.y+=Math.cos(t*71)*shake*.004}
+ cam.updateProjectionMatrix();renderer.render(scene,cam);grain(t);
+
+ // ----- overlay -----
+ if(s.k=='inside'&&lt>=1.2){h+=`<div style="position:absolute;left:50%;top:50%;width:${6+Math.sin(t*6)*2}px;height:${6+Math.sin(t*6)*2}px;margin:-3px;border-radius:50%;background:#fff;box-shadow:0 0 30px 10px rgba(255,255,255,.5)"></div>
+  <div style="position:absolute;left:0;right:0;top:1020px;text-align:center;font:600 28px 'JetBrains Mono';letter-spacing:8px;color:rgba(255,255,255,.7)">SINGULARIDADE?</div>`}
+ h+=`<div class="vig"></div>`;
+ h+=chapter(s.chap,lt,d);
+ if(s.k=='time'&&tdil){h+=`<div style="position:absolute;left:90px;right:90px;top:470px;display:flex;justify-content:space-between;font:700 30px 'JetBrains Mono';color:#cfe8ff;text-align:center">
+  <div><div style="letter-spacing:4px">VOCÊ</div><div style="font-size:64px;color:#ffe600;margin-top:8px">${tdil.you}</div><div style="font-size:24px;opacity:.7">MIN : SEG</div></div>
+  <div><div style="letter-spacing:4px">NA TERRA</div><div style="font-size:52px;color:#ff6b6b;margin-top:16px">${tdil.earth}</div></div></div>`}
+ if(s.k=='end'&&lt>2.2){h+=`<div style="position:absolute;left:0;right:0;top:1640px;text-align:center;font:italic 700 64px 'Liberation Serif',serif;opacity:${clamp((lt-2.2)/.4)}">Você entraria? <span style="font:900 52px 'Inter Display';color:#ffe600">COMENTA</span></div>`}
+ h+=karaoke(s.sub,lt,d);
+ // HUD
+ const blink=Math.floor(t*2)%2==0;
+ h+=`<div class="hud" style="left:50px;top:60px"><span style="color:#ff3b3b">${blink?'●':'○'}</span> REC</div>`;
+ h+=`<div class="hud" style="right:50px;top:60px">T+${String(Math.floor(t/60)).padStart(2,'0')}:${String(Math.floor(t%60)).padStart(2,'0')}</div>`;
+ h+=`<div class="hud" style="left:50px;top:110px;font-size:24px">DIST. HORIZONTE: ${s.k=='inside'?'<span style="color:#ff3b3b">---</span>':fmt(dist)+' KM'}</div>`;
+ // cantos de câmera
+ for(const[x,y,r]of[[30,30,0],[1050,30,90],[1050,1890,180],[30,1890,270]])h+=`<div style="position:absolute;left:${x}px;top:${y}px;width:60px;height:60px;border-left:4px solid rgba(255,255,255,.55);border-top:4px solid rgba(255,255,255,.55);transform:rotate(${r}deg);transform-origin:0 0"></div>`;
+ // glitch na transição
+ const tc=Math.min(lt,d-lt);let gl=0;if(t>.2&&t<TOTAL-.2&&tc<.22)gl=1-tc/.22;
+ if(s.k=='inside'&&Math.abs(lt-1.2)<.15)gl=Math.max(gl,1-Math.abs(lt-1.2)/.15);
+ const glc=document.getElementById('gl');
+ if(gl>0){const f=Math.floor(t*30);let sd=f*131;const r2=()=>(sd=(sd*16807)%2147483647)/2147483647;
+  glc.style.transform=`translate(${(r2()-.5)*60*gl}px,${(r2()-.5)*20*gl}px)`;glc.style.filter=`contrast(1.3) saturate(1.6) hue-rotate(${(r2()-.5)*90*gl}deg)`;
+  for(let i=0;i<7;i++){const y=r2()*1920,hh=10+r2()*90;h+=`<div class="glbar" style="top:${y}px;height:${hh}px;background:${i%2?'rgba(255,0,60,.55)':'rgba(0,240,255,.55)'};transform:translateX(${(r2()-.5)*200}px);opacity:${gl}"></div>`}
+  if(tc<.05)h+=`<div style="position:absolute;inset:0;background:#000"></div>`;
+ }else{glc.style.transform='';glc.style.filter='contrast(1.12) saturate(1.15)'}
+ const fadeIn=clamp(t/.4);h+=`<div style="position:absolute;inset:0;background:#000;opacity:${1-fadeIn}"></div>`;
+ ui.innerHTML=h;
+}
+window.renderAt=renderAt;
+</script></body></html>
