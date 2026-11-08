@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sabor IA — Avaliador de Bebidas e Comidas</title>
+  <meta name="description" content="Envie uma foto de uma bebida ou comida e receba uma nota de 0 a 10, o potencial dela e o que ela faz no seu corpo." />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="topo">
+    <div class="marca">
+      <span class="logo" aria-hidden="true">🥤</span>
+      <div>
+        <h1>Sabor IA</h1>
+        <p>Avalie bebidas e comidas por imagem — nota de 0 a 10</p>
+      </div>
+    </div>
+    <button id="btnConfig" class="btn-sec" type="button">⚙️ Configurar</button>
+  </header>
+
+  <main>
+    <section class="card" id="envio">
+      <h2>1. Envie a imagem</h2>
+
+      <div class="tipos" role="radiogroup" aria-label="Tipo">
+        <label><input type="radio" name="tipo" value="auto" checked /> <span>🔎 Detectar</span></label>
+        <label><input type="radio" name="tipo" value="bebida" /> <span>🥤 Bebida</span></label>
+        <label><input type="radio" name="tipo" value="comida" /> <span>🍔 Comida</span></label>
+      </div>
+
+      <label id="zona" class="zona" for="arquivo">
+        <input id="arquivo" type="file" accept="image/*" capture="environment" hidden />
+        <div id="zonaVazia">
+          <div class="zona-icone">📷</div>
+          <strong>Toque para tirar foto ou escolher imagem</strong>
+          <small>ou arraste e solte aqui (JPG, PNG, WEBP)</small>
+        </div>
+        <img id="previa" alt="Prévia da imagem enviada" hidden />
+      </label>
+
+      <label class="campo">
+        <span>Observação (opcional)</span>
+        <input id="obs" type="text" maxlength="200" placeholder="Ex.: é sem açúcar, tomei depois do treino…" />
+      </label>
+
+      <button id="btnAvaliar" class="btn" type="button" disabled>✨ Avaliar agora</button>
+      <p id="status" class="status" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="card" id="resultado" hidden>
+      <div class="res-topo">
+        <div class="nota" id="notaCirculo" style="--p:0">
+          <span id="notaValor">0</span><small>/10</small>
+        </div>
+        <div class="res-titulo">
+          <span id="resCategoria" class="selo"></span>
+          <h2 id="resNome"></h2>
+          <p id="resVeredito" class="veredito"></p>
+        </div>
+      </div>
+
+      <div class="grade-notas" id="subnotas"></div>
+
+      <div class="bloco">
+        <h3>🚀 Potencial</h3>
+        <p id="resPotencial"></p>
+      </div>
+
+      <div class="bloco">
+        <h3>🧬 O que ela faz no seu corpo</h3>
+        <ul id="resEfeitos" class="lista-efeitos"></ul>
+      </div>
+
+      <div class="duas-colunas">
+        <div class="bloco">
+          <h3>👍 Pontos positivos</h3>
+          <ul id="resPros" class="lista pros"></ul>
+        </div>
+        <div class="bloco">
+          <h3>👎 Pontos negativos</h3>
+          <ul id="resContras" class="lista contras"></ul>
+        </div>
+      </div>
+
+      <div class="bloco">
+        <h3>📊 Nutrição estimada (porção da foto)</h3>
+        <div id="resNutri" class="nutri"></div>
+      </div>
+
+      <div class="duas-colunas">
+        <div class="bloco">
+          <h3>🍽️ Combina com</h3>
+          <ul id="resHarmoniza" class="tags"></ul>
+        </div>
+        <div class="bloco">
+          <h3>⏰ Melhor momento</h3>
+          <p id="resMomento"></p>
+        </div>
+      </div>
+
+      <div class="bloco">
+        <h3>💡 Dica para melhorar a nota</h3>
+        <p id="resDica"></p>
+      </div>
+
+      <div class="bloco alerta" id="blocoAlerta" hidden>
+        <h3>⚠️ Atenção</h3>
+        <p id="resAlerta"></p>
+      </div>
+
+      <p class="aviso">As avaliações são estimativas geradas por IA a partir da imagem e não substituem orientação de nutricionista ou médico.</p>
+    </section>
+
+    <section class="card" id="historicoCard">
+      <div class="hist-topo">
+        <h2>📜 Histórico</h2>
+        <button id="btnLimpar" class="btn-link" type="button">Limpar</button>
+      </div>
+      <ul id="historico" class="historico"></ul>
+      <p id="histVazio" class="vazio">Nenhuma avaliação ainda.</p>
+    </section>
+  </main>
+
+  <dialog id="dlgConfig">
+    <form method="dialog" class="dlg">
+      <h2>⚙️ Configuração</h2>
+      <p>O site usa a API do Claude para analisar a imagem. Cole sua chave da API da Anthropic (fica salva só no seu navegador).</p>
+      <label class="campo">
+        <span>Chave da API</span>
+        <input id="chave" type="password" placeholder="sk-ant-..." autocomplete="off" />
+      </label>
+      <label class="campo">
+        <span>Modelo</span>
+        <select id="modelo">
+          <option value="claude-opus-5-5">Claude Opus 5.5 (mais preciso)</option>
+          <option value="claude-sonnet-5-5">Claude Sonnet 5.5 (equilibrado)</option>
+          <option value="claude-haiku-5-5">Claude Haiku 5.5 (mais rápido e barato)</option>
+        </select>
+      </label>
+      <div class="dlg-acoes">
+        <button value="cancel" class="btn-sec" type="submit">Cancelar</button>
+        <button id="btnSalvar" value="ok" class="btn" type="submit">Salvar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="app.js"></script>
+</body>
+</html>
