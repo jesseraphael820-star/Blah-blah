@@ -29,7 +29,7 @@ export class CameraRig {
     if (this.mode === 'follow' && !G.ui.blocksCamera()) {
       this.yaw -= I.look.dx * sens;
       this.pitch += I.look.dy * sens * (G.settings.invertY ? -1 : 1);
-      this.dist = clamp(this.dist + I.wheel * 0.8, 3, 16);
+      this.dist = clamp(this.dist * Math.pow(1.12, I.wheel), 2.2, 18);
     }
     this.pitch = clamp(this.pitch, -0.35, 1.25);
     // lock-on: rotate camera behind player toward target
@@ -42,7 +42,8 @@ export class CameraRig {
       if (this.snapNext) this.target.copy(head);
       else this.target.x = damp(this.target.x, head.x, 14, dt), this.target.y = damp(this.target.y, head.y, 10, dt), this.target.z = damp(this.target.z, head.z, 14, dt);
       const cp = Math.cos(this.pitch);
-      const d = this.dist;
+      this.distSmooth = damp(this.distSmooth ?? this.dist, this.dist, 10, dt);
+      const d = this.distSmooth;
       this.desired.set(this.target.x - Math.sin(this.yaw) * cp * d, this.target.y + Math.sin(this.pitch) * d, this.target.z - Math.cos(this.yaw) * cp * d);
       const f = G.physics.rayFraction(this.target.x, this.target.y, this.target.z, this.desired.x, this.desired.y, this.desired.z);
       const want = Math.max(1.2, d * f - 0.2);

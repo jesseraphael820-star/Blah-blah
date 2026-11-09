@@ -33,14 +33,31 @@ export class Touch {
     // camera look area
     const look = this.el.querySelector('.t-look');
     let lid = null, lx = 0, ly = 0;
-    look.addEventListener('touchstart', (e) => { const tc = e.changedTouches[0]; lid = tc.identifier; lx = tc.clientX; ly = tc.clientY; e.preventDefault(); }, { passive: false });
+    // pinch with two fingers on the right side to zoom the camera
+    let pinch = null;
+    const pinchDist = (ts) => Math.hypot(ts[0].clientX - ts[1].clientX, ts[0].clientY - ts[1].clientY);
+    look.addEventListener('touchstart', (e) => {
+      if (e.targetTouches.length >= 2) { pinch = pinchDist(e.targetTouches); lid = null; e.preventDefault(); return; }
+      const tc = e.changedTouches[0]; lid = tc.identifier; lx = tc.clientX; ly = tc.clientY; e.preventDefault();
+    }, { passive: false });
     look.addEventListener('touchmove', (e) => {
+      if (pinch && e.targetTouches.length >= 2) {
+        const d = pinchDist(e.targetTouches);
+        I.wheel += Math.log(pinch / d) / Math.log(1.12);
+        pinch = d; e.preventDefault(); return;
+      }
       for (const tc of e.changedTouches) if (tc.identifier === lid) {
         I.look.dx += (tc.clientX - lx) * 1.6; I.look.dy += (tc.clientY - ly) * 1.6; lx = tc.clientX; ly = tc.clientY;
       }
       e.preventDefault();
     }, { passive: false });
-    look.addEventListener('touchend', (e) => { for (const tc of e.changedTouches) if (tc.identifier === lid) lid = null; });
+    look.addEventListener('touchend', (e) => { if (e.targetTouches.length < 2) pinch = null; for (const tc of e.changedTouches) if (tc.identifier === lid) lid = null; });
+    // zoom buttons
+    const zoomBtns = document.createElement('div');
+    zoomBtns.className = 't-zoom';
+    zoomBtns.innerHTML = '<button data-z="-1">+</button><button data-z="1">−</button>';
+    this.el.appendChild(zoomBtns);
+    zoomBtns.querySelectorAll('button').forEach((b) => b.addEventListener('touchstart', (e) => { e.preventDefault(); e.stopPropagation(); I.wheel += +b.dataset.z * 2; }, { passive: false }));
     // buttons
     this.el.querySelectorAll('.tb').forEach((b) => {
       const a = b.dataset.a;

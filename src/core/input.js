@@ -69,7 +69,13 @@ export class Input {
         this.look.dy += e.movementY;
       }
     });
-    dom.addEventListener('wheel', (e) => { this.wheel += Math.sign(e.deltaY); }, { passive: true });
+    // zoom: mouse wheel / trackpad scroll anywhere over the game (not over menus)
+    window.addEventListener('wheel', (e) => {
+      if (e.target && e.target.closest && e.target.closest('#menu, #shop, #dialogue, #title')) return;
+      const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1;
+      this.wheel += Math.max(-3, Math.min(3, (e.deltaY * unit) / 100));
+      if (e.cancelable) e.preventDefault();
+    }, { passive: false });
   }
 
   // Called by touch UI
