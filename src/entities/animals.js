@@ -237,6 +237,7 @@ export class Wildlife {
       }
       a.update(dt);
     }
+    if (G.sky.underground && Math.random() < dt * 10) G.particles.glow.spawn(P.x + (Math.random() - 0.5) * 20, P.y + Math.random() * 5, P.z + (Math.random() - 0.5) * 20, 0.1, 0.05, 0, 0x9ab0d8, 0.06, 5, { drag: 0.1, alpha: 0.5 });
     if (G.sky.underground) { this.flocks.forEach((f) => f.birds.forEach((b) => (b.g.visible = false))); this.butterflies.forEach((b) => (b.g.visible = false)); return; }
     const day = G.sky.night < 0.5 && (G.weather.rain || 0) < 0.4;
     // birds circle above the player area
@@ -269,6 +270,23 @@ export class Wildlife {
       b.g.rotation.y = b.ph * 0.6;
       const fl = Math.sin(b.ph * 18) * 1.1;
       b.wl.rotation.z = fl; b.wr.rotation.z = -fl;
+    }
+    // ambient atmosphere: pollen in sunny meadows, falling leaves in forests, snow on the peaks
+    this.ambAcc = (this.ambAcc || 0) + dt * (G.mobile ? 6 : 12);
+    while (this.ambAcc > 1) {
+      this.ambAcc--;
+      const a = Math.random() * 6.28, r = 2 + Math.random() * 16;
+      const x = P.x + Math.cos(a) * r, z = P.z + Math.sin(a) * r;
+      const h = G.physics.terrainHeight(x, z);
+      const biome = G.world.terrain.biomeAt(x, z);
+      const wind = G.weather.wind;
+      if (h >= 26) G.particles.solid.spawn(x, h + 6 + Math.random() * 4, z, wind * 0.8, -1.2, 0.3, 0xffffff, 0.12, 5, { drag: 0.2, alpha: 0.9 });
+      else if ((biome === 1 || biome === 9) && Math.random() < 0.5) {
+        const leaf = biome === 9 ? 0x8a6ab0 : [0x6a9a3a, 0xc8a03a, 0x9ab040][Math.floor(Math.random() * 3)];
+        G.particles.solid.spawn(x, h + 5 + Math.random() * 4, z, wind * 0.9, -0.9, (Math.random() - 0.5) * 0.6, leaf, 0.16, 6, { drag: 0.4, alpha: 0.95 });
+      } else if (day && (biome === 0 || biome === 10) && Math.random() < 0.35) {
+        G.particles.glow.spawn(x, h + 0.5 + Math.random() * 2.5, z, wind * 0.3, 0.05, (Math.random() - 0.5) * 0.2, 0xfff2b0, 0.07, 4, { drag: 0.1, alpha: 0.6 });
+      }
     }
     // fireflies at night
     if (G.sky.night > 0.6) {

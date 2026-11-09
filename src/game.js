@@ -182,7 +182,7 @@ export class Game {
       G.shop = new Shop();
       G.interact = new Interact();
       G.ui.build();
-      if (G.mobile) { G.touch = new Touch(); }
+      if (G.mobile) { G.touch = new Touch(); document.body.classList.add('touch'); }
       G.inv.spawnPet();
       G.sky.underground = G.player.pos.x > 600;
       this.applySettings();

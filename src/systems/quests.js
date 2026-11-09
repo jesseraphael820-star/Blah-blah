@@ -71,6 +71,8 @@ export class Quests {
     if (a.step >= q.steps.length) { this.complete(id); return; }
     G.audio.sfx('pickup');
     G.ui.objectiveUpdated(id);
+    // tell the player clearly what to do next
+    G.ui.banner(`<small>${t('ui.newObjective')}</small><h2>${t(`q.${id}.title`)}</h2><div class="bn-rewards">${this.objectiveText(id)}</div>`, 'quest ' + q.type, 3.6);
     this.enterStep(id);
     G.game.autosave();
   }
@@ -85,6 +87,10 @@ export class Quests {
     G.prog.grant(q.rewards, { at: G.player.pos });
     if (q.type === 'side') G.state.ach.stats.sideDone = (G.state.ach.stats.sideDone || 0) + 1;
     if (id === 'main6') { G.state.ach.stats.storyDone = 1; G.ui.showEnding(); }
+    else {
+      const next = QUEST_ORDER.find((n) => QUESTS[n].type === 'main' && this.available(n));
+      if (next) setTimeout(() => G.ui.toast(t('ui.nextMain', { name: t('npc.' + QUESTS[next].giver + '.name') }), 'info'), 4200);
+    }
     G.bus.emit('questCompleted', id);
     G.game.autosave();
   }

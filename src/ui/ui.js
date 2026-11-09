@@ -62,6 +62,7 @@ export class UI {
         </div>
       </div>
       <div class="boss-bar hidden"><div class="boss-name"></div><div class="bar boss"><i></i><em></em></div></div>
+      <div class="m-tracker panel-glass hidden"><b></b><span></span></div>
       <div class="feed"></div>
       <div class="banner hidden"></div>
       <div class="fps hidden"></div>
@@ -75,7 +76,7 @@ export class UI {
       tracker: q('.tracker'), trTitle: q('.tr-head b'), trObj: q('.tr-obj'), trDist: q('.tr-dist'),
       prompt: q('.prompt'), promptText: q('.prompt span'), powers: [...this.hud.querySelectorAll('.slot.power')], potion: q('.slot.potion'),
       boss: q('.boss-bar'), bossName: q('.boss-name'), bossBar: q('.bar.boss'),
-      feed: q('.feed'), banner: q('.banner'), fps: q('.fps'), lockHint: q('.lock-hint'),
+      feed: q('.feed'), mTr: q('.m-tracker'), banner: q('.banner'), fps: q('.fps'), lockHint: q('.lock-hint'),
     };
     this.pctx = this.el.portrait.getContext('2d');
     this.pctx.imageSmoothingEnabled = false;
@@ -185,7 +186,10 @@ export class UI {
   updateTracker() {
     const id = G.state.quests.tracked;
     const e = this.el;
-    if (!id || !G.quests.isActive(id)) { e.tracker.classList.add('hidden'); this.waypoint.classList.add('hidden'); return; }
+    if (!id || !G.quests.isActive(id)) { e.tracker.classList.add('hidden'); e.mTr.classList.add('hidden'); this.waypoint.classList.add('hidden'); return; }
+    e.mTr.classList.remove('hidden');
+    e.mTr.querySelector('b').textContent = t(`q.${id}.title`);
+    e.mTr.querySelector('span').textContent = G.quests.objectiveText(id);
     e.tracker.classList.remove('hidden');
     e.tracker.classList.toggle('main', G.quests.def(id).type === 'main');
     e.trTitle.textContent = t(`q.${id}.title`);
@@ -251,6 +255,24 @@ export class UI {
       b.div.style.transform = `translate(${s[0]}px, ${s[1]}px) translate(-50%,-100%)`;
       b.div.style.opacity = b.t > b.dur - 0.4 ? (b.dur - b.t) / 0.4 : Math.min(1, b.t * 5);
     }
+    // name tags for nearby villagers
+    this.tags = this.tags || new Map();
+    const shown = new Set();
+    for (const n of G.entities.npcs.list) {
+      if (!n.visible || n.talking || G.dialogue.active) continue;
+      const d = Math.hypot(n.pos.x - G.player.pos.x, n.pos.z - G.player.pos.z);
+      if (d > 11) continue;
+      const s = proj(n.pos, 2.15 * (n.def.scale || 1) + 0.35);
+      if (!s) continue;
+      shown.add(n);
+      let el = this.tags.get(n);
+      if (!el) { el = document.createElement('div'); el.className = 'ntag'; el.innerHTML = `<b></b><span></span>`; this.worldUi.appendChild(el); this.tags.set(n, el); }
+      el.querySelector('b').textContent = n.name;
+      el.querySelector('span').textContent = t('npc.' + n.id + '.role');
+      el.style.transform = `translate(${s[0]}px, ${s[1]}px) translate(-50%,-100%)`;
+      el.style.opacity = Math.min(1, (11 - d) / 3);
+    }
+    for (const [n, el] of this.tags) if (!shown.has(n)) { el.remove(); this.tags.delete(n); }
     // enemy health bars
     const seen = new Set();
     const P = G.player.pos;

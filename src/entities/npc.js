@@ -146,7 +146,10 @@ export class NPC {
     if (dP < 50 && this.visible) {
       m.root.position.copy(this.pos);
       m.root.rotation.y = this.yaw;
-      m.pose(pose, 0, dt, { speed, headY: 0 });
+      // villagers glance at the hero when nearby
+      let hy = 0;
+      if (dP < 6 && pose !== 'walk') { hy = Math.atan2(P.pos.x - this.pos.x, P.pos.z - this.pos.z) - this.yaw; hy = Math.atan2(Math.sin(hy), Math.cos(hy)); hy = Math.max(-0.9, Math.min(0.9, hy)); }
+      m.pose(pose, 0, dt, { speed, headY: hy });
       m.updateFace(dt);
     }
     // markers

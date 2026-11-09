@@ -376,7 +376,7 @@ export class Humanoid {
       case 'block': T.aRX = -1.25; T.aRZ = 0.6; T.wristX = 1.57; T.wristY = 1.3; T.aLX = -1.0; T.aLZ = -0.4; T.bodyY = -0.06; T.bodyRX = -0.08; T.lLX = 0.3; T.lRX = -0.3; lam = 26; break;
       case 'dodge': {
         lam = 40;
-        T.bodyRX = p * TAU; T.bodyY = Math.sin(p * Math.PI) * 0.35 - 0.2;
+        T.bodyRX = Math.min(1, p * 1.15) * TAU; T.bodyY = Math.sin(p * Math.PI) * 0.25;
         T.lLX = -1.5; T.lRX = -1.5; T.aLX = -1.8; T.aRX = -1.8;
         break;
       }
@@ -411,8 +411,15 @@ export class Humanoid {
     const r = this.rot;
     const D = (k, v, l = lam) => { r[k] = r[k] === undefined ? v : damp(r[k], v, l, dt); return r[k]; };
     this.body.position.y = D('bodyY', T.bodyY);
+    this.body.position.z = 0;
     // full roll / spin bypass smoothing
-    if (name === 'dodge') { this.body.rotation.x = T.bodyRX; r.bodyRX = 0; this.body.position.y = T.bodyY; }
+    if (name === 'dodge') {
+      // roll around the body's center (hips), not the feet, so the hero tumbles forward and lands upright
+      const th = T.bodyRX, h = 0.7;
+      this.body.rotation.x = th; r.bodyRX = 0;
+      this.body.position.y = T.bodyY + h - h * Math.cos(th);
+      this.body.position.z = -h * Math.sin(th);
+    }
     else this.body.rotation.x = D('bodyRX', T.bodyRX, name === 'defeat' ? 5 : lam);
     this.body.rotation.y = name === 'spin' ? T.spin : D('spin', 0, 20);
     this.torso.rotation.y = D('torsoY', T.torsoY);
