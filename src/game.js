@@ -25,6 +25,7 @@ import { NPCManager } from './entities/npc.js';
 import { EnemyManager } from './entities/enemies.js';
 import { Wildlife } from './entities/animals.js';
 import { Pickups } from './entities/pickups.js';
+import { PhysicsProps } from './entities/physicsProps.js';
 import { Progression } from './systems/progression.js';
 import { Inventory } from './systems/inventory.js';
 import { Powers } from './systems/powers.js';
@@ -53,7 +54,7 @@ export class Game {
   constructor() {
     G.game = this;
     window.G = G; // handy for debugging from the console
-    this.autosaveT = 45;
+    this.autosaveT = 15;
     this.saveDebounce = null;
     this.loadEl = document.getElementById('loading');
     this.loadFill = document.getElementById('load-fill');
@@ -92,6 +93,7 @@ export class Game {
     this.applySettings();
     addEventListener('resize', () => this.resize());
     document.addEventListener('visibilitychange', () => { if (document.hidden) this.save(false); });
+    addEventListener('pagehide', () => { if (!this.noSave) this.save(false); });
     addEventListener('beforeunload', () => { if (!this.noSave && G.player) this.save(false); });
     this.loadEl.classList.add('hidden');
     // title screen (no world yet)
@@ -161,8 +163,12 @@ export class Game {
       await this.progress(0.86, t('load.life'));
       G.player = new Player(G.scene);
       if (!saved) { const gy = G.physics.groundAt(sp.x, sp.z, 200); G.player.teleport(sp.x, gy, sp.z, Math.PI); }
+      else { const gy = G.physics.groundAt(sp.x, sp.z, sp.y + 1.2); G.player.teleport(sp.x, Math.max(sp.y, gy), sp.z, sp.yaw); }
       G.cam = new CameraRig(G.camera);
-      G.cam.yaw = G.player.yaw;
+      G.cam.yaw = saved && sp.camYaw !== undefined ? sp.camYaw : G.player.yaw;
+      if (saved && sp.camPitch !== undefined) G.cam.pitch = sp.camPitch;
+      if (saved && sp.camDist) G.cam.dist = sp.camDist;
+      else if (G.settings.camDist) G.cam.dist = G.settings.camDist;
       G.cam.snap();
       G.combat = new Combat(G.scene);
       G.entities = { npcs: null, enemies: new EnemyManager() };
@@ -172,6 +178,7 @@ export class Game {
       G.achievements = new Achievements();
       G.pickups = new Pickups(G.scene);
       G.pickups.scatterWorldCoins();
+      G.physProps = new PhysicsProps(G.scene);
       // UI
       G.ui = new UI();
       G.dialogue = new Dialogue();
@@ -228,6 +235,7 @@ export class Game {
       this.save(false);
     } else {
       G.ui.toast(t('ui.welcomeBack', { name: G.state.appearance.name }), 'info');
+      G.world.prebuild(G.player.pos.x, G.player.pos.z, 120);
     }
     if (G.events.canClaimDaily()) setTimeout(() => G.ui.toast(t('ui.dailyReady'), 'gold'), 4000);
     if (!G.mobile) setTimeout(() => G.ui.toast(t('ui.clickToPlay'), 'info'), 1500);
@@ -249,6 +257,17 @@ export class Game {
     }
     if (G.world) G.world.viewDist = S.viewDist;
     G.camera.far = Math.max(400, (S.viewDist || 200) + 100);
+    G.camera.fov = S.fov || 60;
+    const root = document.documentElement.style;
+    root.setProperty('--hud-scale', S.hudScale ?? 1);
+    root.setProperty('--hud-op', S.hudOpacity ?? 1);
+    root.setProperty('--touch-scale', S.touchScale ?? 1);
+    root.setProperty('--touch-op', S.touchOpacity ?? 0.85);
+    const bc = document.body.classList;
+    bc.toggle('no-minimap', S.minimap === false);
+    bc.toggle('no-tracker', S.tracker === false);
+    bc.toggle('no-dmg', S.dmgNumbers === false);
+    bc.toggle('no-names', S.nameTags === false);
     G.camera.updateProjectionMatrix();
     G.audio?.setVolumes({ master: S.master, music: S.music, sfx: S.sfx });
     this.resize();
@@ -268,7 +287,12 @@ export class Game {
   save(notify) {
     if (!G.player || !G.state || this.noSave) return;
     G.player.saveToState();
-    if (G.sky?.underground) { G.state.player.x = 40; G.state.player.z = -181; G.state.player.y = G.physics.groundAt(40, -181, 200); }
+    // never store a mid-air or dead position: use the last solid ground the hero stood on
+    const sp = G.state.player;
+    if (G.player.dead) { sp.x = sp.respawn.x; sp.z = sp.respawn.z; sp.y = G.physics.groundAt(sp.x, sp.z, 300); sp.hp = Math.max(1, sp.hp); }
+    else if (!G.player.onGround && !G.player.swimming && G.player.lastSafe) { sp.x = G.player.lastSafe.x; sp.y = G.player.lastSafe.y; sp.z = G.player.lastSafe.z; }
+    sp.camYaw = G.cam.yaw; sp.camPitch = G.cam.pitch; sp.camDist = G.cam.dist;
+    G.state.savedAt = Date.now();
     G.mapSys?.serialize();
     const ok = writeState(G.state);
     if (notify) G.ui.toast(ok ? t('ui.saved') : t('ui.saveFailed'), ok ? 'info' : 'warn');
@@ -374,6 +398,7 @@ export class Game {
       G.entities.enemies.update(sim);
       G.wildlife.update(sim);
       G.pickups.update(sim);
+      G.physProps.update(sim);
       G.combat.update(sim);
       G.props.update(sim);
       G.quests.update(sim);
@@ -398,7 +423,7 @@ export class Game {
     G.ui.update(dt);
     G.touch?.update();
     this.autosaveT -= dt;
-    if (this.autosaveT <= 0) { this.autosaveT = 45; this.save(false); }
+    if (this.autosaveT <= 0) { this.autosaveT = 15; this.save(false); }
   }
 
   fatal(e) {

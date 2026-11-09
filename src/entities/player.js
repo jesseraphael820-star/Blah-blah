@@ -41,6 +41,9 @@ export class Player {
     this.shieldT = 0;
     this.speedNow = 0;
     this.lockTarget = null;
+    this.hv = { x: 0, z: 0 };
+    this.jumpBuf = 0;
+    this.squash = 0;
     this.model = new Humanoid(this.look());
     scene.add(this.model.root);
     this.trail = new SwordTrail(scene);
@@ -115,7 +118,8 @@ export class Player {
     if (controlsOn) {
       if (I.consume('attack')) this.tryAttack();
       if (I.consume('dodge')) this.tryDodge(dx, dz, mag);
-      if (I.consume('jump')) this.tryJump();
+      if (I.consume('jump')) this.jumpBuf = 0.16;
+      if (this.jumpBuf > 0) { this.jumpBuf -= dt; if (this.tryJump()) this.jumpBuf = 0; }
       for (let i = 0; i < 4; i++) if (I.consume('power' + (i + 1))) G.powers.cast(i);
       if (I.consume('potion')) G.inv.quickPotion();
       if (I.consume('lockon')) this.toggleLock();
@@ -158,6 +162,16 @@ export class Player {
       else if (this.state === 'attack') { mx = Math.sin(this.yaw) * speed * dt; mz = Math.cos(this.yaw) * speed * dt; }
       else { mx = (dx / len) * speed * dt; mz = (dz / len) * speed * dt; }
     }
+    // momentum: walking/running accelerates and brakes smoothly (less control in the air)
+    if (this.state === 'normal') {
+      const wantX = mx / Math.max(dt, 1e-4), wantZ = mz / Math.max(dt, 1e-4);
+      const moving = Math.hypot(wantX, wantZ) > 0.1;
+      const acc = !this.onGround && !this.swimming ? 4 : moving ? 16 : 22;
+      this.hv.x = damp(this.hv.x, wantX, acc, dt);
+      this.hv.z = damp(this.hv.z, wantZ, acc, dt);
+      mx = this.hv.x * dt; mz = this.hv.z * dt;
+    } else if (this.state === 'dodge' || this.state === 'attack') { this.hv.x = mx / Math.max(dt, 1e-4); this.hv.z = mz / Math.max(dt, 1e-4); }
+    else { this.hv.x *= 0.8; this.hv.z *= 0.8; }
     // attack lunge
     if (this.state === 'attack' && this.stateT < 0.18) { mx += Math.sin(this.yaw) * 3 * dt; mz += Math.cos(this.yaw) * 3 * dt; }
     if (this.knock) { mx += this.knock.x * dt; mz += this.knock.z * dt; this.knock.multiplyScalar(Math.max(0, 1 - dt * 8)); if (this.knock.lengthSq() < 0.05) this.knock = null; }
@@ -182,8 +196,11 @@ export class Player {
       if (!wasSwim) { G.audio.sfx('splash'); G.particles.splash(this.pos.x, water, this.pos.z, 16); }
       if (this.speedNow > 1 && Math.random() < dt * 8) G.particles.splash(this.pos.x, water, this.pos.z, 2);
     } else {
-      this.vy -= GRAV * dt;
+      // heavier fall + short hop when the jump button is released early
+      const g = this.vy < 0 ? GRAV * 1.3 : (!G.input.isDown('jump') && !G.mobile ? GRAV * 1.8 : GRAV);
+      this.vy = Math.max(-38, this.vy - g * dt);
       this.pos.y += this.vy * dt;
+      this.airT = this.onGround ? 0 : (this.airT || 0) + dt;
       if (this.pos.y <= ground) {
         if (!this.onGround) this.land(ground);
         this.pos.y = ground; this.vy = 0; this.onGround = true;
@@ -191,7 +208,7 @@ export class Player {
         if (this.onGround && this.pos.y - ground < STEP_UP + 0.1 && this.vy <= 0) { this.pos.y = ground; this.vy = 0; } // step down stairs smoothly
         else { if (this.onGround) this.fallStart = this.pos.y; this.onGround = false; }
       }
-      if (this.onGround) this.fallStart = this.pos.y;
+      if (this.onGround) { this.fallStart = this.pos.y; this.lastSafe = this.lastSafe || {}; this.lastSafe.x = this.pos.x; this.lastSafe.y = this.pos.y; this.lastSafe.z = this.pos.z; }
       else this.fallStart = Math.max(this.fallStart, this.pos.y);
     }
     if (this.pos.y < -30) this.respawnAt(this.s.respawn.x, this.s.respawn.z);
@@ -254,6 +271,7 @@ export class Player {
 
   land(ground) {
     const fall = this.fallStart - ground;
+    this.squash = Math.min(0.28, 0.08 + fall * 0.03);
     if (fall > 1.5) { G.audio.sfx('land', { vol: Math.min(1, fall / 6) }); G.particles.dust(this.pos.x, ground, this.pos.z, 8); }
     if (fall > 8) {
       const dmg = Math.floor((fall - 8) * 7);
@@ -262,11 +280,16 @@ export class Player {
   }
 
   tryJump() {
-    if (this.swimming) { this.vy = 6; this.pos.y += 0.3; this.swimming = false; return; }
-    if (!this.onGround || this.busy()) return;
-    this.vy = 9.2;
+    if (this.swimming) { this.vy = 6; this.pos.y += 0.3; this.swimming = false; return true; }
+    const coyote = !this.onGround && (this.airT || 0) < 0.13 && this.vy <= 0;
+    if ((!this.onGround && !coyote) || this.busy()) return false;
+    this.vy = 9.6;
     this.onGround = false;
+    this.airT = 1;
+    this.squash = 0.12;
     G.audio.sfx('jump');
+    G.particles.dust(this.pos.x, this.pos.y, this.pos.z, 4);
+    return true;
   }
 
   tryDodge(dx, dz, mag) {
@@ -457,6 +480,10 @@ export class Player {
     this.visualY = damp(this.visualY, this.pos.y, this.onGround ? 18 : 40, dt);
     if (Math.abs(this.visualY - this.pos.y) > 3) this.visualY = this.pos.y;
     m.root.position.set(this.pos.x, this.visualY, this.pos.z);
+    // landing squash & stretch
+    this.squash = Math.max(0, (this.squash || 0) - dt * 1.2);
+    const k = Math.sin(Math.min(1, this.squash / 0.28) * Math.PI) * this.squash;
+    m.root.scale.set(1 + k * 0.6, 1 - k, 1 + k * 0.6);
     m.root.rotation.y = this.yaw;
     let pose = 'idle', phase = 0;
     const armed = true;

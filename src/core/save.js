@@ -70,6 +70,8 @@ export function defaultSettings() {
     lang: null, master: 0.8, music: 0.5, sfx: 0.8,
     quality: null, pixel: null, shadows: true, sensitivity: 1, invertY: false,
     showFps: false, shake: true, viewDist: null,
+    hudScale: 1, hudOpacity: 1, minimap: true, tracker: true, dmgNumbers: true, nameTags: true,
+    touchScale: 1, touchOpacity: 0.85, touchSens: 1, fov: 60, invertX: false, camDist: 7.5, weatherMode: 'dynamic',
   };
 }
 export function loadSettings() {

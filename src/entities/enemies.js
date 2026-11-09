@@ -283,6 +283,7 @@ export class Enemy {
     G.particles.ring(this.pos.x, this.pos.y + 0.3, this.pos.z, color, r, 40, { speed: r * 1.6 });
     G.particles.dust(this.pos.x, this.pos.y, this.pos.z, 14, color);
     G.audio.sfxAt('slam', this.pos.x, this.pos.z, { range: 50 });
+    G.physProps?.impulseRadius(this.pos.x, this.pos.y, this.pos.z, r + 2, 12);
     const dp = dist2d(this.pos.x, this.pos.z, P.pos.x, P.pos.z);
     if (dp < 25) G.cam.shake(0.45 * (1 - dp / 25));
     if (dp < r + 0.4 && Math.abs(P.pos.y - this.pos.y) < 2.5) this.hitPlayer(mult, 9);

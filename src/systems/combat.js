@@ -40,6 +40,7 @@ export class Combat {
 
   playerMelee(o) {
     const P = G.player;
+    G.physProps?.hitArc(P.pos, P.yaw, o.reach, o.arc, 3 + o.knock * 0.6);
     let hits = 0;
     for (const e of this.enemies()) {
       if (e.dead) continue;

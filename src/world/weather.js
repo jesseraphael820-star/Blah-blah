@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { G } from '../core/context.js';
 import { damp, clamp } from '../core/utils.js';
+import { WorldUniforms } from '../render/voxel.js';
 
 const STATES = {
   clear:  { cloud: 0.35, rain: 0, fog: 1, dim: 1, wind: 0.8 },
@@ -55,6 +56,23 @@ export class Weather {
     G.bus.emit('weather', state);
   }
 
+  // bolt of lightning drawn as a jagged line from the clouds to the ground
+  spawnBolt(camPos) {
+    const a = Math.random() * 6.28, r = 40 + Math.random() * 80;
+    const x = camPos.x + Math.cos(a) * r, z = camPos.z + Math.sin(a) * r;
+    const gy = G.physics.terrainHeight(x, z);
+    const pts = [];
+    let px = x, pz = z;
+    for (let y = gy + 110; y > gy; y -= 9) { pts.push(new THREE.Vector3(px, y, pz)); px += (Math.random() - 0.5) * 6; pz += (Math.random() - 0.5) * 6; }
+    pts.push(new THREE.Vector3(px, gy, pz));
+    const geo = new THREE.BufferGeometry().setFromPoints(pts);
+    const line = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: 0xeaf2ff, transparent: true, opacity: 1, fog: false }));
+    G.scene.add(line);
+    this.bolts = this.bolts || [];
+    this.bolts.push({ line, t: 0 });
+    return Math.hypot(x - camPos.x, z - camPos.z);
+  }
+
   pick() {
     const opts = NEXT[this.state];
     const tot = opts.reduce((a, o) => a + o[1], 0);
@@ -65,14 +83,22 @@ export class Weather {
 
   update(dt, camPos) {
     this.timer -= dt;
-    if (this.timer <= 0) {
+    const mode = G.settings.weatherMode || 'dynamic';
+    if (mode !== 'dynamic') { if (this.state !== mode) this.set(mode); }
+    else if (this.timer <= 0) {
       this.timer = 90 + Math.random() * 150;
       this.set(this.pick());
     }
     const T = STATES[this.state];
     for (const k of Object.keys(T)) this.cur[k] = damp(this.cur[k], T[k], 0.25, dt);
     const c = this.cur;
-    this.wind = c.wind;
+    // gusts: wind strength breathes over time
+    const t = G.time;
+    const gust = Math.max(0, Math.sin(t * 0.23) * Math.sin(t * 0.71 + 1.3)) * 0.9 + Math.sin(t * 1.9) * 0.08;
+    this.wind = c.wind * (0.75 + gust);
+    // wet ground darkens slowly during rain and dries afterwards
+    this.wet = damp(this.wet || 0, c.rain > 0.3 ? 1 : 0, c.rain > 0.3 ? 0.08 : 0.03, dt);
+    WorldUniforms.uWet.value = G.sky.underground ? 0 : this.wet;
     const sky = G.sky;
     sky.cloudCover = c.cloud;
     sky.dim = c.dim;
@@ -89,11 +115,14 @@ export class Weather {
     if (this.flash > 0) fog.color.lerp(new THREE.Color(0xc8d0e0), this.flash * 0.5);
 
     // rain
-    this.mat.opacity = clamp(rain, 0, 1) * 0.55;
+    // above the snow line precipitation falls as snow
+    const snow = camPos.y > 26;
+    this.mat.color.setHex(snow ? 0xffffff : 0xaac4e0);
+    this.mat.opacity = clamp(rain, 0, 1) * (snow ? 0.9 : 0.55);
     this.lines.visible = rain > 0.02;
     if (this.lines.visible) {
-      const fall = 26, slant = 2 + this.wind * 2;
-      const len = 0.7;
+      const fall = snow ? 4 : 26, slant = (2 + this.wind * 2) * (snow ? 0.6 : 1);
+      const len = snow ? 0.12 : 0.7;
       for (let i = 0; i < this.n; i++) {
         const k = i * 3;
         this.drops[k + 1] -= fall * dt;
@@ -127,10 +156,16 @@ export class Weather {
         const delay = 0.3 + Math.random() * 1.5;
         setTimeout(() => G.audio.sfx('thunder', { vol: 1.2 - delay * 0.3 }), delay * 1000);
         G.ui?.screenFlash(0.35);
+        this.spawnBolt(camPos);
         G.bus.emit('stormBolt');
       }
     }
     this.flash = Math.max(0, this.flash - dt * 2.2);
+    if (this.bolts) for (let i = this.bolts.length - 1; i >= 0; i--) {
+      const b = this.bolts[i]; b.t += dt;
+      b.line.material.opacity = b.t < 0.08 || (b.t > 0.14 && b.t < 0.2) ? 1 : Math.max(0, 1 - b.t * 3);
+      if (b.t > 0.4) { G.scene.remove(b.line); b.line.geometry.dispose(); this.bolts.splice(i, 1); }
+    }
     this.boltLight.intensity = this.flash * 3;
     this.boltLight.position.set(camPos.x + 30, camPos.y + 100, camPos.z + 10);
     this.boltLight.target.position.copy(camPos);

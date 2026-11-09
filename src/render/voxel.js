@@ -6,6 +6,7 @@ export const WorldUniforms = {
   uTime: { value: 0 },
   uWind: { value: 1 },
   uNight: { value: 0 },
+  uWet: { value: 0 },
 };
 
 const FACES = [
@@ -112,7 +113,10 @@ export function getWorldMaterial() {
         }`);
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', `#include <common>
-        varying float vEmit; uniform float uNight;`)
+        varying float vEmit; uniform float uNight; uniform float uWet;`)
+      .replace('#include <color_fragment>', `#include <color_fragment>
+        diffuseColor.rgb *= 1.0 - uWet * 0.28;
+        diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.85, 0.92, 1.05), uWet * 0.5);`)
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
         float em = vEmit >= 1.5 ? (vEmit - 1.5) : vEmit * uNight;
         totalEmissiveRadiance += vColor.rgb * em * 1.6;`);

@@ -27,7 +27,7 @@ export class CameraRig {
     const p = G.player;
     const sens = 0.0026 * (G.settings.sensitivity || 1);
     if (this.mode === 'follow' && !G.ui.blocksCamera()) {
-      this.yaw -= I.look.dx * sens;
+      this.yaw -= I.look.dx * sens * (G.settings.invertX ? -1 : 1);
       this.pitch += I.look.dy * sens * (G.settings.invertY ? -1 : 1);
       this.dist = clamp(this.dist * Math.pow(1.12, I.wheel), 2.2, 18);
     }

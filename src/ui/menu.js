@@ -423,10 +423,28 @@ export class Menu {
       <div class="settings-grid">
         <div class="card"><h4>${t('set.general')}</h4>
           <div class="srow"><span>${t('set.language')}</span>${sel('lang', LANG_LIST.map((l) => [l.id, l.name]))}</div>
-          <div class="srow"><span>${t('set.sensitivity')}</span>${range('sensitivity', 0.3, 2.5, 0.1)}</div>
-          <div class="srow"><span>${t('set.invertY')}</span>${chk('invertY')}</div>
-          <div class="srow"><span>${t('set.shake')}</span>${chk('shake')}</div>
+          <div class="srow"><span>${t('set.weather')}</span>${sel('weatherMode', ['dynamic', 'clear', 'cloudy', 'rain', 'fog', 'storm'].map((w) => [w, t('weather.' + w)]))}</div>
           <div class="srow"><span>${t('set.fps')}</span>${chk('showFps')}</div>
+        </div>
+        <div class="card"><h4>${t('set.camera')}</h4>
+          <div class="srow"><span>${t('set.sensitivity')}</span>${range('sensitivity', 0.2, 3, 0.1)}</div>
+          <div class="srow"><span>${t('set.touchSens')}</span>${range('touchSens', 0.3, 3, 0.1)}</div>
+          <div class="srow"><span>${t('set.invertX')}</span>${chk('invertX')}</div>
+          <div class="srow"><span>${t('set.invertY')}</span>${chk('invertY')}</div>
+          <div class="srow"><span>${t('set.fov')}</span>${range('fov', 45, 90, 1)}</div>
+          <div class="srow"><span>${t('set.camDist')}</span>${range('camDist', 2.5, 16, 0.5)}</div>
+          <div class="srow"><span>${t('set.shake')}</span>${chk('shake')}</div>
+        </div>
+        <div class="card"><h4>${t('set.hud')}</h4>
+          <div class="srow"><span>${t('set.hudScale')}</span>${range('hudScale', 0.6, 1.4, 0.05)}</div>
+          <div class="srow"><span>${t('set.hudOpacity')}</span>${range('hudOpacity', 0.3, 1, 0.05)}</div>
+          <div class="srow"><span>${t('set.minimap')}</span>${chk('minimap')}</div>
+          <div class="srow"><span>${t('set.tracker')}</span>${chk('tracker')}</div>
+          <div class="srow"><span>${t('set.dmgNumbers')}</span>${chk('dmgNumbers')}</div>
+          <div class="srow"><span>${t('set.nameTags')}</span>${chk('nameTags')}</div>
+          <div class="srow"><span>${t('set.touchScale')}</span>${range('touchScale', 0.6, 1.5, 0.05)}</div>
+          <div class="srow"><span>${t('set.touchOpacity')}</span>${range('touchOpacity', 0.2, 1, 0.05)}</div>
+          <div class="srow"><button class="btn sm" data-a="hudreset">${t('set.hudReset')}</button></div>
         </div>
         <div class="card"><h4>${t('set.audio')}</h4>
           <div class="srow"><span>${t('set.master')}</span>${range('master', 0, 1, 0.05)}</div>
@@ -453,10 +471,12 @@ export class Menu {
         if (k === 'pixel') v = +v;
         S[k] = v;
         if (k === 'lang') { setLang(v); this.render(); G.ui.refreshHotbar(); }
+        if (k === 'camDist') G.cam.dist = v;
         G.game.applySettings();
         saveSettings(S);
       };
     });
+    this.content.querySelector('[data-a="hudreset"]').onclick = () => { Object.assign(S, { hudScale: 1, hudOpacity: 1, minimap: true, tracker: true, dmgNumbers: true, nameTags: true, touchScale: 1, touchOpacity: 0.85 }); G.game.applySettings(); saveSettings(S); this.render(); };
     this.content.querySelector('[data-a="save"]').onclick = () => { G.game.save(true); };
     this.content.querySelector('[data-a="title"]').onclick = () => { G.game.save(false); location.reload(); };
     this.content.querySelector('[data-a="reset"]').onclick = (e) => {

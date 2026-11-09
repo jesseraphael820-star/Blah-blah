@@ -135,6 +135,7 @@ export class UI {
     const hh = Math.floor(h), mm = Math.floor((h - hh) * 60 / 10) * 10;
     e.time.textContent = `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
     e.day.textContent = t('ui.day', { n: G.state.world.day });
+    e.wx.title = t('weather.' + G.weather.state);
     e.wx.textContent = G.sky.underground ? '⛰' : (G.sky.isNight() && G.weather.state === 'clear' ? '☾' : WEATHER_ICON[G.weather.state]);
     // minimap
     this.miniT = (this.miniT || 0) - dt;

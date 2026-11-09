@@ -120,6 +120,7 @@ export class Powers {
           G.particles.burst(P.pos.x, P.pos.y + 1, P.pos.z, 0xffffff, 40, 8, { up: 3 });
           for (const e of G.combat.enemiesInRadius(P.pos.x, P.pos.z, r, P.pos.y)) e.takeDamage(dmg, { power: true, knock: 12 });
           G.audio.sfx('explosion');
+          G.physProps?.impulseRadius(P.pos.x, P.pos.y, P.pos.z, r + 2, 16);
           G.cam.shake(0.5);
           G.ui.screenFlash(0.25, '#ffe26a');
         });
@@ -148,6 +149,7 @@ export class Powers {
             if (d < range + e.radius && Math.abs(angleDiff(yaw, a)) < 0.7) { e.takeDamage(dmg, { power: true, knock: 3 }); e.status.burn = 4; e.status.burnDps = dmg * 0.3; }
           }
           G.audio.sfx('fire');
+          G.physProps?.impulseRadius(P.pos.x + fx * 3, P.pos.y, P.pos.z + fz * 3, 4.5, 7);
         });
         break;
       }
@@ -159,6 +161,7 @@ export class Powers {
           for (let i = 0; i < 30; i++) G.particles.solid.spawn(P.pos.x + (Math.random() - 0.5) * r * 2, P.pos.y + 0.2, P.pos.z + (Math.random() - 0.5) * r * 2, 0, 3 + Math.random() * 3, 0, 0xe8faff, 0.3, 1, { gravity: 6 });
           for (const e of G.combat.enemiesInRadius(P.pos.x, P.pos.z, r, P.pos.y)) { e.takeDamage(dmg, { power: true }); e.status.frozen = e.boss ? 1 + lvl * 0.2 : 2.2 + lvl * 0.4; }
           G.audio.sfx('freeze');
+          G.physProps?.impulseRadius(P.pos.x, P.pos.y, P.pos.z, r, 5);
           G.cam.shake(0.25);
         });
         break;

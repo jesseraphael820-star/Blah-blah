@@ -47,7 +47,7 @@ export class Touch {
         pinch = d; e.preventDefault(); return;
       }
       for (const tc of e.changedTouches) if (tc.identifier === lid) {
-        I.look.dx += (tc.clientX - lx) * 1.6; I.look.dy += (tc.clientY - ly) * 1.6; lx = tc.clientX; ly = tc.clientY;
+        const ts = 1.6 * (G.settings.touchSens || 1); I.look.dx += (tc.clientX - lx) * ts; I.look.dy += (tc.clientY - ly) * ts; lx = tc.clientX; ly = tc.clientY;
       }
       e.preventDefault();
     }, { passive: false });
