@@ -131,7 +131,7 @@ export class Player {
     let speed = 0;
     if (this.state === 'normal') {
       const horse = this.mounted;
-      const base = horse ? horse.B.speed * (I.isDown('run') ? 1.15 : 1) : this.swimming ? 3.2 : wantRun ? 8.6 : 5.0;
+      const base = horse ? (this.swimming ? 5 : horse.B.speed * (I.isDown('run') ? 1.15 : 1)) : this.swimming ? 3.2 : wantRun ? 8.6 : 5.0;
       speed = base * (horse ? 1 : st.speedMul) * mag * (this.blocking && !horse ? 0.4 : 1);
       if (wantRun && !this.swimming && !horse) { s.stamina = Math.max(0, s.stamina - dt * 14); this.staminaDelay = 0.6; }
       if (mag > 0.05) {
@@ -179,8 +179,12 @@ export class Player {
     if (this.state === 'attack' && this.stateT < 0.18) { mx += Math.sin(this.yaw) * 3 * dt; mz += Math.cos(this.yaw) * 3 * dt; }
     if (this.knock) { mx += this.knock.x * dt; mz += this.knock.z * dt; this.knock.multiplyScalar(Math.max(0, 1 - dt * 8)); if (this.knock.lengthSq() < 0.05) this.knock = null; }
     const ox = this.pos.x, oz = this.pos.z;
-    G.physics.move(this.pos, mx, mz, this.mounted ? 0.55 : this.radius, this.height, !this.onGround);
-    if (this.mounted) this.mounted.keepBodyClear(this.pos, this.yaw, !this.onGround, ox, oz);
+    // swimming: measure step height from the water surface so you can climb out onto the shore
+    const swimY = this.swimming ? this.pos.y : null;
+    if (this.swimming) this.pos.y = G.physics.waterLevel(this.pos.x, this.pos.z) + 1.4; // can climb a bank up to ~2.5 above the water
+    G.physics.move(this.pos, mx, mz, this.mounted ? 0.55 : this.radius, this.height, !this.onGround && !this.swimming);
+    if (this.mounted) this.mounted.keepBodyClear(this.pos, this.yaw, !this.onGround && !this.swimming, ox, oz);
+    if (swimY !== null) this.pos.y = swimY;
     const moved = Math.hypot(this.pos.x - ox, this.pos.z - oz);
     this.speedNow = moved / Math.max(dt, 1e-4);
     G.state.ach.stats.distance += moved;
@@ -504,7 +508,7 @@ export class Player {
       case 'cast': pose = this.castAnim; phase = this.stateT / this.castDur; break;
       case 'action': pose = this.action; phase = this.stateT / this.actionDur; break;
       default:
-        if (this.swimming) pose = 'swim';
+        if (this.swimming && !this.mounted) pose = 'swim';
         else if (!this.mounted && !this.onGround && Math.abs(this.pos.y - G.physics.groundAt(this.pos.x, this.pos.z, this.pos.y)) > 0.4) pose = this.vy > 0 ? 'jump' : 'fall';
         else if (this.mounted) pose = 'ride';
         else if (this.blocking) pose = 'block';

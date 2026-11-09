@@ -80,6 +80,10 @@ export class UI {
     };
     this.pctx = this.el.portrait.getContext('2d');
     this.pctx.imageSmoothingEnabled = false;
+    // tap/click the minimap to open the full map
+    this.el.mini.parentElement.style.pointerEvents = 'auto';
+    this.el.mini.parentElement.style.cursor = 'pointer';
+    this.el.mini.parentElement.addEventListener('click', (e) => { e.stopPropagation(); G.audio.sfx('open'); this.openMenu('map'); });
     this.hud.querySelectorAll('.hud-buttons button').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); G.audio.sfx('open'); this.openMenu(b.dataset.m); }));
     this.el.powers.forEach((s, i) => s.addEventListener('pointerdown', (e) => { e.stopPropagation(); if (!G.mobile) G.powers.cast(i); }));
     this.el.potion.addEventListener('pointerdown', (e) => { e.stopPropagation(); if (!G.mobile) G.inv.quickPotion(); });

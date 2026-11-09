@@ -122,11 +122,19 @@ class Horse {
         const vx = Math.sin(this.yaw) * move * dt, vz = Math.cos(this.yaw) * move * dt;
         const blocked = G.physics.move(this.pos, vx, vz, 0.7, 2, false);
         if (blocked) this.target = null;
-        if (G.physics.waterLevel(this.pos.x, this.pos.z) - G.physics.terrainHeight(this.pos.x, this.pos.z) > 1) { this.pos.x -= vx * 2; this.pos.z -= vz * 2; this.target = null; }
+        if (!this.called && !this.owned && G.physics.waterLevel(this.pos.x, this.pos.z) - G.physics.terrainHeight(this.pos.x, this.pos.z) > 1) { this.pos.x -= vx * 2; this.pos.z -= vz * 2; this.target = null; }
       }
       this.speed = move;
       this.keepBodyClear(this.pos, this.yaw, false);
-      this.pos.y = G.physics.groundAt(this.pos.x, this.pos.z, this.pos.y + 1.2);
+      const wl = G.physics.waterLevel(this.pos.x, this.pos.z);
+      const gy = G.physics.groundAt(this.pos.x, this.pos.z, Math.max(this.pos.y, wl) + 1.2);
+      this.pos.y = wl - gy > 1.2 ? wl - 1.15 : gy; // floats in deep water
+      // a horse left in deep water swims to the nearest shore by itself
+      if (wl - gy > 1.2 && !this.called && move === 0) {
+        let best = null;
+        for (let a = 0; a < 6.28; a += 0.5) { const x = this.pos.x + Math.sin(a) * 12, z = this.pos.z + Math.cos(a) * 12; if (G.physics.terrainHeight(x, z) > wl - 0.5) { best = a; break; } }
+        if (best !== null) { this.yaw = dampAngle(this.yaw, best, 3, dt); G.physics.move(this.pos, Math.sin(this.yaw) * 3 * dt, Math.cos(this.yaw) * 3 * dt, 0.7, 2, false); }
+      }
     }
     this.m.g.visible = true;
     this.animate(dt);
@@ -146,6 +154,15 @@ class Horse {
     const P = G.player;
     const ridden = P.mounted === this;
     this.landT = Math.max(0, (this.landT || 0) - dt);
+    // swimming: paddle with the head above water
+    const wl = G.physics.waterLevel(this.pos.x, this.pos.z);
+    if (wl - G.physics.terrainHeight(this.pos.x, this.pos.z) > 1.2 && this.pos.y < wl - 0.6) {
+      const w = G.time * 6;
+      m.legs.forEach((l, i) => (l.rotation.x = Math.sin(w + i * 1.6) * 0.9));
+      m.body.rotation.x = -0.12; m.body.position.y = 1.15; m.neck.rotation.x = -0.25;
+      if (Math.random() < 0.3) G.particles.splash(this.pos.x, wl, this.pos.z, 1);
+      return;
+    }
     if (ridden && !P.onGround && !P.swimming) {
       const pitch = Math.max(-0.45, Math.min(0.4, -P.vy * 0.045));
       m.body.rotation.x = pitch;
@@ -288,7 +305,7 @@ export class Horses {
   update(dt) {
     if (G.input.consume('whistle') && !G.ui.blocksGameplay()) this.toggle();
     const P = G.player;
-    if (this.riding && (P.dead || P.swimming)) this.dismount();
+    if (this.riding && P.dead) this.dismount();
     for (const h of this.wild) h.update(dt, false);
     if (this.mine) {
       this.mine.update(dt, this.riding);
