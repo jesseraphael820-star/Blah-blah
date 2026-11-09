@@ -448,6 +448,7 @@ export class Menu {
           <div class="srow"><span>${t('set.language')}</span>${sel('lang', LANG_LIST.map((l) => [l.id, l.name]))}</div>
           <div class="srow"><span>${t('set.weather')}</span>${sel('weatherMode', ['dynamic', 'clear', 'cloudy', 'rain', 'fog', 'storm'].map((w) => [w, t('weather.' + w)]))}</div>
           <div class="srow"><span>${t('set.fps')}</span>${chk('showFps')}</div>
+          <div class="srow"><span>${t('set.fullscreen')}</span><button class="btn sm" data-a="fs">⛶ ${t('set.fullscreen')}</button></div>
         </div>
         <div class="card"><h4>${t('set.camera')}</h4>
           <div class="srow"><span>${t('set.sensitivity')}</span>${range('sensitivity', 0.2, 3, 0.1)}</div>
@@ -500,6 +501,7 @@ export class Menu {
       };
     });
     this.content.querySelector('[data-a="hudreset"]').onclick = () => { Object.assign(S, { hudScale: 1, hudOpacity: 1, minimap: true, tracker: true, dmgNumbers: true, nameTags: true, touchScale: 1, touchOpacity: 0.85 }); G.game.applySettings(); saveSettings(S); this.render(); };
+    this.content.querySelector('[data-a="fs"]').onclick = () => G.ui.toggleFullscreen();
     this.content.querySelector('[data-a="save"]').onclick = () => { G.game.save(true); };
     this.content.querySelector('[data-a="title"]').onclick = () => { G.game.save(false); location.reload(); };
     this.content.querySelector('[data-a="reset"]').onclick = (e) => {

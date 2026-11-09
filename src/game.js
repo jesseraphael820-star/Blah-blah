@@ -397,6 +397,7 @@ export class Game {
         else for (const k of ['inventory', 'journal', 'map', 'character', 'powers', 'swords']) if (I.consume(k)) { G.audio.sfx('open'); G.menu.open(k); break; }
       }
     }
+    if (I.consume('fullscreen')) G.ui.toggleFullscreen?.();
     G.shop.update();
     G.dialogue.update(dt);
     if (G.ui.overlay === 'defeat' && (I.consume('interact') || I.consume('confirm'))) document.querySelector('.overlay.defeat button:not([disabled])')?.click();

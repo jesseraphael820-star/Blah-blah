@@ -54,6 +54,7 @@ export class UI {
         <button data-m="map" title="M">${img(icon('map'))}</button>
         <button data-m="character" title="K">${img(icon('user', '#4aa8ff'))}</button>
         <button data-m="settings" title="Esc">${img(icon('gear'))}</button>
+        <button data-fs class="fs-btn">⛶</button>
       </div>
       <div class="hud-bottom">
         <div class="prompt hidden"><kbd>E</kbd><span></span></div>
@@ -85,7 +86,8 @@ export class UI {
     this.el.mini.parentElement.style.pointerEvents = 'auto';
     this.el.mini.parentElement.style.cursor = 'pointer';
     this.el.mini.parentElement.addEventListener('click', (e) => { e.stopPropagation(); G.audio.sfx('open'); this.openMenu('map'); });
-    this.hud.querySelectorAll('.hud-buttons button').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); G.audio.sfx('open'); this.openMenu(b.dataset.m); }));
+    this.hud.querySelectorAll('.hud-buttons button[data-m]').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); G.audio.sfx('open'); this.openMenu(b.dataset.m); }));
+    this.hud.querySelector('[data-fs]').addEventListener('click', (e) => { e.stopPropagation(); this.toggleFullscreen(); });
     this.el.powers.forEach((s, i) => s.addEventListener('pointerdown', (e) => { e.stopPropagation(); if (!G.mobile) G.powers.cast(i); }));
     this.el.potion.addEventListener('pointerdown', (e) => { e.stopPropagation(); if (!G.mobile) G.inv.quickPotion(); });
     // waypoint marker
@@ -95,6 +97,18 @@ export class UI {
     this.worldUi.appendChild(this.waypoint);
     this.refreshHotbar();
     G.bus.on('powerUnlocked', () => this.refreshHotbar());
+  }
+  // full screen (works in most browsers; some app views don't allow it)
+  async toggleFullscreen() {
+    const d = document, el = d.documentElement;
+    try {
+      if (d.fullscreenElement || d.webkitFullscreenElement) { await (d.exitFullscreen || d.webkitExitFullscreen).call(d); return; }
+      const req = el.requestFullscreen || el.webkitRequestFullscreen;
+      if (!req) throw new Error('no api');
+      await req.call(el, { navigationUI: 'hide' });
+      try { await screen.orientation?.lock?.('landscape'); } catch { /* not supported */ }
+      G.audio.sfx('open');
+    } catch { this.toast(t('ui.fullscreenBlocked'), 'warn'); }
   }
   show() { this.hud.classList.remove('hidden'); }
   hide() { this.hud.classList.add('hidden'); }
