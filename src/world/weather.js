@@ -1,0 +1,138 @@
+// Weather state machine: clear, cloudy, rain, fog, storm (with lightning).
+import * as THREE from 'three';
+import { G } from '../core/context.js';
+import { damp, clamp } from '../core/utils.js';
+
+const STATES = {
+  clear:  { cloud: 0.35, rain: 0, fog: 1, dim: 1, wind: 0.8 },
+  cloudy: { cloud: 0.8, rain: 0, fog: 0.85, dim: 0.82, wind: 1.2 },
+  rain:   { cloud: 0.95, rain: 1, fog: 0.6, dim: 0.62, wind: 1.6 },
+  fog:    { cloud: 0.7, rain: 0, fog: 0.3, dim: 0.8, wind: 0.4 },
+  storm:  { cloud: 1, rain: 1.6, fog: 0.5, dim: 0.42, wind: 2.6 },
+};
+const NEXT = {
+  clear: [['clear', 4], ['cloudy', 3], ['fog', 1]],
+  cloudy: [['clear', 3], ['rain', 3], ['cloudy', 1], ['storm', 1]],
+  rain: [['cloudy', 3], ['rain', 1], ['storm', 1.2], ['clear', 1]],
+  fog: [['clear', 3], ['cloudy', 2]],
+  storm: [['rain', 3], ['cloudy', 1]],
+};
+
+export class Weather {
+  constructor(scene, mobile) {
+    this.state = G.state.world.weather || 'clear';
+    this.cur = { ...STATES[this.state] };
+    this.timer = 60 + Math.random() * 90;
+    this.flash = 0;
+    this.nextBolt = 8;
+    this.wind = 1;
+    // rain streaks
+    const n = mobile ? 1200 : 2600;
+    this.n = n;
+    this.area = 36;
+    this.drops = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) {
+      this.drops[i * 3] = (Math.random() - 0.5) * this.area * 2;
+      this.drops[i * 3 + 1] = Math.random() * 30;
+      this.drops[i * 3 + 2] = (Math.random() - 0.5) * this.area * 2;
+    }
+    this.linePos = new Float32Array(n * 6);
+    const geo = new THREE.BufferGeometry();
+    this.attr = new THREE.BufferAttribute(this.linePos, 3).setUsage(THREE.DynamicDrawUsage);
+    geo.setAttribute('position', this.attr);
+    this.mat = new THREE.LineBasicMaterial({ color: 0xaac4e0, transparent: true, opacity: 0.0, fog: true });
+    this.lines = new THREE.LineSegments(geo, this.mat);
+    this.lines.frustumCulled = false;
+    scene.add(this.lines);
+    this.boltLight = new THREE.DirectionalLight(0xc8d8ff, 0);
+    scene.add(this.boltLight); scene.add(this.boltLight.target);
+  }
+
+  set(state) {
+    if (!STATES[state]) return;
+    this.state = state;
+    G.state.world.weather = state;
+    G.bus.emit('weather', state);
+  }
+
+  pick() {
+    const opts = NEXT[this.state];
+    const tot = opts.reduce((a, o) => a + o[1], 0);
+    let r = Math.random() * tot;
+    for (const [s, w] of opts) { r -= w; if (r <= 0) return s; }
+    return 'clear';
+  }
+
+  update(dt, camPos) {
+    this.timer -= dt;
+    if (this.timer <= 0) {
+      this.timer = 90 + Math.random() * 150;
+      this.set(this.pick());
+    }
+    const T = STATES[this.state];
+    for (const k of Object.keys(T)) this.cur[k] = damp(this.cur[k], T[k], 0.25, dt);
+    const c = this.cur;
+    this.wind = c.wind;
+    const sky = G.sky;
+    sky.cloudCover = c.cloud;
+    sky.dim = c.dim;
+    const under = sky.underground;
+    const rain = under ? 0 : c.rain;
+    this.rain = rain;
+
+    // fog
+    const fog = G.scene.fog;
+    const vd = G.world.viewDist;
+    if (under) { fog.near = 6; fog.far = 60; }
+    else { fog.near = vd * 0.25 * c.fog; fog.far = vd * (0.45 + 0.55 * c.fog); }
+    fog.color.copy(sky.fogColor);
+    if (this.flash > 0) fog.color.lerp(new THREE.Color(0xc8d0e0), this.flash * 0.5);
+
+    // rain
+    this.mat.opacity = clamp(rain, 0, 1) * 0.55;
+    this.lines.visible = rain > 0.02;
+    if (this.lines.visible) {
+      const fall = 26, slant = 2 + this.wind * 2;
+      const len = 0.7;
+      for (let i = 0; i < this.n; i++) {
+        const k = i * 3;
+        this.drops[k + 1] -= fall * dt;
+        this.drops[k] += slant * dt * 0.3;
+        if (this.drops[k + 1] < -2) {
+          this.drops[k + 1] = 26 + Math.random() * 6;
+          this.drops[k] = (Math.random() - 0.5) * this.area * 2;
+          this.drops[k + 2] = (Math.random() - 0.5) * this.area * 2;
+        }
+        const x = camPos.x + this.drops[k], y = camPos.y - 6 + this.drops[k + 1], z = camPos.z + this.drops[k + 2];
+        const o = i * 6;
+        this.linePos[o] = x; this.linePos[o + 1] = y; this.linePos[o + 2] = z;
+        this.linePos[o + 3] = x - slant * 0.03; this.linePos[o + 4] = y + len; this.linePos[o + 5] = z;
+      }
+      this.attr.needsUpdate = true;
+      // ground splashes near player
+      const p = G.player.pos;
+      for (let s = 0; s < rain * 3; s++) {
+        const sx = p.x + (Math.random() - 0.5) * 20, sz = p.z + (Math.random() - 0.5) * 20;
+        const sy = Math.max(G.physics.terrainHeight(sx, sz), G.physics.waterLevel(sx, sz) - 0.1);
+        G.particles.solid.spawn(sx, sy + 0.05, sz, 0, 1.2, 0, 0xc8d8ec, 0.12, 0.25, { gravity: 8, alpha: 0.7 });
+      }
+    }
+
+    // lightning
+    if (this.state === 'storm' && !under) {
+      this.nextBolt -= dt;
+      if (this.nextBolt <= 0) {
+        this.nextBolt = 5 + Math.random() * 10;
+        this.flash = 1;
+        const delay = 0.3 + Math.random() * 1.5;
+        setTimeout(() => G.audio.sfx('thunder', { vol: 1.2 - delay * 0.3 }), delay * 1000);
+        G.ui?.screenFlash(0.35);
+        G.bus.emit('stormBolt');
+      }
+    }
+    this.flash = Math.max(0, this.flash - dt * 2.2);
+    this.boltLight.intensity = this.flash * 3;
+    this.boltLight.position.set(camPos.x + 30, camPos.y + 100, camPos.z + 10);
+    this.boltLight.target.position.copy(camPos);
+  }
+}

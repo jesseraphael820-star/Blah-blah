@@ -1,0 +1,36 @@
+// Shared game context. Every system registers itself here so modules can
+// talk to each other without circular constructor wiring.
+export const G = {
+  time: 0,          // real seconds since start
+  dt: 0,
+  paused: false,
+  scene: null,
+  camera: null,
+  renderer: null,
+  world: null,
+  physics: null,
+  player: null,
+  state: null,      // save data (see core/save.js)
+  settings: null,
+  audio: null,
+  ui: null,
+  bus: null,
+  sky: null,
+  weather: null,
+  particles: null,
+  entities: null,
+  quests: null,
+  inv: null,
+  progression: null,
+  dialogue: null,
+  combat: null,
+  powers: null,
+  shop: null,
+  achievements: null,
+  events: null,
+  interact: null,
+  input: null,
+  cam: null,
+  mobile: false,
+  quality: 'high',
+};
