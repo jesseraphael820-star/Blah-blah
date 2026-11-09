@@ -28,9 +28,9 @@ export function newState(appearance) {
     inv: {
       items: { potion_small: 2, bread: 2 },
       owned: {
-        swords: ['wood_sword'], armors: ['cloth'], hats: ['none'], accessories: ['none'], skins: ['custom'], powers: [], pets: [],
+        swords: ['wood_sword'], armors: ['cloth'], hats: ['none'], accessories: ['none'], skins: ['custom'], powers: [], pets: [], horses: [],
       },
-      equipped: { sword: 'wood_sword', armor: 'cloth', hat: 'none', accessory: 'none', skin: 'custom', pet: null },
+      equipped: { sword: 'wood_sword', armor: 'cloth', hat: 'none', accessory: 'none', skin: 'custom', pet: null, horse: null },
       powerSlots: [null, null, null, null],
       powerLevels: {},
     },

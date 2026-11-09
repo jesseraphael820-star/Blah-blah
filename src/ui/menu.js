@@ -198,6 +198,7 @@ export class Menu {
             <small>${t('char.hats')}</small><div class="chips">${ownedRow('hat', G.state.inv.owned.hats, 'hat')}</div>
             <small>${t('char.accessories')}</small><div class="chips">${ownedRow('acc', G.state.inv.owned.accessories, 'accessory')}</div>
             <small>${t('char.pet')}</small><div class="chips"><button class="chip ${!G.state.inv.equipped.pet ? 'on' : ''}" data-slot="pet" data-id="">${t('ui.none')}</button>${pets.map((id) => `<button class="chip ${G.state.inv.equipped.pet === id ? 'on' : ''}" data-slot="pet" data-id="${id}">${t('pet.' + id)}</button>`).join('')}</div>
+            <small>${t('char.horse')}</small><div class="chips">${(G.state.inv.owned.horses || []).map((h) => `<button class="chip ${G.state.inv.equipped.horse === h.id ? 'on' : ''}" data-horse="${h.id}" style="${G.state.inv.equipped.horse === h.id ? '' : `border-color:${rarityColor({ common: 'common', rare: 'rare', epic: 'epic', legendary: 'legendary', mythic: 'magic' }[h.breed])}`}">${t('horse.' + h.breed)}</button>`).join('') || `<span class="hint">${t('char.noHorse')}</span>`}</div>
             <p class="hint">${t('char.shopHint')}</p>
           </div>
           <div class="card"><h4>${t('char.attributes')} <span class="pts">${t('ui.points')}: ${p.attrPoints}</span></h4><div class="attrs">${attrs}</div>
@@ -210,6 +211,7 @@ export class Menu {
     c.querySelector('.name-in').oninput = (e) => { A.name = e.target.value.slice(0, 16) || 'Hero'; };
     c.querySelectorAll('[data-hair]').forEach((b) => b.onclick = () => { A.hairStyle = b.dataset.hair; G.player.refreshLook(); G.audio.sfx('click'); this.rerender(); });
     c.querySelectorAll('.sw').forEach((b) => b.onclick = () => { A[b.dataset.k] = +b.dataset.v; G.player.refreshLook(); G.audio.sfx('click'); this.rerender(); });
+    c.querySelectorAll('[data-horse]').forEach((b) => b.onclick = () => { if (G.horses.riding) G.horses.dismount(); G.state.inv.equipped.horse = b.dataset.horse; G.horses.spawnOwned(); G.audio.sfx('equip'); this.rerender(); });
     c.querySelectorAll('[data-slot]').forEach((b) => b.onclick = () => { G.inv.equip(b.dataset.slot, b.dataset.id || null); this.rerender(); });
     c.querySelectorAll('[data-attr]').forEach((b) => b.onclick = () => { G.prog.spendAttr(b.dataset.attr); this.rerender(); });
     c.querySelectorAll('[data-title]').forEach((b) => b.onclick = () => { G.state.player.title = b.dataset.title; G.audio.sfx('click'); this.rerender(); });

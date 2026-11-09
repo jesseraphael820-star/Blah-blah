@@ -221,6 +221,8 @@ export function lampPost(B, x, z) {
   B.box(x + 0.45, y + 3.15, z - 0.27, x + 0.99, y + 3.25, z + 0.27, 0x2a2a2a);
   B.glow(x + 0.72, y + 2.85, z, 0xffb04a, 2.6, true);
   B.cyl(x, z, 0.25, y, y + 3.4);
+  // the hanging lantern and its arm are solid too
+  B.collider(x + 0.1, y + 2.55, z - 0.3, x + 1.0, y + 3.4, z + 0.3, { noCam: true });
 }
 
 export function well(B, x, z) {

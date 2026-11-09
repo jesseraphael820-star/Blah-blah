@@ -137,7 +137,8 @@ export class NPC {
       }
     } else if (this.visible) {
       pose = { hammer: 'hammer', farm: 'farm', sit: 'sit', fish: 'fish', read: 'read', guard: 'guard', play: 'play' }[act] || (this.def.float ? 'float' : 'idle');
-      if (dP < 6 && pose !== 'hammer' && pose !== 'farm' && pose !== 'fish') this.yaw = dampAngle(this.yaw, Math.atan2(P.pos.x - this.pos.x, P.pos.z - this.pos.z), 3, dt);
+      if (this.chatting) pose = 'talk';
+      else if (dP < 6 && pose !== 'hammer' && pose !== 'farm' && pose !== 'fish') this.yaw = dampAngle(this.yaw, Math.atan2(P.pos.x - this.pos.x, P.pos.z - this.pos.z), 3, dt);
       else if (act === 'fish') this.yaw = dampAngle(this.yaw, Math.PI / 2, 3, dt);
     }
     if (this.id !== 'spirit') this.pos.y = G.physics.groundAt(this.pos.x, this.pos.z, this.pos.y + 1.2);
@@ -148,7 +149,7 @@ export class NPC {
       m.root.rotation.y = this.yaw;
       // villagers glance at the hero when nearby
       let hy = 0;
-      if (dP < 6 && pose !== 'walk') { hy = Math.atan2(P.pos.x - this.pos.x, P.pos.z - this.pos.z) - this.yaw; hy = Math.atan2(Math.sin(hy), Math.cos(hy)); hy = Math.max(-0.9, Math.min(0.9, hy)); }
+      if (dP < 6 && pose !== 'walk' && !this.chatting) { hy = Math.atan2(P.pos.x - this.pos.x, P.pos.z - this.pos.z) - this.yaw; hy = Math.atan2(Math.sin(hy), Math.cos(hy)); hy = Math.max(-0.9, Math.min(0.9, hy)); }
       m.pose(pose, 0, dt, { speed, headY: hy });
       m.updateFace(dt);
     }
@@ -190,6 +191,53 @@ export class NPCManager {
     this.list = Object.keys(NPCS).map((id) => new NPC(id));
     this.byId = Object.fromEntries(this.list.map((n) => [n.id, n]));
   }
-  update(dt) { for (const n of this.list) n.update(dt); }
+  update(dt) {
+    for (const n of this.list) n.update(dt);
+    this.updateChats(dt);
+  }
+  // villagers standing near each other strike up short conversations
+  updateChats(dt) {
+    if (this.chat) {
+      const c = this.chat;
+      c.t -= dt;
+      const [a, b] = c.pair;
+      const ok = a.visible && b.visible && !a.talking && !b.talking && !a.path.length && !b.path.length;
+      if (!ok) { this.endChat(); return; }
+      a.yaw = dampAngle(a.yaw, Math.atan2(b.pos.x - a.pos.x, b.pos.z - a.pos.z), 5, dt);
+      b.yaw = dampAngle(b.yaw, Math.atan2(a.pos.x - b.pos.x, a.pos.z - b.pos.z), 5, dt);
+      if (c.t <= 0) {
+        if (c.i >= c.lines.length) { this.endChat(); return; }
+        const sp = c.i % 2 === 0 ? a : b, other = sp === a ? b : a;
+        const line = c.lines[c.i++];
+        G.ui.bubble(sp, line, 3);
+        sp.model.setTalking(true); other.model.setTalking(false);
+        sp.model.setExpression(line.includes('!') ? 'happy' : 'smile');
+        const near = Math.hypot(sp.pos.x - G.player.pos.x, sp.pos.z - G.player.pos.z);
+        if (near < 14) G.audio.sfx('blip', { pitch: sp.def.pitch, vol: 0.35 });
+        setTimeout(() => sp.model.setTalking(false), 1400);
+        c.t = 3.2;
+      }
+      return;
+    }
+    this.chatT = (this.chatT ?? 6) - dt;
+    if (this.chatT > 0) return;
+    this.chatT = 10 + Math.random() * 12;
+    const free = this.list.filter((n) => n.visible && !n.talking && !n.path.length && !n.def.secret && n.id !== 'spirit' && n.activity !== 'hammer' && Math.hypot(n.pos.x - G.player.pos.x, n.pos.z - G.player.pos.z) < 60);
+    for (let i = 0; i < free.length; i++) for (let j = i + 1; j < free.length; j++) {
+      const a = free[i], b = free[j];
+      if (Math.hypot(a.pos.x - b.pos.x, a.pos.z - b.pos.z) > 9) continue;
+      const convs = tr('npcChat');
+      if (!Array.isArray(convs) || !convs.length) return;
+      const lines = convs[Math.floor(Math.random() * convs.length)].map((l) => l.replace('{a}', a.name).replace('{b}', b.name));
+      a.chatting = b.chatting = true;
+      this.chat = { pair: [a, b], lines, i: 0, t: 0 };
+      return;
+    }
+  }
+  endChat() {
+    if (!this.chat) return;
+    for (const n of this.chat.pair) { n.chatting = false; n.model.setTalking(false); n.model.setExpression('neutral'); }
+    this.chat = null;
+  }
   get(id) { return this.byId[id]; }
 }

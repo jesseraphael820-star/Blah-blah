@@ -124,15 +124,16 @@ export class Player {
       if (I.consume('potion')) G.inv.quickPotion();
       if (I.consume('lockon')) this.toggleLock();
     }
-    this.blocking = controlsOn && I.isDown('block') && !this.swimming && (this.state === 'normal') && s.stamina > 0;
+    this.blocking = controlsOn && I.isDown('block') && !this.swimming && !this.mounted && (this.state === 'normal') && s.stamina > 0;
     if (this.blocking) { this.blockT += dt; } else this.blockT = 0;
 
     // ---------- horizontal movement ----------
     let speed = 0;
     if (this.state === 'normal') {
-      const base = this.swimming ? 3.2 : wantRun ? 8.6 : 5.0;
-      speed = base * st.speedMul * mag * (this.blocking ? 0.4 : 1);
-      if (wantRun && !this.swimming) { s.stamina = Math.max(0, s.stamina - dt * 14); this.staminaDelay = 0.6; }
+      const horse = this.mounted;
+      const base = horse ? horse.B.speed * (I.isDown('run') ? 1.15 : 1) : this.swimming ? 3.2 : wantRun ? 8.6 : 5.0;
+      speed = base * (horse ? 1 : st.speedMul) * mag * (this.blocking && !horse ? 0.4 : 1);
+      if (wantRun && !this.swimming && !horse) { s.stamina = Math.max(0, s.stamina - dt * 14); this.staminaDelay = 0.6; }
       if (mag > 0.05) {
         const targetYaw = Math.atan2(dx, dz);
         if (!this.blocking || !this.lockTarget) this.yaw = dampAngle(this.yaw, targetYaw, 14, dt);
@@ -284,7 +285,7 @@ export class Player {
     if (this.swimming) { this.vy = 6; this.pos.y += 0.3; this.swimming = false; return true; }
     const coyote = !this.onGround && (this.airT || 0) < 0.13 && this.vy <= 0;
     if ((!this.onGround && !coyote) || this.busy()) return false;
-    this.vy = 9.6;
+    this.vy = this.mounted ? this.mounted.B.jump : 9.6;
     this.onGround = false;
     this.airT = 1;
     this.squash = 0.12;
@@ -296,7 +297,7 @@ export class Player {
   tryDodge(dx, dz, mag) {
     if (this.busy() && this.state !== 'attack') return;
     if (this.state === 'attack' && this.stateT < 0.15) return;
-    if (this.s.stamina < 22 || this.swimming) return;
+    if (this.s.stamina < 22 || this.swimming || this.mounted) return;
     this.s.stamina -= 22; this.staminaDelay = 0.8;
     this.dodgeYaw = mag > 0.1 ? Math.atan2(dx, dz) : this.yaw; // standing still: roll forward
     if (mag > 0.1) this.yaw = this.dodgeYaw;
@@ -480,7 +481,7 @@ export class Player {
     const m = this.model;
     this.visualY = damp(this.visualY, this.pos.y, this.onGround ? 18 : 40, dt);
     if (Math.abs(this.visualY - this.pos.y) > 3) this.visualY = this.pos.y;
-    m.root.position.set(this.pos.x, this.visualY, this.pos.z);
+    m.root.position.set(this.pos.x, this.visualY + (this.mounted ? 1.0 + this.mounted.m.body.position.y - 1.15 : 0), this.pos.z);
     // landing squash & stretch
     this.squash = Math.max(0, (this.squash || 0) - dt * 1.2);
     const k = Math.sin(Math.min(1, this.squash / 0.28) * Math.PI) * this.squash;
@@ -497,7 +498,8 @@ export class Player {
       case 'action': pose = this.action; phase = this.stateT / this.actionDur; break;
       default:
         if (this.swimming) pose = 'swim';
-        else if (!this.onGround && Math.abs(this.pos.y - G.physics.groundAt(this.pos.x, this.pos.z, this.pos.y)) > 0.4) pose = this.vy > 0 ? 'jump' : 'fall';
+        else if (!this.mounted && !this.onGround && Math.abs(this.pos.y - G.physics.groundAt(this.pos.x, this.pos.z, this.pos.y)) > 0.4) pose = this.vy > 0 ? 'jump' : 'fall';
+        else if (this.mounted) pose = 'ride';
         else if (this.blocking) pose = 'block';
         else if (this.speedNow > 6.5) pose = 'run';
         else if (this.speedNow > 0.4) pose = 'walk';

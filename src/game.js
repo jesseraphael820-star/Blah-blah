@@ -24,6 +24,7 @@ import { CameraRig } from './entities/cameraRig.js';
 import { NPCManager } from './entities/npc.js';
 import { EnemyManager } from './entities/enemies.js';
 import { Wildlife } from './entities/animals.js';
+import { Horses } from './entities/horses.js';
 import { Pickups } from './entities/pickups.js';
 import { PhysicsProps } from './entities/physicsProps.js';
 import { Progression } from './systems/progression.js';
@@ -184,6 +185,7 @@ export class Game {
       G.dialogue = new Dialogue();
       G.entities.npcs = new NPCManager();
       G.wildlife = new Wildlife(G.scene);
+      G.horses = new Horses();
       G.mapSys = new MapSys(G.world.terrain.mapCanvas());
       G.menu = new Menu();
       G.shop = new Shop();
@@ -397,6 +399,7 @@ export class Game {
       G.entities.npcs.update(sim);
       G.entities.enemies.update(sim);
       G.wildlife.update(sim);
+      G.horses.update(sim);
       G.pickups.update(sim);
       G.physProps.update(sim);
       G.combat.update(sim);

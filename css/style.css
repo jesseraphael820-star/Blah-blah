@@ -496,3 +496,4 @@ body.no-minimap .minimap-wrap { display: none; }
 body.no-tracker .tracker, body.no-tracker .m-tracker, body.no-tracker .waypoint { display: none !important; }
 body.no-dmg .dmg { display: none !important; }
 body.no-names .ntag { display: none !important; }
+.tb.horse { right: 228px; bottom: 182px; width: 46px; height: 46px; font-size: 22px; border-color: #e8b83a; }
