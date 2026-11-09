@@ -81,6 +81,18 @@ class Horse {
     this.id = o.id || null;
     this.m.saddle.visible = this.owned;
   }
+  // keep the whole horse (head and hindquarters) out of walls, not just its center
+  keepBodyClear(pos, yaw, airborne, ox, oz) {
+    const fx = Math.sin(yaw), fz = Math.cos(yaw);
+    for (const off of [1.35, -1.05]) {
+      const p = { x: pos.x + fx * off, y: pos.y, z: pos.z + fz * off };
+      const bx = p.x, bz = p.z;
+      G.physics.resolve(p, 0.42, 2.2, airborne ? 0.15 : 1.1);
+      pos.x += p.x - bx; pos.z += p.z - bz;
+      const gh = G.physics.groundAt(p.x, p.z, pos.y, 0.3, airborne ? 0.15 : 1.1);
+      if (gh > pos.y + (airborne ? 0.3 : 1.15) && ox !== undefined) { pos.x = ox; pos.z = oz; }
+    }
+  }
   update(dt, ridden) {
     const P = G.player;
     const dP = dist2d(P.pos.x, P.pos.z, this.pos.x, this.pos.z);
@@ -113,6 +125,7 @@ class Horse {
         if (G.physics.waterLevel(this.pos.x, this.pos.z) - G.physics.terrainHeight(this.pos.x, this.pos.z) > 1) { this.pos.x -= vx * 2; this.pos.z -= vz * 2; this.target = null; }
       }
       this.speed = move;
+      this.keepBodyClear(this.pos, this.yaw, false);
       this.pos.y = G.physics.groundAt(this.pos.x, this.pos.z, this.pos.y + 1.2);
     }
     this.m.g.visible = true;
@@ -129,8 +142,29 @@ class Horse {
     if (sp > 6) { m.legs[0].rotation.x = s * amp; m.legs[1].rotation.x = Math.sin(this.phase + 0.5) * amp; m.legs[2].rotation.x = -s * amp; m.legs[3].rotation.x = -Math.sin(this.phase + 0.5) * amp; }
     else { m.legs[0].rotation.x = s * amp; m.legs[3].rotation.x = s * amp; m.legs[1].rotation.x = -s * amp; m.legs[2].rotation.x = -s * amp; }
     m.body.position.y = 1.15 + (sp > 6 ? Math.abs(Math.sin(this.phase)) * 0.18 : 0);
-    if (this.rear > 0) { m.body.rotation.x = -0.6 * Math.sin(Math.min(1, (1.2 - this.rear) / 0.4) * Math.PI * 0.5); m.legs[0].rotation.x = -1.2 + Math.sin(G.time * 18) * 0.5; m.legs[1].rotation.x = -1.2 - Math.sin(G.time * 18) * 0.5; }
+      // ridden jumps: lift the front, tuck the forelegs, stretch the hind legs, then land
+    const P = G.player;
+    const ridden = P.mounted === this;
+    this.landT = Math.max(0, (this.landT || 0) - dt);
+    if (ridden && !P.onGround && !P.swimming) {
+      const pitch = Math.max(-0.45, Math.min(0.4, -P.vy * 0.045));
+      m.body.rotation.x = pitch;
+      m.legs[0].rotation.x = -1.3; m.legs[1].rotation.x = -1.15;
+      m.legs[2].rotation.x = 0.9; m.legs[3].rotation.x = 1.05;
+      m.body.position.y = 1.15;
+      m.neck.rotation.x = -0.15 + P.vy * 0.02;
+      m.tail.rotation.x = 0.9;
+      if (m.wings) for (const w of m.wings) w.rotation.z = w.userData.s * Math.sin(G.time * 14) * 0.8;
+      return;
+    }
+    if (this.landT > 0) {
+      const k = Math.sin((this.landT / 0.35) * Math.PI);
+      m.body.position.y = 1.15 - k * 0.22;
+      m.body.rotation.x = k * 0.14;
+      m.neck.rotation.x = 0.35 * k;
+    } else if (this.rear > 0) { m.body.rotation.x = -0.6 * Math.sin(Math.min(1, (1.2 - this.rear) / 0.4) * Math.PI * 0.5); m.legs[0].rotation.x = -1.2 + Math.sin(G.time * 18) * 0.5; m.legs[1].rotation.x = -1.2 - Math.sin(G.time * 18) * 0.5; }
     else m.body.rotation.x = sp > 6 ? 0.05 : 0;
+    if (this.landT > 0) { const k = Math.sin((this.landT / 0.35) * Math.PI); m.body.rotation.x = k * 0.14; m.body.position.y = 1.15 - k * 0.22; }
     m.neck.rotation.x = sp > 0.3 ? 0.1 + Math.sin(this.phase) * 0.05 : (Math.sin(G.time * 0.4 + this.home.x) > 0.6 ? 0.9 : 0.1);
     m.tail.rotation.x = 0.3 + sp * 0.04 + Math.sin(G.time * 3) * 0.08;
     m.tail.rotation.z = Math.sin(G.time * 2.3) * 0.2;

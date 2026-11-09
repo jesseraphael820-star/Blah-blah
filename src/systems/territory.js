@@ -86,7 +86,7 @@ export class Territory {
         can: () => this.owner(r.id) === 'raiders' && op.phase === 'idle',
         act: () => this.spawnDefenders(op),
       });
-      if (this.owner(r.id) === 'aurora') this.guards.push(new GuardGolem(x + 3, z + 3));
+      if (this.owner(r.id) === 'aurora') { op.guard = new GuardGolem(x + 3, z + 3); this.guards.push(op.guard); }
       this.paintBanner(op);
     }
     // the village gate always has a guardian golem
@@ -105,9 +105,102 @@ export class Territory {
     this.plotMeshes = [];
     for (const res of S.village.residents) this.buildPlot(res, false);
     G.bus.on('newDay', () => this.naturalGrowth());
+    S.terr.battles = S.terr.battles || [];
+    S.terr.nextWar = S.terr.nextWar ?? this.hours() + 3;
     this.curRegion = null;
   }
   owner(id) { return G.state.terr.owners[id]; }
+  hours() { return G.state.world.day * 24 + G.state.world.time; }
+  region(id) { return REGIONS.find((r) => r.id === id); }
+  neighbors(r) { return REGIONS.filter((o) => o !== r && Math.hypot(o.c[0] - r.c[0], o.c[1] - r.c[1]) < 185); }
+
+  // ---------- living war: factions attack each other's borders over time ----------
+  startBattle() {
+    const S = G.state.terr;
+    const ours = REGIONS.filter((r) => r.outpost && this.owner(r.id) === 'aurora');
+    const theirs = REGIONS.filter((r) => r.outpost && this.owner(r.id) === 'raiders');
+    const opts = [];
+    // raiders counter-attack conquered lands next to them
+    for (const r of ours) for (const n of this.neighbors(r)) if (this.owner(n.id) === 'raiders') opts.push({ from: n.id, to: r.id, att: 'raiders', w: 2 });
+    // Aurora's golems and militia push into raider lands next to ours
+    for (const r of theirs) for (const n of this.neighbors(r)) if (this.owner(n.id) === 'aurora' && ours.length) opts.push({ from: n.id, to: r.id, att: 'aurora', w: 1 });
+    if (!opts.length) return;
+    const tot = opts.reduce((a, o) => a + o.w, 0);
+    let k = Math.random() * tot, pick = opts[0];
+    for (const o of opts) { k -= o.w; if (k <= 0) { pick = o; break; } }
+    const b = { ...pick, p: 0, wave: false };
+    delete b.w;
+    S.battles.push(b);
+    G.audio.sfx('roar', { vol: 0.6 });
+    G.ui.toast(t(b.att === 'raiders' ? 'terr.warAttacked' : 'terr.warOffensive', { region: t('terr.r.' + b.to) }), b.att === 'raiders' ? 'boss' : 'event');
+  }
+  endBattlesAt(id) { G.state.terr.battles = G.state.terr.battles.filter((b) => b.to !== id); }
+  resolveBattle(b, attackerWins) {
+    const S = G.state.terr;
+    S.battles = S.battles.filter((q) => q !== b);
+    const op = this.outposts.find((o) => o.r.id === b.to);
+    if (b.att === 'raiders') {
+      if (attackerWins) {
+        S.owners[b.to] = 'raiders';
+        S.captured = S.captured.filter((id) => id !== b.to);
+        if (op) {
+          if (op.guard) { G.scene.remove(op.guard.m.group); this.guards = this.guards.filter((g) => g !== op.guard); op.guard = null; }
+          op.phase = 'idle'; op.progress = 0; op.defenders = [];
+          this.paintBanner(op);
+        }
+        G.ui.toast(t('terr.warLost', { region: t('terr.r.' + b.to) }), 'warn');
+        G.audio.sfx('error');
+      } else {
+        G.ui.toast(t('terr.warDefended', { region: t('terr.r.' + b.to) }), 'gold');
+        G.prog.grant({ gold: 90, xp: 120, rep: { aurora: 8 } }, {});
+      }
+    } else if (attackerWins && op) {
+      for (const e of op.defenders) if (!e.dead) e.despawn = true;
+      S.owners[b.to] = 'aurora'; S.captured.push(b.to);
+      op.phase = 'done'; this.paintBanner(op);
+      op.guard = new GuardGolem(op.x + 3, op.z + 3); this.guards.push(op.guard);
+      G.ui.toast(t('terr.warAllyWon', { region: t('terr.r.' + b.to) }), 'gold');
+      setTimeout(() => this.grow(true), 2000);
+    } else G.ui.toast(t('terr.warAllyFailed', { region: t('terr.r.' + b.to) }), 'info');
+    this.redraw();
+    G.game.autosave();
+  }
+  updateBattles(dt) {
+    const S = G.state.terr;
+    if (!S.battles.length && this.hours() >= S.nextWar) { S.nextWar = this.hours() + 4 + Math.random() * 4; this.startBattle(); }
+    const P = G.player.pos;
+    for (const b of [...S.battles]) {
+      const to = this.region(b.to), op = this.outposts.find((o) => o.r.id === b.to);
+      const near = op && dist2d(P.x, P.z, op.x, op.z) < 45;
+      if (b.att === 'raiders') {
+        // a raider warband marches on the outpost: fight them off to save it
+        if (near && !b.wave && op) {
+          b.wave = true;
+          b.foes = [];
+          const tier = to.tier || 1;
+          for (let i = 0; i < 2 + tier; i++) {
+            const a = (i / (2 + tier)) * Math.PI * 2;
+            const e = G.entities.enemies.spawn(i === 0 ? 'golem_guard' : 'raider', op.x + Math.cos(a) * 9, op.z + Math.sin(a) * 9, { aggro: true, raid: true, homeR: 8 });
+            if (i === 0) { e.maxHp = e.hp = Math.round(e.hp * 0.6); }
+            e.home.set(op.x, 0, op.z);
+            b.foes.push(e);
+          }
+          G.ui.toast(t('terr.warDefend'), 'boss');
+        }
+        if (b.foes) {
+          if (b.foes.every((e) => e.dead)) { this.resolveBattle(b, false); continue; }
+          if (!near) { for (const e of b.foes) if (!e.dead) e.despawn = true; b.foes = null; b.wave = false; }
+        }
+        const rate = (op && op.guard ? 0.7 : 1) / 150;
+        if (!b.foes) b.p += dt * rate; // the battle keeps going while you're away
+      } else {
+        // allied offensive: faster if the hero joins the fight
+        b.p += dt * (near ? 3 : 1) / 170;
+        if (near && op && op.phase === 'idle') this.spawnDefenders(op);
+      }
+      if (b.p >= 1) this.resolveBattle(b, b.att === 'raiders' ? true : Math.random() < 0.55);
+    }
+  }
   ownedCount(f = 'aurora') { return REGIONS.filter((r) => this.owner(r.id) === f).length; }
   conquered() { return G.state.terr.captured.length; }
 
@@ -163,7 +256,8 @@ export class Territory {
     op.phase = 'done';
     this.paintBanner(op);
     this.redraw();
-    this.guards.push(new GuardGolem(op.x + 3, op.z + 3));
+    op.guard = new GuardGolem(op.x + 3, op.z + 3); this.guards.push(op.guard);
+    this.endBattlesAt(r.id);
     G.audio.sfx('quest');
     G.ui.screenFlash(0.35, '#ffe08a');
     G.particles.ring(op.x, op.y + 1, op.z, 0xffc83a, 8, 60, { speed: 10 });
@@ -241,12 +335,15 @@ export class Territory {
       const op = this.outposts.find((o) => o.r === r);
       rows.push([t('terr.difficulty'), '⚔'.repeat(r.tier || 1)], [t('terr.status'), owner === 'aurora' ? t('terr.st_ours') : t('terr.st_' + op.phase)], [t('terr.reward'), `${120 + (r.tier || 1) * 80} Gold`]);
     } else rows.push([t('terr.residents'), r.id === 'farm' ? 1 : 0]);
+    const war = G.state.terr.battles.find((b) => b.to === r.id || b.from === r.id);
+    if (war) rows.push([t('terr.atWar'), `<span style="color:#ff6a6a">⚔ ${t('terr.r.' + war.from)} → ${t('terr.r.' + war.to)} · ${Math.round(war.p * 100)}%</span>`]);
     return { title: t('terr.r.' + r.id), rows };
   }
 
   update(dt) {
     const P = G.player.pos;
     for (const g of this.guards) g.update(dt);
+    this.updateBattles(dt);
     // current region label
     if (!G.sky.underground) {
       const r = regionAt(P.x, P.z);
@@ -255,7 +352,8 @@ export class Territory {
         if (this.curRegion) G.ui.toast(r.village ? t('terr.r.' + r.id) : t('terr.entering', { region: t('terr.r.' + r.id), owner: t('terr.f.' + o) }), o === 'raiders' ? 'warn' : 'info');
         this.curRegion = r;
       }
-      this.label.innerHTML = `<i style="background:${FACTIONS[o].color}"></i><span>${t('terr.r.' + r.id)}</span>`;
+      const war = G.state.terr.battles[0];
+      this.label.innerHTML = `<i style="background:${FACTIONS[o].color}"></i><span>${t('terr.r.' + r.id)}</span>` + (war ? `<em class="war ${war.att}">⚔ ${t('terr.r.' + war.to)} ${Math.round(war.p * 100)}%</em>` : '');
       this.label.classList.remove('hidden');
     } else this.label.classList.add('hidden');
     // outposts

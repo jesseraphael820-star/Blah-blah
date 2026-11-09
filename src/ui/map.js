@@ -81,8 +81,8 @@ export class MapSys {
       const fk = EXP_N / WORLD.size;
       c.scale(k / fk, k / fk);
       const fsx = (P.x + WORLD.half) * fk, fsz = (P.z + WORLD.half) * fk, fsp = (W / scale) * fk;
-      if (G.territory) c.drawImage(G.territory.canvas, fsx - fsp, fsz - fsp, fsp * 2, fsp * 2, -fsp, -fsp, fsp * 2, fsp * 2);
       c.drawImage(this.fog, fsx - fsp, fsz - fsp, fsp * 2, fsp * 2, -fsp, -fsp, fsp * 2, fsp * 2);
+      if (G.territory) c.drawImage(G.territory.canvas, fsx - fsp, fsz - fsp, fsp * 2, fsp * 2, -fsp, -fsp, fsp * 2, fsp * 2);
       c.setTransform(1, 0, 0, 1, 0, 0); c.translate(R, R); c.rotate(yaw - Math.PI);
     } else {
       c.fillStyle = '#2a2632';
@@ -98,6 +98,18 @@ export class MapSys {
       const edge = R - 9;
       if (d > edge) { if (m.kind !== 'quest') continue; dx *= edge / d; dz *= edge / d; }
       this.drawMarker(c, dx, dz, m.kind, -(yaw - Math.PI));
+    }
+    // battles near you
+    if (G.territory && !under) for (const b of G.state.terr.battles) {
+      const Bt = REGIONS.find((r) => r.id === b.to), tp = Bt.outpost || Bt.c;
+      let dx = (tp[0] - P.x) * scale, dz = (tp[1] - P.z) * scale;
+      const d = Math.hypot(dx, dz), edge = R - 10;
+      if (d > edge) { dx *= edge / d; dz *= edge / d; }
+      c.save(); c.translate(dx, dz); c.rotate(-(yaw - Math.PI));
+      c.fillStyle = FACTIONS[b.att].color; c.globalAlpha = 0.5 + Math.sin(G.time * 6) * 0.3;
+      c.beginPath(); c.arc(0, 0, 7, 0, Math.PI * 2); c.fill(); c.globalAlpha = 1;
+      c.fillStyle = '#fff'; c.font = 'bold 10px sans-serif'; c.textAlign = 'center'; c.fillText('⚔', 0, 4);
+      c.restore();
     }
     // enemies nearby
     for (const e of G.entities.enemies.list) {
@@ -141,8 +153,8 @@ export class MapSys {
     const ox = W / 2 - (view.cx + WORLD.half) * s, oz = H / 2 - (view.cz + WORLD.half) * s;
     c.drawImage(this.base, ox, oz, WORLD.size * s, WORLD.size * s);
     this.updateFog();
-    if (G.territory) c.drawImage(G.territory.canvas, ox, oz, WORLD.size * s, WORLD.size * s);
     c.drawImage(this.fog, ox, oz, WORLD.size * s, WORLD.size * s);
+    if (G.territory) c.drawImage(G.territory.canvas, ox, oz, WORLD.size * s, WORLD.size * s);
     const toS = (x, z) => [ox + (x + WORLD.half) * s, oz + (z + WORLD.half) * s];
     // grid
     c.strokeStyle = 'rgba(255,255,255,0.05)';
@@ -184,6 +196,29 @@ export class MapSys {
           this.hit.push({ x: ox2, y: oy2 - 7, kind: 'region', r });
         }
       }
+    }
+    // live battles: animated arrows between regions + battle icon with progress
+    if (G.territory) for (const b of G.state.terr.battles) {
+      const A = REGIONS.find((r) => r.id === b.from), Bt = REGIONS.find((r) => r.id === b.to);
+      const [ax, ay] = toS(A.c[0], A.c[1]);
+      const tp = Bt.outpost || Bt.c;
+      const [bx, by] = toS(tp[0], tp[1]);
+      const col = FACTIONS[b.att].color;
+      c.save();
+      c.strokeStyle = col; c.lineWidth = 4; c.setLineDash([10, 8]); c.lineDashOffset = -G.time * 30;
+      c.beginPath(); c.moveTo(ax, ay); c.lineTo(bx, by); c.stroke();
+      c.setLineDash([]);
+      const ang = Math.atan2(by - ay, bx - ax);
+      c.fillStyle = col;
+      c.beginPath(); c.moveTo(bx - Math.cos(ang) * 16, by - Math.sin(ang) * 16);
+      c.lineTo(bx - Math.cos(ang) * 30 - Math.sin(ang) * 9, by - Math.sin(ang) * 30 + Math.cos(ang) * 9);
+      c.lineTo(bx - Math.cos(ang) * 30 + Math.sin(ang) * 9, by - Math.sin(ang) * 30 - Math.cos(ang) * 9); c.fill();
+      const pulse = 14 + Math.sin(G.time * 6) * 4;
+      c.globalAlpha = 0.35; c.beginPath(); c.arc(bx, by, pulse, 0, Math.PI * 2); c.fill(); c.globalAlpha = 1;
+      c.font = 'bold 18px sans-serif'; c.textAlign = 'center'; c.fillStyle = '#fff'; c.fillText('⚔', bx, by + 6);
+      c.fillStyle = 'rgba(10,12,20,.85)'; c.fillRect(bx - 24, by + 14, 48, 7);
+      c.fillStyle = col; c.fillRect(bx - 23, by + 15, 46 * b.p, 5);
+      c.restore();
     }
     for (const m of this.markers()) {
       const [x, y] = toS(m.x, m.z);

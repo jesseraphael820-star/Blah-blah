@@ -344,6 +344,9 @@ export class Menu {
     const wrap = this.content.querySelector('.map-wrap');
     const resize = () => { cv.width = wrap.clientWidth; cv.height = wrap.clientHeight; this.mapGeom = G.mapSys.drawFull(cv, this.mapView); };
     requestAnimationFrame(resize);
+    // keep the map alive (battles, moving markers) while it is open
+    const tick = () => { if (!this.isOpen || this.tab !== 'map' || !cv.isConnected) return; if (!drag && this.mapGeom) this.mapGeom = G.mapSys.drawFull(cv, this.mapView); setTimeout(() => requestAnimationFrame(tick), 120); };
+    setTimeout(tick, 300);
     let drag = null, moved = false;
     cv.onpointerdown = (e) => { drag = { x: e.clientX, y: e.clientY, cx: this.mapView.cx, cz: this.mapView.cz }; moved = false; cv.setPointerCapture(e.pointerId); };
     cv.onpointermove = (e) => {

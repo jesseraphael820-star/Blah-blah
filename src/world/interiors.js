@@ -106,6 +106,7 @@ export class Interiors {
     return room;
   }
   enter(room) {
+    if (G.horses?.riding) G.horses.dismount(); // the horse waits outside
     G.ui.fade(() => {
       this.current = room;
       G.player.teleport(room.entry.x, 0, room.entry.z, Math.PI);

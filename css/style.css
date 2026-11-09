@@ -509,3 +509,6 @@ body.no-names .ntag { display: none !important; }
 .map-info h3 { margin: 0 0 4px; font-family: var(--pixel); color: var(--gold); font-size: 20px; padding-right: 30px; }
 .map-info .close.sm { position: absolute; right: 8px; top: 8px; width: 28px; height: 28px; font-size: 13px; }
 .map-info table.stats td { font-size: 13px; }
+.hud-terr { flex-wrap: wrap; }
+.hud-terr em.war { flex-basis: 100%; font-style: normal; font-size: 11px; color: #ff8a8a; animation: pulse 1.2s infinite; }
+.hud-terr em.war.aurora { color: var(--gold-2); }

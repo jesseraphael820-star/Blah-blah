@@ -136,7 +136,9 @@ export class Player {
       if (wantRun && !this.swimming && !horse) { s.stamina = Math.max(0, s.stamina - dt * 14); this.staminaDelay = 0.6; }
       if (mag > 0.05) {
         const targetYaw = Math.atan2(dx, dz);
-        if (!this.blocking || !this.lockTarget) this.yaw = dampAngle(this.yaw, targetYaw, 14, dt);
+        // horses turn in wide arcs and can't change direction in mid-air
+        const turn = this.mounted ? (this.onGround ? 4.5 : 0.6) : 14;
+        if (!this.blocking || !this.lockTarget) this.yaw = dampAngle(this.yaw, targetYaw, turn, dt);
       }
       if (this.lockTarget && this.blocking) this.faceTarget(this.lockTarget, dt, 12);
     } else if (this.state === 'attack') {
@@ -167,7 +169,7 @@ export class Player {
     if (this.state === 'normal') {
       const wantX = mx / Math.max(dt, 1e-4), wantZ = mz / Math.max(dt, 1e-4);
       const moving = Math.hypot(wantX, wantZ) > 0.1;
-      const acc = !this.onGround && !this.swimming ? 4 : moving ? 16 : 22;
+      const acc = this.mounted ? (!this.onGround ? 0.4 : moving ? 3.2 : 2.6) : !this.onGround && !this.swimming ? 4 : moving ? 16 : 22;
       this.hv.x = damp(this.hv.x, wantX, acc, dt);
       this.hv.z = damp(this.hv.z, wantZ, acc, dt);
       mx = this.hv.x * dt; mz = this.hv.z * dt;
@@ -177,7 +179,8 @@ export class Player {
     if (this.state === 'attack' && this.stateT < 0.18) { mx += Math.sin(this.yaw) * 3 * dt; mz += Math.cos(this.yaw) * 3 * dt; }
     if (this.knock) { mx += this.knock.x * dt; mz += this.knock.z * dt; this.knock.multiplyScalar(Math.max(0, 1 - dt * 8)); if (this.knock.lengthSq() < 0.05) this.knock = null; }
     const ox = this.pos.x, oz = this.pos.z;
-    G.physics.move(this.pos, mx, mz, this.radius, this.height, !this.onGround);
+    G.physics.move(this.pos, mx, mz, this.mounted ? 0.55 : this.radius, this.height, !this.onGround);
+    if (this.mounted) this.mounted.keepBodyClear(this.pos, this.yaw, !this.onGround, ox, oz);
     const moved = Math.hypot(this.pos.x - ox, this.pos.z - oz);
     this.speedNow = moved / Math.max(dt, 1e-4);
     G.state.ach.stats.distance += moved;
@@ -274,8 +277,9 @@ export class Player {
   land(ground) {
     const fall = this.fallStart - ground;
     this.squash = Math.min(0.28, 0.08 + fall * 0.03);
+    if (this.mounted) { this.mounted.landT = 0.35; if (fall > 1.5) { G.cam.shake(Math.min(0.35, fall * 0.04)); G.particles.dust(this.pos.x, ground, this.pos.z, 12); G.audio.sfx('land', { vol: 0.8 }); } }
     if (fall > 1.5) { G.audio.sfx('land', { vol: Math.min(1, fall / 6) }); G.particles.dust(this.pos.x, ground, this.pos.z, 8); }
-    if (fall > 8) {
+    if (fall > (this.mounted ? 14 : 8)) {
       const dmg = Math.floor((fall - 8) * 7);
       this.damage(dmg, null, { fall: true });
     }
@@ -286,6 +290,7 @@ export class Player {
     const coyote = !this.onGround && (this.airT || 0) < 0.13 && this.vy <= 0;
     if ((!this.onGround && !coyote) || this.busy()) return false;
     this.vy = this.mounted ? this.mounted.B.jump : 9.6;
+    if (this.mounted) { this.hv.x += Math.sin(this.yaw) * 2.5; this.hv.z += Math.cos(this.yaw) * 2.5; this.mounted.jumpT = 0; G.audio.sfx('growl', { vol: 0.25 }); }
     this.onGround = false;
     this.airT = 1;
     this.squash = 0.12;
@@ -486,7 +491,9 @@ export class Player {
     this.squash = Math.max(0, (this.squash || 0) - dt * 1.2);
     const k = Math.sin(Math.min(1, this.squash / 0.28) * Math.PI) * this.squash;
     m.root.scale.set(1 + k * 0.6, 1 - k, 1 + k * 0.6);
+    m.root.rotation.order = 'YXZ';
     m.root.rotation.y = this.yaw;
+    m.root.rotation.x = this.mounted ? this.mounted.m.body.rotation.x * 0.8 : 0;
     let pose = 'idle', phase = 0;
     const armed = true;
     switch (this.state) {
