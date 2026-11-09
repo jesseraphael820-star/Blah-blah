@@ -415,6 +415,7 @@ export class Game {
       G.wildlife.update(sim);
       G.horses.update(sim);
       G.territory.update(sim);
+      G.interiors.update();
       G.pickups.update(sim);
       G.physProps.update(sim);
       G.combat.update(sim);

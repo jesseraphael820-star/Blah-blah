@@ -66,7 +66,7 @@ export function buildInterior(W, idx, house) {
   // bookshelf and decor along the right wall
   B.box(x1 - 0.7, 0, cz - 1.5, x1, 2.8, cz + 1.5, 0x5a3a20);
   for (let k = 0; k < 4; k++) for (let b = 0; b < 6; b++) B.box(x1 - 0.6, 0.3 + k * 0.65, cz - 1.35 + b * 0.45, x1 - 0.15, 0.75 + k * 0.65, cz - 1.0 + b * 0.45, [0xa83a3a, 0x3a6ab0, 0x4a8a3a, 0xe0b030, 0x8a3a8a][Math.floor(rng() * 5)]);
-  B.collider(x1 - 0.7, -1, cz - 1.5, x1, 2.8, cz + 1.5);
+  B.collider(x1 - 0.7, -1, cz - 1.5, x1, H + 2, cz + 1.5); // full height: can't climb on the shelf
   for (const [px, pz] of [[x0 + 0.6, z1 - 0.6], [x1 - 0.6, z1 - 0.6]]) {
     B.box(px - 0.3, 0, pz - 0.3, px + 0.3, 0.5, pz + 0.3, 0xa0603a);
     B.box(px - 0.4, 0.5, pz - 0.4, px + 0.4, 1.3, pz + 0.4, 0x4f9a3a, { wind: 0.1 });
@@ -75,7 +75,7 @@ export function buildInterior(W, idx, house) {
   // exit door
   B.box(cx - 0.8, 0, z1 - 0.12, cx + 0.8, 2.5, z1, 0x6a4020);
   B.box(cx + 0.4, 1.2, z1 - 0.2, cx + 0.55, 1.35, z1 - 0.12, 0xd4a83a);
-  const room = { idx, cx, cz, entry: { x: cx, z: z1 - 1.8 }, house };
+  const room = { idx, cx, cz, entry: { x: cx, z: z1 - 1.8 }, house, x0, x1, z0, z1 };
   W.addInteractable({
     kind: 'exit', x: cx, y: 0, z: z1 - 0.8, r: 2.2,
     label: () => t('ui.leaveHouse'),
@@ -141,4 +141,22 @@ export class Interiors {
     });
   }
   isInside(p) { return p.x >= INTERIOR_X0 - 20; }
+  roomAt(p) { return this.rooms.find((r) => p.x > r.x0 - 0.2 && p.x < r.x1 + 0.2 && p.z > r.z0 - 0.2 && p.z < r.z1 + 0.2); }
+  // safety net: if the hero ever ends up outside the walls of a room (or on the roof), put them back inside
+  update() {
+    const P = G.player;
+    if (!P) return;
+    if (P.pos.x > 600 && P.pos.x < INTERIOR_X0 - 25 && !G.physics.regions.some((q) => P.pos.x >= q.x0 && P.pos.x <= q.x1 && P.pos.z >= q.z0 && P.pos.z <= q.z1)) { P.respawnAt(P.s.respawn.x, P.s.respawn.z); G.game.onTeleport(); return; }
+    if (P.pos.x < INTERIOR_X0 - 25) return;
+    const r = this.roomAt(P.pos);
+    if (r) {
+      if (P.pos.y > 2.3) { P.pos.y = 2.3; if (P.vy > 0) P.vy = 0; } // head hits the ceiling
+      this.current = r;
+      return;
+    }
+    let best = this.rooms[0];
+    for (const q of this.rooms) if (Math.abs(q.cx - P.pos.x) < Math.abs(best.cx - P.pos.x)) best = q;
+    P.teleport(best.entry.x, 0, best.entry.z, Math.PI);
+    this.current = best;
+  }
 }
