@@ -274,7 +274,7 @@ export class Player {
     if (this.state === 'attack' && this.stateT < 0.15) return;
     if (this.s.stamina < 22 || this.swimming) return;
     this.s.stamina -= 22; this.staminaDelay = 0.8;
-    this.dodgeYaw = mag > 0.1 ? Math.atan2(dx, dz) : this.yaw + Math.PI;
+    this.dodgeYaw = mag > 0.1 ? Math.atan2(dx, dz) : this.yaw; // standing still: roll forward
     if (mag > 0.1) this.yaw = this.dodgeYaw;
     this.setState('dodge');
     this.invuln = 0.38;
