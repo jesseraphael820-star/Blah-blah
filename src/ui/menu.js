@@ -8,6 +8,7 @@ import { SWORDS, ARMORS, HATS, ACCESSORIES, SKINS, PETS, POWERS, ITEMS, RARITY, 
 import { QUESTS, QUEST_ORDER, ACHIEVEMENTS, RIVALS, DAILY_REWARDS } from '../data/quests.js';
 import { WAYSTONES } from '../data/world.js';
 import { repTier } from '../data/npcs.js';
+import { regionAt } from '../data/territory.js';
 import { saveSettings, deleteSave } from '../core/save.js';
 
 const TABS = ['inventory', 'character', 'swords', 'powers', 'journal', 'map', 'achievements', 'settings'];
@@ -358,7 +359,11 @@ export class Menu {
       const r = cv.getBoundingClientRect();
       const x = e.clientX - r.left, y = e.clientY - r.top;
       const hit = (G.mapSys.hit || []).find((h) => Math.hypot(h.x - x, h.y - y) < 14);
-      if (hit) this.fastTravel(hit.id);
+      if (hit && hit.kind === 'way') { this.fastTravel(hit.id); return; }
+      // clicking a village, outpost or any land shows its information
+      let reg = hit && hit.r;
+      if (!reg && this.mapGeom) { const g = this.mapGeom; reg = regionAt((x - g.ox) / g.s - 320, (y - g.oz) / g.s - 320); }
+      if (reg) this.showRegionInfo(reg);
     };
     cv.onwheel = (e) => { e.preventDefault(); this.mapView.zoom = clamp(this.mapView.zoom * (e.deltaY < 0 ? 1.15 : 0.87), 1, 6); this.mapGeom = G.mapSys.drawFull(cv, this.mapView); };
     this.content.querySelectorAll('[data-z]').forEach((b) => b.onclick = () => {
@@ -367,6 +372,15 @@ export class Menu {
       else this.mapView.zoom = clamp(this.mapView.zoom * (z > 0 ? 1.3 : 0.77), 1, 6);
       this.mapGeom = G.mapSys.drawFull(cv, this.mapView);
     });
+  }
+  showRegionInfo(r) {
+    const wrap = this.content.querySelector('.map-wrap');
+    let box = wrap.querySelector('.map-info');
+    if (!box) { box = document.createElement('div'); box.className = 'map-info panel-glass'; wrap.appendChild(box); }
+    const inf = G.territory.info(r);
+    box.innerHTML = `<button class="close sm">✕</button><h3>${inf.title}</h3>${this.statRows(inf.rows)}`;
+    box.querySelector('.close').onclick = () => box.remove();
+    G.audio.sfx('click');
   }
   canTravel() {
     if (G.entities.enemies.list.some((e) => e.aggro && !e.dead)) return { ok: false, reason: 'combat' };

@@ -40,6 +40,21 @@ export const ENEMIES = {
     model: 'slime', color: 0xffcc33, level: 4, hp: 120, dmg: 4, speed: 4.2, xp: 60, gold: [150, 260], radius: 0.7, flee: true,
     aggro: 14, drops: [['stardust', 0.5, 1], ['essence', 0.5, 1]], attacks: [],
   },
+  // ---------- raiders (territory war) ----------
+  raider: {
+    model: 'sentinel', color: 0x7a3a2a, eye: 0xffaa3a, scale: 0.82, level: 5, hp: 95, dmg: 12, speed: 4.2, xp: 42, gold: [8, 16], radius: 0.7,
+    aggro: 18, drops: [['potion_small', 0.2, 1], ['iron_ore', 0.2, 1]],
+    attacks: [{ kind: 'melee', range: 2.4, windup: 0.5, cd: 1.4, mult: 1 }, { kind: 'charge', range: 8, minRange: 4, windup: 0.7, cd: 5, mult: 1.2 }],
+  },
+  golem_guard: {
+    model: 'golem', color: 0x6a3a3a, crystal: 0xff5a3a, scale: 1.45, level: 8, hp: 460, dmg: 20, speed: 2.6, xp: 220, gold: [60, 90], radius: 1.6, heavy: true, guardian: true,
+    aggro: 20, drops: [['stone_core', 0.8, 1], ['essence', 0.5, 1], ['crystal', 0.5, 1]],
+    attacks: [
+      { kind: 'melee', range: 3.4, windup: 0.8, cd: 1.8, mult: 1 },
+      { kind: 'slam', range: 6, windup: 1.1, cd: 6, mult: 1.3, radius: 6 },
+      { kind: 'volley', range: 20, windup: 1, cd: 7, mult: 0.7, n: 2, speed: 15, rock: true },
+    ],
+  },
   // ---------- bosses ----------
   alpha_wolf: {
     model: 'wolf', boss: true, scale: 2.2, color: 0x2e2a36, eye: 0xff2a2a, level: 7, hp: 760, dmg: 20, speed: 6.5, xp: 450, gold: [180, 220], radius: 1.4,

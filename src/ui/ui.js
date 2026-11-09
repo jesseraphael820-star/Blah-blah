@@ -155,6 +155,7 @@ export class UI {
     e.potion.querySelector('.cnt').textContent = pc;
     e.potion.classList.toggle('empty', pc === 0);
     // boss
+    if (this.bossTarget && (this.bossTarget.dead || this.bossTarget.hp <= 0)) this.setBoss(null);
     if (this.bossTarget) {
       const b = this.bossTarget;
       setBar(e.bossBar, b.hp, b.maxHp, false);
@@ -269,7 +270,7 @@ export class UI {
       let el = this.tags.get(n);
       if (!el) { el = document.createElement('div'); el.className = 'ntag'; el.innerHTML = `<b></b><span></span>`; this.worldUi.appendChild(el); this.tags.set(n, el); }
       el.querySelector('b').textContent = n.name;
-      el.querySelector('span').textContent = t('npc.' + n.id + '.role');
+      el.querySelector('span').textContent = n.role;
       el.style.transform = `translate(${s[0]}px, ${s[1]}px) translate(-50%,-100%)`;
       el.style.opacity = Math.min(1, (11 - d) / 3);
     }

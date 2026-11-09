@@ -4,6 +4,7 @@ import { LOC, ROADS, RIVER, RIVER_W, WAYSTONES, CHESTS, ORES, GLOWSHROOMS, HERBS
 import { makeRng, distToPolyline, shade, simplex2, hash2 } from '../core/utils.js';
 import { FLAG, B as BIOME, forestMask } from './terrain.js';
 import * as S from './structures.js';
+import { REGIONS, PLOTS } from '../data/territory.js';
 
 // ---------------- vegetation ----------------
 function oak(B, x, z, s, rng, palette) {
@@ -128,6 +129,28 @@ export function generateWorld(W) {
   const rng = makeRng(2024);
   const T = W.terrain;
 
+  W.houses = [];
+  // reserve land for village growth plots and raider outposts (no trees there)
+  for (const [x, z] of PLOTS) B.flag(x - 6, z - 6, x + 6, z + 6, FLAG.NOTREE);
+  for (const r of REGIONS) if (r.outpost) {
+    const [x, z] = r.outpost;
+    B.flag(x - 12, z - 12, x + 12, z + 12, FLAG.NOTREE);
+    // palisade ring with an opening facing the village
+    const ang0 = Math.atan2(LOC.village.x - x, LOC.village.z - z);
+    for (let i = 0; i < 18; i++) {
+      const a = (i / 18) * Math.PI * 2;
+      let da = Math.atan2(Math.sin(a - ang0), Math.cos(a - ang0));
+      if (Math.abs(da) < 0.45) continue;
+      const px = x + Math.sin(a) * 10, pz = z + Math.cos(a) * 10, gy = B.ground(px, pz);
+      B.box(px - 0.45, gy - 1, pz - 0.45, px + 0.45, gy + 2.6 + (i % 2) * 0.4, pz + 0.45, i % 2 ? 0x5a3a20 : 0x6a4428, { col: true });
+      B.box(px - 0.2, gy + 2.6 + (i % 2) * 0.4, pz - 0.2, px + 0.2, gy + 3.2 + (i % 2) * 0.4, pz + 0.2, 0x4a2a18);
+    }
+    S.tent(B, x - 5, z - 4, 0, 0x6a2a2a);
+    S.tent(B, x + 5, z - 3, 1, 0x5a2a2a);
+    S.campfire(B, x + 1, z + 4);
+    S.crate(B, x - 6, z + 4); S.barrel(B, x - 4.8, z + 5);
+    S.bones(B, x + 6, z + 5);
+  }
   // ===== VILLAGE (Vila Aurora) =====
   S.house(B, 6, 22, 0, { w: 10, d: 8, roof: 0x6a4a8a, wall: 0xe8dcc0, sign: 0x6a4a8a });          // elder Tomás
   S.house(B, 5, 42, 3, { w: 8, d: 7, roof: 0xd0609a, wall: 0xf4e6d4, sign: 0xe07ab0 });          // tailor Lia

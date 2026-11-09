@@ -192,6 +192,7 @@ export class Quests {
   target(id) {
     const st = this.step(id);
     if (!st) return null;
+    if (G.sky.indoor) return null;
     const underground = G.sky.underground;
     if (st.npc) {
       const n = G.entities.npcs.get(st.npc);

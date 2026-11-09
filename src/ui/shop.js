@@ -98,7 +98,7 @@ export class Shop {
     }).join('');
     this.el.innerHTML = `
       <div class="shop-frame">
-        <header><div><small>${t('npc.' + this.npc.id + '.role')}</small><h1>${t('shop.' + this.id)}</h1></div>
+        <header><div><small>${this.npc.role}</small><h1>${t('shop.' + this.id)}</h1></div>
           <div class="mh-right">${disc ? `<span class="disc">-${Math.round(disc * 100)}%</span>` : ''}${img(icon('coin'))}<b>${fmt(G.state.player.gold)}</b><button class="close">✕</button></div></header>
         <div class="subtabs">${cats.map((c) => `<button class="${c === this.cat ? 'on' : ''}" data-c="${c}">${t('shopCat.' + c)}</button>`).join('')}</div>
         <div class="shop-list">${list || `<div class="empty-msg">${t('shop.nothing')}</div>`}</div>

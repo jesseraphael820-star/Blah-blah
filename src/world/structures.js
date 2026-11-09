@@ -85,6 +85,7 @@ export function house(B, x, z, rot, o = {}) {
   f.box(dx - 0.65, 0.45, d / 2 + 0.12, dx + 0.65, 2.65, d / 2 + 0.2, o.door ?? 0x6a4020);
   f.box(dx + 0.35, 1.5, d / 2 + 0.2, dx + 0.5, 1.65, d / 2 + 0.3, 0xd4a83a);
   f.box(dx - 1.2, 0.0, d / 2 + 0.2, dx + 1.2, 0.45, d / 2 + 1.2, STONE_D);
+  f.col(dx - 1.2, -1, d / 2 + 0.2, dx + 1.2, 0.45, d / 2 + 1.2, { noCam: true }); // door step is solid (walk up onto it)
   // windows
   for (let fl = 0; fl < floors; fl++) {
     const wy = 1.4 + fl * 3.1;
@@ -110,7 +111,11 @@ export function house(B, x, z, rot, o = {}) {
     f.box(dx + 0.9, 2.1, d / 2 + 0.9, dx + 1.6, 2.9, d / 2 + 1.0, o.sign);
   }
   f.col(-w / 2 - 0.3, -1, -d / 2 - 0.3, w / 2 + 0.3, top, d / 2 + 0.3);
-  return { f, y, top, door: f.p(dx, 0, d / 2 + 1.6) };
+  const [ox, oz] = f.xz(0, 0), [fx, fz] = f.xz(0, 1);
+  const di = f.p(dx, 0, d / 2 + 1.0), out = f.p(dx, 0, d / 2 + 2.4);
+  const res = { f, y, top, door: f.p(dx, 0, d / 2 + 1.6), doorIn: { x: di[0], z: di[2] }, out: { x: out[0], z: out[2] }, outYaw: Math.atan2(fx - ox, fz - oz), style: o.roof };
+  if (B.houses) B.houses.push(res);
+  return res;
 }
 
 export function barn(B, x, z, rot) {

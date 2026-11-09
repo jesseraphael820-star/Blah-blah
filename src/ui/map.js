@@ -3,6 +3,7 @@ import { G } from '../core/context.js';
 import { WORLD, WAYSTONES, POIS } from '../data/world.js';
 import { t } from '../core/i18n.js';
 import { CAVE } from '../world/cave.js';
+import { REGIONS, FACTIONS } from '../data/territory.js';
 
 const EXP_N = 80; // fog-of-war grid
 export class MapSys {
@@ -80,6 +81,7 @@ export class MapSys {
       const fk = EXP_N / WORLD.size;
       c.scale(k / fk, k / fk);
       const fsx = (P.x + WORLD.half) * fk, fsz = (P.z + WORLD.half) * fk, fsp = (W / scale) * fk;
+      if (G.territory) c.drawImage(G.territory.canvas, fsx - fsp, fsz - fsp, fsp * 2, fsp * 2, -fsp, -fsp, fsp * 2, fsp * 2);
       c.drawImage(this.fog, fsx - fsp, fsz - fsp, fsp * 2, fsp * 2, -fsp, -fsp, fsp * 2, fsp * 2);
       c.setTransform(1, 0, 0, 1, 0, 0); c.translate(R, R); c.rotate(yaw - Math.PI);
     } else {
@@ -139,6 +141,7 @@ export class MapSys {
     const ox = W / 2 - (view.cx + WORLD.half) * s, oz = H / 2 - (view.cz + WORLD.half) * s;
     c.drawImage(this.base, ox, oz, WORLD.size * s, WORLD.size * s);
     this.updateFog();
+    if (G.territory) c.drawImage(G.territory.canvas, ox, oz, WORLD.size * s, WORLD.size * s);
     c.drawImage(this.fog, ox, oz, WORLD.size * s, WORLD.size * s);
     const toS = (x, z) => [ox + (x + WORLD.half) * s, oz + (z + WORLD.half) * s];
     // grid
@@ -156,10 +159,36 @@ export class MapSys {
       c.fillStyle = '#ffe9b8'; c.fillText(label, x, y - 10);
     }
     this.hit = [];
+    // territory labels, villages and outposts (clickable)
+    if (G.territory) {
+      for (const r of REGIONS) {
+        const own = G.territory.owner(r.id);
+        const [x, y] = toS(r.c[0], r.c[1]);
+        c.font = `700 ${Math.max(10, 10 * view.zoom)}px Nunito, sans-serif`;
+        const label = t('terr.r.' + r.id);
+        c.fillStyle = 'rgba(10,12,20,0.6)';
+        const w = c.measureText(label).width + 14;
+        c.fillRect(x - w / 2, y + 4, w, 15);
+        c.fillStyle = FACTIONS[own].color; c.fillRect(x - w / 2, y + 4, 4, 15);
+        c.fillStyle = '#f3ead7'; c.fillText(label, x + 2, y + 15);
+        if (r.village) {
+          c.fillStyle = '#1a1424'; c.fillRect(x - 9, y - 16, 18, 16);
+          c.fillStyle = FACTIONS[own].color; c.fillRect(x - 7, y - 10, 14, 8);
+          c.beginPath(); c.moveTo(x - 9, y - 9); c.lineTo(x, y - 18); c.lineTo(x + 9, y - 9); c.fill();
+          this.hit.push({ x, y: y - 8, kind: 'region', r });
+        }
+        if (r.outpost) {
+          const [ox2, oy2] = toS(r.outpost[0], r.outpost[1]);
+          c.fillStyle = '#1a1424'; c.fillRect(ox2 - 1, oy2 - 14, 3, 15);
+          c.fillStyle = FACTIONS[own].color; c.fillRect(ox2 + 2, oy2 - 14, 9, 6);
+          this.hit.push({ x: ox2, y: oy2 - 7, kind: 'region', r });
+        }
+      }
+    }
     for (const m of this.markers()) {
       const [x, y] = toS(m.x, m.z);
       c.save(); c.scale(1.4, 1.4); this.drawMarker(c, x / 1.4, y / 1.4, m.kind, 0); c.restore();
-      if (m.kind === 'way') this.hit.push({ x, y, id: m.id });
+      if (m.kind === 'way') this.hit.push({ x, y, id: m.id, kind: 'way' });
     }
     // player
     const P = G.sky.underground ? { x: 40, z: -186 } : G.player.pos;

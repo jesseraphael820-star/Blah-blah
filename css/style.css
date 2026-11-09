@@ -497,3 +497,15 @@ body.no-tracker .tracker, body.no-tracker .m-tracker, body.no-tracker .waypoint 
 body.no-dmg .dmg { display: none !important; }
 body.no-names .ntag { display: none !important; }
 .tb.horse { right: 228px; bottom: 182px; width: 46px; height: 46px; font-size: 22px; border-color: #e8b83a; }
+/* ---------- territory ---------- */
+.hud-terr { display: flex; align-items: center; gap: 7px; padding: 4px 10px; font-size: 12px; font-weight: 800; max-width: 190px; }
+.hud-terr i { width: 10px; height: 10px; border-radius: 2px; flex: none; box-shadow: 0 0 0 2px rgba(0,0,0,.4); }
+.hud-terr span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.capture { position: absolute; top: 120px; left: 50%; transform: translateX(-50%); width: min(380px, 70vw); text-align: center; padding: 10px 14px; border-radius: 10px; background: rgba(10,14,24,.85); border: 2px solid var(--gold); }
+.capture b { font-family: var(--pixel); color: var(--gold-2); font-size: 15px; }
+.capture .bar { height: 12px; margin: 6px 0 4px; } .capture .bar i { background-color: var(--gold); transition: width .1s; }
+.capture small { color: var(--muted); font-weight: 700; }
+.map-info { position: absolute; right: 60px; top: 12px; width: min(300px, 70%); padding: 12px 14px; }
+.map-info h3 { margin: 0 0 4px; font-family: var(--pixel); color: var(--gold); font-size: 20px; padding-right: 30px; }
+.map-info .close.sm { position: absolute; right: 8px; top: 8px; width: 28px; height: 28px; font-size: 13px; }
+.map-info table.stats td { font-size: 13px; }

@@ -25,6 +25,10 @@ import { NPCManager } from './entities/npc.js';
 import { EnemyManager } from './entities/enemies.js';
 import { Wildlife } from './entities/animals.js';
 import { Horses } from './entities/horses.js';
+import { Interiors } from './world/interiors.js';
+import { Territory } from './systems/territory.js';
+import { PLOTS } from './data/territory.js';
+import { house } from './world/structures.js';
 import { Pickups } from './entities/pickups.js';
 import { PhysicsProps } from './entities/physicsProps.js';
 import { Progression } from './systems/progression.js';
@@ -142,6 +146,11 @@ export class Game {
       await this.progress(0.25, t('load.village'));
       generateWorld(G.world);
       await this.progress(0.42, t('load.cave'));
+      G.interiors = new Interiors();
+      for (const h of G.world.houses) G.interiors.add(G.world, h);
+      // rooms for the houses that will be built when the village grows
+      const dry = { houses: null, lightsSpots: [], ground: (a, b) => G.world.ground(a, b), box() {}, collider() {}, cyl() {}, flag() {}, smoke() {}, glow() {}, fire() {}, dynamic() {} };
+      PLOTS.forEach(([x, z, rot], i) => { const h = house(dry, x, z, rot, { w: 7, d: 6 }); G.interiors.add(G.world, h, () => G.state.village && G.state.village.residents.length > i); });
       G.cave = buildCave(G.world);
       G.world.buildGlows();
       G.world.buildExtras();
@@ -191,9 +200,10 @@ export class Game {
       G.shop = new Shop();
       G.interact = new Interact();
       G.ui.build();
+      G.territory = new Territory();
       if (G.mobile) { G.touch = new Touch(); document.body.classList.add('touch'); }
       G.inv.spawnPet();
-      G.sky.underground = G.player.pos.x > 600;
+      G.sky.underground = G.player.pos.x > 600; G.sky.indoor = G.player.pos.x > 800;
       this.applySettings();
       await this.progress(1, t('load.done'));
     } catch (e) {
@@ -353,6 +363,7 @@ export class Game {
       let theme = 'field';
       if (this.bossMusic) theme = 'boss';
       else if (near) theme = 'combat';
+      else if (G.sky.indoor) theme = 'village';
       else if (under) theme = 'cave';
       else if (dist2d(P.x, P.z, LOC.ruins.x, LOC.ruins.z) < 50) theme = 'ruins';
       else if (dist2d(P.x, P.z, LOC.village.x, LOC.village.z) < 60 && !G.sky.isNight()) theme = 'village';
@@ -391,7 +402,7 @@ export class Game {
     const paused = G.paused || G.ui.overlay === 'title';
     let sim = dt;
     if (G.combat.hitstop > 0) { G.combat.hitstop -= dt; sim = dt * 0.15; }
-    G.sky.underground = G.player.pos.x > 600;
+    G.sky.underground = G.player.pos.x > 600; G.sky.indoor = G.player.pos.x > 800;
     if (!paused) {
       G.events.update(sim);
       G.player.update(sim);
@@ -400,6 +411,7 @@ export class Game {
       G.entities.enemies.update(sim);
       G.wildlife.update(sim);
       G.horses.update(sim);
+      G.territory.update(sim);
       G.pickups.update(sim);
       G.physProps.update(sim);
       G.combat.update(sim);

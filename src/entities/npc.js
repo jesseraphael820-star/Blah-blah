@@ -7,6 +7,11 @@ import { Humanoid } from './character.js';
 import { dampAngle, dist2d } from '../core/utils.js';
 import { t, tr } from '../core/i18n.js';
 
+export function addNode(name, pos, linkTo) {
+  NODES[name] = pos;
+  (ADJ[name] = ADJ[name] || []).push(linkTo);
+  (ADJ[linkTo] = ADJ[linkTo] || []).push(name);
+}
 const ADJ = {};
 for (const [a, b] of EDGES) { (ADJ[a] = ADJ[a] || []).push(b); (ADJ[b] = ADJ[b] || []).push(a); }
 function bfs(from, to) {
@@ -73,12 +78,14 @@ export class NPC {
     G.world.addInteractable({
       kind: 'npc', npc: this, x: 0, y: 0, z: 0, r: 3.2, dynamic: true,
       pos: () => this.pos,
-      label: () => t('ui.talkTo', { name: t('npc.' + id + '.name') }),
+      label: () => t('ui.talkTo', { name: this.name }),
       can: () => this.visible && !this.talking,
       act: () => G.dialogue.talkTo(this),
     });
   }
-  get name() { return t('npc.' + this.id + '.name'); }
+  get name() { return this.def.name || t('npc.' + this.id + '.name'); }
+  get lk() { return this.def.langKey || this.id; }
+  get role() { return t('npc.' + this.lk + '.role'); }
 
   scheduleEntry() {
     const h = G.state.world.time;
@@ -165,7 +172,7 @@ export class NPC {
       this.barkT -= dt;
       if (this.barkT <= 0) {
         this.barkT = 18 + Math.random() * 20;
-        const lines = tr('npc.' + this.id + '.barks');
+        const lines = tr('npc.' + this.lk + '.barks');
         if (Array.isArray(lines) && lines.length) {
           const line = lines[Math.floor(Math.random() * lines.length)];
           G.ui.bubble(this, line, 3.2);
@@ -240,4 +247,18 @@ export class NPCManager {
     this.chat = null;
   }
   get(id) { return this.byId[id]; }
+  // a new villager moves into Aurora (village growth)
+  addResident(r) {
+    const nodeName = 'plot_' + r.plot;
+    if (!NODES[nodeName]) addNode(nodeName, r.door, r.link);
+    const id = 'res_' + r.plot;
+    NPCS[id] = {
+      pal: r.pal, hairStyle: r.hair, hat: r.hat || 'none', pitch: r.pitch, name: r.name, langKey: 'villager',
+      schedule: [[0, nodeName, 'home'], [7, nodeName, 'idle'], [8, r.day1, 'idle'], [12, 'well', 'idle'], [14, r.day2, 'idle'], [19, 'plaza', 'idle'], [21, nodeName, 'home']],
+    };
+    const n = new NPC(id);
+    this.list.push(n);
+    this.byId[id] = n;
+    return n;
+  }
 }

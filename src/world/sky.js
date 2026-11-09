@@ -157,7 +157,12 @@ export class Sky {
     const L = this.hemi.intensity * 0.65 + this.sun.intensity * 0.17;
     this.lightLevel.copy(this.hemi.color).multiplyScalar(0.5).add(tmpA.copy(this.sun.color).multiplyScalar(0.5)).multiplyScalar(clamp(L, 0.12, 1.25));
 
-    if (this.underground) {
+    if (this.underground && this.indoor) {
+      // cozy house interiors: warm light from windows and the fireplace
+      this.hemi.color.setHex(0xffe2b8); this.hemi.groundColor.setHex(0x5a3a28); this.hemi.intensity = 1.25;
+      this.sun.intensity = 0.2; this.fogColor.setHex(0x1a120c);
+      this.lightLevel.setRGB(0.8, 0.7, 0.6);
+    } else if (this.underground) {
       this.hemi.color.setHex(0x7a7aa8); this.hemi.groundColor.setHex(0x2a2430); this.hemi.intensity = 1.05;
       this.sun.intensity = 0.15; this.fogColor.setHex(0x05040a);
       this.lightLevel.setRGB(0.45, 0.45, 0.58);

@@ -76,13 +76,13 @@ export class Dialogue {
     }
     // 3) reminder for active quest given by this npc
     const given = Object.keys(G.state.quests.active).find((q) => QUESTS[q].giver === id);
-    const def = NPCS[id];
+    const def = npc.def;
     const menu = [];
     if (def.shop) menu.push({ label: t('dlg.shop'), act: () => { this.close(); G.shop.open(def.shop, npc); } });
-    menu.push({ label: t('dlg.chat'), act: () => this.open(npc, this.smallTalk(id), menu) });
+    menu.push({ label: t('dlg.chat'), act: () => this.open(npc, this.smallTalk(npc.lk), menu) });
     if (given) menu.push({ label: t('dlg.aboutQuest'), act: () => this.open(npc, L(`q.${given}.progress`).length ? L(`q.${given}.progress`) : [G.quests.objectiveText(given)], menu) });
-    menu.push({ label: t('dlg.bye'), act: () => this.open(npc, [this.pick(L(`npc.${id}.bye`)) || t('dlg.byeLine')], null) });
-    const greet = L(`npc.${id}.greet`);
+    menu.push({ label: t('dlg.bye'), act: () => this.open(npc, [this.pick(L(`npc.${npc.lk}.bye`)) || t('dlg.byeLine')], null) });
+    const greet = L(`npc.${npc.lk}.greet`);
     this.open(npc, [this.pick(greet) || '...'], menu);
   }
   smallTalk(id) {
@@ -125,7 +125,7 @@ export class Dialogue {
     else sp.setExpression(isP ? 'neutral' : 'smile');
     this.nameEl.textContent = isP ? (G.state.appearance.name || 'Hero') : this.npc.name;
     this.nameEl.className = 'dlg-name ' + (isP ? 'player' : 'npc');
-    const role = isP ? t('title.' + G.state.player.title) : t('npc.' + this.npc.id + '.role');
+    const role = isP ? t('title.' + G.state.player.title) : this.npc.role;
     this.nameEl.innerHTML = `<span>${this.nameEl.textContent}</span><em>${role}</em>`;
     this.textEl.textContent = '';
     this.nextEl.style.visibility = 'hidden';
@@ -203,7 +203,7 @@ export class Dialogue {
         this.blipT -= now - before;
         if (this.blipT <= 0) {
           this.blipT = 3;
-          const pitch = this.cur.speaker === 'player' ? 1.15 : (NPCS[this.npc.id].pitch || 1);
+          const pitch = this.cur.speaker === 'player' ? 1.15 : (this.npc.def.pitch || 1);
           G.audio.sfx('blip', { pitch });
         }
       }
