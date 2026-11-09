@@ -99,7 +99,7 @@ export class Player {
     s.energy = Math.min(st.maxEnergy, s.energy + dt * (3 + st.spi * 0.25) * st.energyRegen);
     this.staminaDelay -= dt;
     if (this.staminaDelay <= 0) s.stamina = Math.min(st.maxStamina, s.stamina + dt * 32 * st.staminaRegen * (this.swimming ? 0.6 : 1));
-    if (this.lastHurt > 6 && !this.dead) s.hp = Math.min(st.maxHp, s.hp + dt * (0.6 + st.vit * 0.1) * st.hpRegen);
+    if (this.lastHurt > 6 && !this.dead) s.hp = Math.min(st.maxHp, s.hp + dt * (0.6 + st.vit * 0.1) * st.hpRegen * 1.2); // +20% natural regeneration
     if (this.shieldT > 0) { this.shieldT -= dt; if (this.shieldT <= 0) this.shield = 0; }
 
     if (this.dead) { this.updateDead(dt); this.animate(dt); return; }
@@ -123,6 +123,7 @@ export class Player {
       for (let i = 0; i < 4; i++) if (I.consume('power' + (i + 1))) G.powers.cast(i);
       if (I.consume('potion')) G.inv.quickPotion();
       if (I.consume('lockon')) this.toggleLock();
+      if (I.consume('sneak')) { this.sneaking = !this.sneaking && !this.mounted && !this.swimming; G.audio.sfx('click'); }
     }
     this.blocking = controlsOn && I.isDown('block') && !this.swimming && !this.mounted && (this.state === 'normal') && s.stamina > 0;
     if (this.blocking) { this.blockT += dt; } else this.blockT = 0;
@@ -131,7 +132,8 @@ export class Player {
     let speed = 0;
     if (this.state === 'normal') {
       const horse = this.mounted;
-      const base = horse ? (this.swimming ? 5 : horse.B.speed * st.horseMul * (I.isDown('run') ? 1.15 : 1)) : this.swimming ? 3.2 * st.swimMul * (wantRun ? 1.35 : 1) : wantRun ? 8.6 * st.runMul : 5.0;
+      if (this.mounted || this.swimming || this.state === 'dodge') this.sneaking = false;
+      const base = this.sneaking ? 2.8 : horse ? (this.swimming ? 5 : horse.B.speed * st.horseMul * (I.isDown('run') ? 1.15 : 1)) : this.swimming ? 3.2 * st.swimMul * (wantRun ? 1.35 : 1) : wantRun ? 8.6 * st.runMul : 5.0;
       speed = base * (horse ? 1 : st.speedMul) * mag * (this.blocking && !horse ? 0.4 : 1);
       if (wantRun && !horse) { s.stamina = Math.max(0, s.stamina - dt * (this.swimming ? 10 : 14) * st.drainMul); this.staminaDelay = 0.6; }
       if (mag > 0.05) {
@@ -233,7 +235,7 @@ export class Player {
         this.stepAcc = 0;
         const surf = G.physics.waterLevel(this.pos.x, this.pos.z) > this.pos.y + 0.05 ? 'water' : this.surface();
         if (surf === 'water') { G.water.ripple(this.pos.x, this.pos.z, 0.6, 0.4); G.particles.splash(this.pos.x, G.physics.waterLevel(this.pos.x, this.pos.z), this.pos.z, 3); }
-        G.audio.sfx('step', { surface: surf, vol: wantRun ? 0.9 : 0.6 });
+        G.audio.sfx('step', { surface: surf, vol: this.sneaking ? 0.15 : wantRun ? 0.9 : 0.6 });
         if (surf === 'dirt' || (wantRun && surf !== 'wood')) G.particles.dust(this.pos.x, this.pos.y, this.pos.z, wantRun ? 4 : 2, surf === 'dirt' ? 0xb8a07a : 0x9aa070);
         if (surf === 'dirt') this.footprint();
       }
@@ -518,6 +520,7 @@ export class Player {
         else if (!this.mounted && !this.onGround && Math.abs(this.pos.y - G.physics.groundAt(this.pos.x, this.pos.z, this.pos.y)) > 0.4) pose = this.vy > 0 ? 'jump' : 'fall';
         else if (this.mounted) pose = 'ride';
         else if (this.blocking) pose = 'block';
+        else if (this.sneaking) pose = 'sneak';
         else if (this.speedNow > 6.5) pose = 'run';
         else if (this.speedNow > 0.4) pose = 'walk';
         else if (G.dialogue?.active && G.dialogue.speaker === 'player') pose = 'talk';

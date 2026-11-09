@@ -78,6 +78,8 @@ export class Enemy {
       return this.stT > 1.7;
     }
     if (st.frozen > 0) { this.place(); return false; }
+    // stunned by a sneak attack: dazed, can't fight back for a moment
+    if (this.stunT > 0) { this.stunT -= dt; this.place(); this.model.animate(dt, 'idle', 0, 0); if (Math.random() < dt * 6) G.particles.trail(this.pos.x, this.pos.y + 2 * (this.def.scale || 1), this.pos.z, 0xfff0a0, 0.15, 0.5); return false; }
 
     this.stT += dt;
     const dP = dist2d(this.pos.x, this.pos.z, P.pos.x, P.pos.z);
@@ -157,7 +159,7 @@ export class Enemy {
       case 'return': {
         moveYaw = Math.atan2(this.home.x - this.pos.x, this.home.z - this.pos.z);
         move = this.speed() * 0.8;
-        this.hp = Math.min(this.maxHp, this.hp + this.maxHp * 0.2 * dt);
+        this.hp = Math.min(this.maxHp, this.hp + this.maxHp * 0.04 * dt); // enemies recover slowly
         if (dist2d(this.pos.x, this.pos.z, this.home.x, this.home.z) < 2) this.set('idle');
         break;
       }
@@ -167,10 +169,15 @@ export class Enemy {
 
     // aggro check
     if ((this.state === 'idle' || this.state === 'wander') && playerOk && sameLevel) {
-      const range = d.aggro * (G.sky.night > 0.5 ? 1.2 : 1);
+      let range = d.aggro * (G.sky.night > 0.5 ? 1.2 : 1);
+      // stealth: a sneaking hero is much harder to notice, especially from behind or at night
+      if (P.sneaking) {
+        const behind = Math.abs(angleDiff(this.yaw, yToP)) > 1.1;
+        range *= (behind ? 0.1 : 0.4) * (G.sky.night > 0.5 ? 0.75 : 1) * Math.max(0.5, 1 - (G.training?.level('stealth') || 0) * 0.025);
+      }
       if (dP < range && !inVillage(P.pos.x, P.pos.z)) { this.aggro = true; this.set('chase'); this.afraid = !this.boss && !this.raid && !this.def.guardian && this.level + 6 <= G.state.player.level; if (this.boss) this.onBossAggro(); else if (d.model === 'wolf') G.audio.sfxAt('growl', this.pos.x, this.pos.z); }
     }
-    if (this.state === 'return' && dP < d.aggro * 0.6 && playerOk && !inVillage(P.pos.x, P.pos.z) && this.hp > this.maxHp * 0.5) this.set('chase');
+    if (this.state === 'return' && dP < d.aggro * 0.6 && !P.sneaking && playerOk && !inVillage(P.pos.x, P.pos.z) && this.hp > this.maxHp * 0.5) this.set('chase');
 
     // movement
     if (move > 0) {

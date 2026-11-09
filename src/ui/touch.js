@@ -18,6 +18,7 @@ export class Touch {
         <button class="tb p1" data-a="power1">1</button><button class="tb p2" data-a="power2">2</button>
         <button class="tb p3" data-a="power3">3</button><button class="tb p4" data-a="power4">4</button>
         <button class="tb horse" data-a="whistle">🐴</button>
+        <button class="tb sneak" data-a="sneak">🥷</button>
         <button class="tb potion" data-a="potion">${img(icon('potion', '#e03a3a'))}</button>
       </div>`;
     const I = G.input;

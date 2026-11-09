@@ -11,6 +11,7 @@ export const SKILLS = {
   magic: { icon: '✦', per: { power: 0.025, maxEnergy: 2 } },
   endurance: { icon: '🛡', per: { maxHp: 5, def: 0.6 } },
   riding: { icon: '🐴', per: { horseSpeed: 0.015 } },
+  stealth: { icon: '🥷', per: {} },
 };
 export const SKILL_MAX = 20;
 export const skillNeed = (l) => Math.floor(60 * Math.pow(l, 1.4));

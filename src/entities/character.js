@@ -410,6 +410,14 @@ export class Humanoid {
       case 'hammer': { const k = Math.sin(t * 6); T.aRX = -1.4 - k * 0.8; T.aRZ = 0.1; T.aLX = -0.6; T.bodyRX = 0.2; T.headX = 0.3; break; }
       case 'farm': { const k = Math.sin(t * 3); T.aRX = -1.0 - k * 0.6; T.aLX = -1.0 - k * 0.6; T.bodyRX = 0.3 + k * 0.1; break; }
       case 'ride': T.lLX = -1.1; T.lRX = -1.1; T.bodyRX = 0.08 + (o.speed || 0) * 0.008; T.bodyY = Math.abs(Math.sin(t * Math.min(12, 2 + (o.speed || 0)))) * Math.min(0.12, (o.speed || 0) * 0.01); T.aLX = -0.7; T.aRX = o.armed ? -0.5 : -0.7; break;
+      case 'sneak': {
+        this.walkPhase += dt * (o.speed || 0) * 1.8;
+        const w = this.walkPhase, mv = (o.speed || 0) > 0.3 ? 1 : 0;
+        T.bodyY = -0.28; T.bodyRX = 0.35; T.headX = -0.3;
+        T.lLX = -0.7 + Math.sin(w) * 0.45 * mv; T.lRX = -0.7 - Math.sin(w) * 0.45 * mv;
+        T.aLX = -0.6; T.aRX = -0.9; T.aLZ = 0.3; T.wristX = 0.6;
+        lam = 14; break;
+      }
       case 'sit': T.lLX = -1.5; T.lRX = -1.5; T.bodyY = -0.5; T.aLX = -0.5; T.aRX = -0.5; break;
       case 'fish': T.aRX = -0.9; T.aLX = -0.9; T.aLZ = -0.3; T.headX = 0.15 + Math.sin(t) * 0.05; break;
       case 'read': T.aLX = -1.2; T.aLZ = -0.2; T.aRX = -1.1; T.aRZ = 0.4; T.headX = 0.35; break;

@@ -2,6 +2,7 @@
 // telegraphs (ground warnings), hitstop.
 import * as THREE from 'three';
 import { G } from '../core/context.js';
+import { t } from '../core/i18n.js';
 import { angleDiff, dist2d } from '../core/utils.js';
 
 const ringGeo = new THREE.RingGeometry(0.9, 1, 40).rotateX(-Math.PI / 2);
@@ -52,7 +53,18 @@ export class Combat {
       const crit = Math.random() < o.crit;
       let dmg = o.dmg * (crit ? 1.8 : 1) * (0.92 + Math.random() * 0.16);
       if (e.status.frozen > 0) dmg *= 1.3;
-      e.takeDamage(dmg, { crit, knock: o.knock });
+      // sneak attack: an enemy that hasn't noticed you takes massive damage and is stunned
+      const unaware = !e.aggro && e.state !== 'chase';
+      if (unaware) {
+        const behind = Math.abs(angleDiff(e.yaw, Math.atan2(P.pos.x - e.pos.x, P.pos.z - e.pos.z))) > 1.2;
+        dmg *= (behind ? 4 : 3) * (1 + (G.training?.level('stealth') || 0) * 0.05) * (e.boss ? 0.5 : 1);
+        e.stunT = e.boss ? 0.6 : 1.8;
+        G.ui.damageNumber(e.pos.x, e.pos.y + 2.8, e.pos.z, t('ui.sneakAttack'), 'crit');
+        G.audio.sfx('crit'); G.audio.sfx('dodge', { vol: 0.6 });
+        G.particles.burst(e.pos.x, e.pos.y + 1.2, e.pos.z, 0xb0a0ff, 24, 5, { size: 0.22 });
+        G.training?.add('stealth', 12);
+      }
+      e.takeDamage(dmg, { crit: crit || unaware, knock: o.knock });
       G.training?.add('combat', 3);
       hits++;
       this.applyEffect(o.effect, e, dmg, o.finisher);

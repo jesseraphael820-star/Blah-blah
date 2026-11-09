@@ -13,6 +13,7 @@ const KEYMAP = {
   KeyI: 'inventory', Tab: 'inventory',
   KeyJ: 'journal', KeyM: 'map', KeyP: 'powers', KeyK: 'character', KeyO: 'swords',
   Escape: 'pause', Enter: 'confirm',
+  KeyV: 'sneak', KeyX: 'sneak',
   KeyR: 'lockon', KeyT: 'whistle', KeyH: 'whistle',
 };
 
