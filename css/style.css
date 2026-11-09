@@ -520,3 +520,9 @@ body.no-names .ntag { display: none !important; }
 .fs-btn { font-size: 20px; font-weight: 800; color: var(--gold-2); }
 .tb.sneak { right: 228px; bottom: 244px; width: 46px; height: 46px; font-size: 22px; border-color: #b0a0ff; }
 .buff.sneak { background: rgba(176,160,255,.22); border-color: rgba(176,160,255,.6); }
+.board-h { font-family: var(--pixel); color: var(--gold-2); margin: 16px 0 6px; font-size: 18px; }
+.cls { font-size: 11px; font-weight: 800; padding: 1px 7px; border: 1px solid; border-radius: 99px; white-space: nowrap; }
+.board { font-size: 13px; } .board-wrap { overflow-x: auto; }
+.people { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 10px; }
+.person { padding: 10px 12px; border-radius: 10px; background: rgba(255,255,255,.04); border: 2px solid rgba(255,255,255,.07); font-size: 13px; display: flex; flex-direction: column; gap: 3px; }
+.person .p-head { display: flex; justify-content: space-between; align-items: center; } .person b { font-family: var(--pixel); font-size: 15px; } .person em { font-style: normal; color: var(--good); font-weight: 800; }

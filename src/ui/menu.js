@@ -10,6 +10,7 @@ import { WAYSTONES } from '../data/world.js';
 import { repTier } from '../data/npcs.js';
 import { regionAt } from '../data/territory.js';
 import { SKILLS, SKILL_MAX, skillNeed } from '../systems/training.js';
+import { GENES, classOf, friendTier } from '../systems/adventurers.js';
 import { saveSettings, deleteSave } from '../core/save.js';
 
 const TABS = ['inventory', 'character', 'swords', 'powers', 'journal', 'map', 'achievements', 'settings'];
@@ -409,7 +410,7 @@ export class Menu {
 
   // ================= ACHIEVEMENTS / LEADERBOARD =================
   r_achievements() {
-    const tabs = ['ach', 'board', 'stats'];
+    const tabs = ['ach', 'board', 'people', 'stats'];
     let body = '';
     if (this.achTab === 'ach') {
       const un = G.state.ach.unlocked;
@@ -418,11 +419,16 @@ export class Menu {
         return `<div class="ach ${got ? 'got' : ''}">${img(icon(a.icon), 'px big')}<div><b>${t('ach.' + a.id + '.name')}</b><small>${t('ach.' + a.id + '.desc', { n: a.n })}</small><div class="bar mini"><i style="width:${clamp(v / a.n * 100, 0, 100)}%"></i></div><em>${img(icon('coin'))}${a.gold}${a.title ? ` · ${t('ui.title')}: ${t('title.' + a.title)}` : ''}</em></div></div>`;
       }).join('')}</div>`;
     } else if (this.achTab === 'board') {
-      const day = G.state.world.day;
-      const rows = RIVALS.map((r, i) => ({ name: r.name, level: Math.min(30, r.level + Math.floor(day / (3 + i))), title: r.title, me: false }));
-      rows.push({ name: G.state.appearance.name, level: G.state.player.level, title: G.state.player.title, me: true });
-      rows.sort((a, b) => b.level - a.level || (b.me ? 1 : -1));
-      body = `<p class="hint">${t('board.hint')}</p><table class="board"><tr><th>#</th><th>${t('board.name')}</th><th>${t('ui.title')}</th><th>${t('ui.level')}</th></tr>${rows.map((r, i) => `<tr class="${r.me ? 'me' : ''}"><td>${i === 0 ? img(icon('crown')) : i + 1}</td><td>${r.name}</td><td>${t('title.' + r.title)}</td><td>${r.level}</td></tr>`).join('')}</table>`;
+      const rows = G.adventurers.ranking();
+      const gr = G.adventurers.geneRanking();
+      const geneCell = (g) => g === 'aurora' ? `🌅 ${t('gene.aurora')}` : `${GENES[g].icon} ${t('gene.' + g)}`;
+      body = `<p class="hint">${t('board.hint')}</p>
+        <h3 class="board-h">${t('board.topPower')}</h3>
+        <table class="board"><tr><th>#</th><th>${t('board.name')}</th><th>${t('board.gene')}</th><th>${t('board.class')}</th><th>${t('ui.level')}</th><th>${t('train.power')}</th></tr>${rows.map((r, i) => { const c = classOf(r.power); return `<tr class="${r.me ? 'me' : ''}"><td>${i === 0 ? img(icon('crown')) : i + 1}</td><td>${r.name}</td><td>${geneCell(r.gene)}</td><td><span class="cls" style="color:${c.color};border-color:${c.color}">${t('cls.' + c.id)}</span></td><td>${r.level}</td><td><b>⚡ ${r.power}</b></td></tr>`; }).join('')}</table>
+        <h3 class="board-h">${t('board.topGene')}</h3>
+        <table class="board"><tr><th>#</th><th>${t('board.gene')}</th><th>${t('board.bonus')}</th><th>${t('board.best')}</th><th>${t('board.avg')}</th><th>${t('board.champion')}</th></tr>${gr.map((g, i) => `<tr><td>${i + 1}</td><td>${geneCell(g.gene)}</td><td>+${Math.round((g.mult - 1) * 100)}%</td><td><b>⚡ ${g.best}</b></td><td>${g.avg}</td><td>${g.top}</td></tr>`).join('')}</table>`;
+    } else if (this.achTab === 'people') {
+      body = `<p class="hint">${t('board.peopleHint')}</p><div class="people">${G.adventurers.list.slice().sort((a, b) => b.power() - a.power()).map((a) => { const c = a.cls(), g = GENES[a.gene], f = friendTier(a.s.friend); return `<div class="person"><div class="p-head"><b>${a.name}</b><span class="cls" style="color:${c.color};border-color:${c.color}">${t('cls.' + c.id)}</span></div><div>${g.icon} ${t('gene.' + a.gene)} <em>+${Math.round((g.mult - 1) * 100)}%</em></div><div>⚡ ${a.power()} · ${t('ui.lv')}${a.level()}</div><div class="bar mini"><i style="width:${a.s.friend}%;background-color:#ff7ab0"></i></div><small>❤ ${t('friend.' + f.id)} (${a.s.friend})${a.following() ? ' · ' + t('adv.withYou') : ''}</small></div>`; }).join('')}</div>`;
     } else {
       const s = G.state.ach.stats;
       const pt = G.state.playTime;

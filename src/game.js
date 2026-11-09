@@ -28,6 +28,7 @@ import { Horses } from './entities/horses.js';
 import { Interiors } from './world/interiors.js';
 import { Territory } from './systems/territory.js';
 import { Training } from './systems/training.js';
+import { Adventurers } from './systems/adventurers.js';
 import { PLOTS } from './data/territory.js';
 import { house } from './world/structures.js';
 import { Pickups } from './entities/pickups.js';
@@ -197,6 +198,7 @@ export class Game {
       G.entities.npcs = new NPCManager();
       G.wildlife = new Wildlife(G.scene);
       G.horses = new Horses();
+      G.adventurers = new Adventurers();
       G.mapSys = new MapSys(G.world.terrain.mapCanvas());
       G.menu = new Menu();
       G.shop = new Shop();
@@ -414,6 +416,7 @@ export class Game {
       G.entities.enemies.update(sim);
       G.wildlife.update(sim);
       G.horses.update(sim);
+      G.adventurers.update(sim);
       G.territory.update(sim);
       G.interiors.update();
       G.pickups.update(sim);

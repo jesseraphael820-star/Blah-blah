@@ -287,7 +287,7 @@ export class UI {
     // name tags for nearby villagers
     this.tags = this.tags || new Map();
     const shown = new Set();
-    for (const n of G.entities.npcs.list) {
+    for (const n of [...G.entities.npcs.list, ...(G.adventurers ? G.adventurers.list : [])]) {
       if (!n.visible || n.talking || G.dialogue.active) continue;
       const d = Math.hypot(n.pos.x - G.player.pos.x, n.pos.z - G.player.pos.z);
       if (d > 11) continue;
@@ -297,7 +297,7 @@ export class UI {
       let el = this.tags.get(n);
       if (!el) { el = document.createElement('div'); el.className = 'ntag'; el.innerHTML = `<b></b><span></span>`; this.worldUi.appendChild(el); this.tags.set(n, el); }
       el.querySelector('b').textContent = n.name;
-      el.querySelector('span').textContent = n.role;
+      el.querySelector('span').textContent = n.gene ? `${n.role} · ⚡${n.power()}${n.s.friend >= 50 ? ' · ❤' : ''}` : n.role;
       el.style.transform = `translate(${s[0]}px, ${s[1]}px) translate(-50%,-100%)`;
       el.style.opacity = Math.min(1, (11 - d) / 3);
     }
