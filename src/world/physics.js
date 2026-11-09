@@ -64,11 +64,11 @@ export class Physics {
   }
 
   // highest walkable surface under (x,z) that is not above y + step
-  groundAt(x, z, y, r = 0.3) {
+  groundAt(x, z, y, r = 0.3, step = STEP_UP) {
     let g = this.terrainHeight(x, z);
     const list = this.query(x, z, r);
     for (const c of list) {
-      if (c.y1 > y + STEP_UP || c.y1 <= g) continue;
+      if (c.y1 > y + step || c.y1 <= g) continue;
       if (c.t === 'box') {
         if (x + r * 0.5 > c.x0 && x - r * 0.5 < c.x1 && z + r * 0.5 > c.z0 && z - r * 0.5 < c.z1) g = c.y1;
       } else {
@@ -80,11 +80,12 @@ export class Physics {
   }
 
   // Push a cylinder (x,z,radius) at height range [y, y+h] out of colliders. Mutates pos.
-  resolve(pos, r, h) {
+  resolve(pos, r, h, step = STEP_UP) {
     const list = this.query(pos.x, pos.z, r + 0.5);
     let hit = false;
     for (const c of list) {
-      if (c.y1 <= pos.y + STEP_UP || c.y0 >= pos.y + h) continue;
+      // while airborne only things below the feet can be stepped over: posts and walls stay solid mid-jump
+      if (c.y1 <= pos.y + step || c.y0 >= pos.y + h) continue;
       if (c.t === 'box') {
         const cx = Math.max(c.x0, Math.min(pos.x, c.x1));
         const cz = Math.max(c.z0, Math.min(pos.z, c.z1));
@@ -123,7 +124,7 @@ export class Physics {
       if (d === 0) return false;
       const ox = pos.x, oz = pos.z;
       if (ax === 0) pos.x += d; else pos.z += d;
-      const g = this.groundAt(pos.x, pos.z, pos.y, r);
+      const g = this.groundAt(pos.x, pos.z, pos.y, r, airborne ? 0.15 : STEP_UP);
       if (g > pos.y + (airborne ? 0.05 : STEP_UP)) { pos.x = ox; pos.z = oz; return true; }
       return false;
     };
@@ -133,7 +134,7 @@ export class Physics {
     for (let s = 0; s < steps; s++) {
       blocked = tryAxis(0, dx / steps) || blocked;
       blocked = tryAxis(1, dz / steps) || blocked;
-      this.resolve(pos, r, h);
+      this.resolve(pos, r, h, airborne ? 0.15 : STEP_UP);
     }
     if (!this.regions.some((q) => pos.x >= q.x0 - 50 && pos.x <= q.x1 + 50 && pos.z >= q.z0 - 50 && pos.z <= q.z1 + 50)) {
       pos.x = Math.max(-lim, Math.min(lim, pos.x));

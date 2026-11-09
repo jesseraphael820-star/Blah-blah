@@ -183,7 +183,8 @@ export class Player {
     G.events?.track('distance', moved);
 
     // ---------- vertical ----------
-    const ground = G.physics.groundAt(this.pos.x, this.pos.z, this.pos.y, this.radius);
+    // in the air, only surfaces just under the feet count as ground (no snapping onto tall posts)
+    const ground = G.physics.groundAt(this.pos.x, this.pos.z, this.pos.y, this.radius, this.onGround ? STEP_UP : Math.max(0.3, -this.vy * dt + 0.15));
     const water = G.physics.waterLevel(this.pos.x, this.pos.z);
     const wasSwim = this.swimming;
     this.swimming = water - ground > 1.25 && this.pos.y < water - 0.9;
