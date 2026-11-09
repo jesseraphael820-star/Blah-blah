@@ -10,6 +10,7 @@ export const NODES = {
   // camp
   campC: [258, 102], campTent: [270, 112], campLook: [248, 94],
   // lake
+  barDoor: [2, 0.5], barYard: [2, 4],
   pier: [80, -12], lakeW: [72, 0], hermitHut: [163, -58], hermitShore: [156, -48],
 };
 export const EDGES = [
@@ -18,6 +19,7 @@ export const EDGES = [
   ['pE', 'forge'], ['pE', 'libDoor'], ['pS', 'innDoor'], ['pS', 'inn2'], ['inn2', 'innDoor'], ['pS', 'pedDoor'],
   ['farmC', 'farmDoor'], ['farmC', 'fieldA'], ['farmC', 'barnDoor'], ['farmC', 'coop'], ['farmC', 'corral'],
   ['campC', 'campTent'], ['campC', 'campLook'],
+  ['barDoor', 'barYard'],
   ['pier', 'lakeW'], ['hermitHut', 'hermitShore'],
 ];
 
@@ -89,6 +91,11 @@ export const NPCS = {
     hairStyle: 'short', hat: 'wizard', acc: 'backpack', pitch: 1.0, shop: 'traveler', event: 'merchant',
     schedule: [[0, 'market', 'idle']],
   },
+  gael: {
+    pal: { skin: 0xc8905a, hair: 0x1a1a1a, shirt: 0xf0ece0, pants: 0x2a2a3a, shoes: 0x1a1a1a, trim: 0x8a2a2a, eye: 0x3a2a1a },
+    hairStyle: 'short', beard: true, apron: 0x3a2a5a, pitch: 0.95, shop: 'bar', scale: 1.05,
+    schedule: [[0, 'barDoor', 'idle'], [3, 'barDoor', 'home'], [9, 'barDoor', 'idle'], [13, 'barYard', 'idle'], [16, 'barDoor', 'idle']],
+  },
   spirit: {
     pal: { skin: 0xfff0c0, hair: 0xffd36a, shirt: 0xfff8e0, pants: 0xffe8a8, shoes: 0xffd36a, trim: 0xffb22e, eye: 0xff9a2a },
     hairStyle: 'long', pitch: 1.4, glow: 0xffd36a, float: true, quest: true,
@@ -104,6 +111,7 @@ export const SHOPS = {
   magic: { powers: ['shield', 'magic_ray', 'blink', 'energy_burst', 'frost_nova'], items: ['essence', 'energy_potion'], rep: 'aurora' },
   hunter: { swords: ['hunter_blade'], armors: ['leather', 'chain'], items: ['potion_small', 'stew', 'bread'], rep: 'camp' },
   hermit: { swords: ['moon_blade'], powers: ['fire_wave'], items: ['essence', 'elixir'], rep: null },
+  bar: { accessories: ['scarf', 'glasses', 'necklace', 'bandana', 'earrings', 'flowerpin', 'backpack', 'cape', 'wings'], items: ['coffee', 'mead', 'herbal_tea', 'apple_juice', 'stew'], horses: ['common', 'rare', 'epic', 'legendary', 'mythic'], rep: 'aurora' },
   traveler: { swords: ['frost_edge', 'ember_saber'], items: ['elixir', 'essence', 'potion_large', 'stardust'], skins: ['ninja'], markup: 1.15, rep: null },
 };
 

@@ -96,10 +96,10 @@ export class Player {
     const controlsOn = !G.ui.blocksGameplay();
 
     // ---------- regen ----------
-    s.energy = Math.min(st.maxEnergy, s.energy + dt * (3 + st.spi * 0.25));
+    s.energy = Math.min(st.maxEnergy, s.energy + dt * (3 + st.spi * 0.25) * st.energyRegen);
     this.staminaDelay -= dt;
-    if (this.staminaDelay <= 0) s.stamina = Math.min(st.maxStamina, s.stamina + dt * 32);
-    if (this.lastHurt > 6 && !this.dead) s.hp = Math.min(st.maxHp, s.hp + dt * (0.6 + st.vit * 0.1));
+    if (this.staminaDelay <= 0) s.stamina = Math.min(st.maxStamina, s.stamina + dt * 32 * st.staminaRegen * (this.swimming ? 0.6 : 1));
+    if (this.lastHurt > 6 && !this.dead) s.hp = Math.min(st.maxHp, s.hp + dt * (0.6 + st.vit * 0.1) * st.hpRegen);
     if (this.shieldT > 0) { this.shieldT -= dt; if (this.shieldT <= 0) this.shield = 0; }
 
     if (this.dead) { this.updateDead(dt); this.animate(dt); return; }
@@ -131,9 +131,9 @@ export class Player {
     let speed = 0;
     if (this.state === 'normal') {
       const horse = this.mounted;
-      const base = horse ? (this.swimming ? 5 : horse.B.speed * (I.isDown('run') ? 1.15 : 1)) : this.swimming ? 3.2 : wantRun ? 8.6 : 5.0;
+      const base = horse ? (this.swimming ? 5 : horse.B.speed * st.horseMul * (I.isDown('run') ? 1.15 : 1)) : this.swimming ? 3.2 * st.swimMul * (wantRun ? 1.35 : 1) : wantRun ? 8.6 * st.runMul : 5.0;
       speed = base * (horse ? 1 : st.speedMul) * mag * (this.blocking && !horse ? 0.4 : 1);
-      if (wantRun && !this.swimming && !horse) { s.stamina = Math.max(0, s.stamina - dt * 14); this.staminaDelay = 0.6; }
+      if (wantRun && !horse) { s.stamina = Math.max(0, s.stamina - dt * (this.swimming ? 10 : 14) * st.drainMul); this.staminaDelay = 0.6; }
       if (mag > 0.05) {
         const targetYaw = Math.atan2(dx, dz);
         // horses turn in wide arcs and can't change direction in mid-air
@@ -189,6 +189,7 @@ export class Player {
     this.speedNow = moved / Math.max(dt, 1e-4);
     G.state.ach.stats.distance += moved;
     G.events?.track('distance', moved);
+    G.training?.track(dt, moved, this);
 
     // ---------- vertical ----------
     // in the air, only surfaces just under the feet count as ground (no snapping onto tall posts)
@@ -202,8 +203,10 @@ export class Player {
       this.pos.y = damp(this.pos.y, target, 8, dt);
       this.onGround = false;
       this.fallStart = this.pos.y;
-      if (!wasSwim) { G.audio.sfx('splash'); G.particles.splash(this.pos.x, water, this.pos.z, 16); }
+      if (!wasSwim) { G.water.splash(this.pos.x, this.pos.z, Math.min(2, 0.4 + Math.max(0, this.fallStart - water) * 0.12 + (this.mounted ? 0.6 : 0))); }
       if (this.speedNow > 1 && Math.random() < dt * 8) G.particles.splash(this.pos.x, water, this.pos.z, 2);
+      this.rippleT = (this.rippleT || 0) - dt;
+      if (this.rippleT <= 0) { this.rippleT = this.speedNow > 1 ? 0.35 : 1.1; G.water.ripple(this.pos.x, this.pos.z, this.mounted ? 1.4 : 0.8, 0.45); }
     } else {
       // heavier fall + short hop when the jump button is released early
       const g = this.vy < 0 ? GRAV * 1.3 : (!G.input.isDown('jump') && !G.mobile ? GRAV * 1.8 : GRAV);
@@ -228,7 +231,8 @@ export class Player {
       const stride = wantRun ? 1.9 : 1.45;
       if (this.stepAcc > stride) {
         this.stepAcc = 0;
-        const surf = this.surface();
+        const surf = G.physics.waterLevel(this.pos.x, this.pos.z) > this.pos.y + 0.05 ? 'water' : this.surface();
+        if (surf === 'water') { G.water.ripple(this.pos.x, this.pos.z, 0.6, 0.4); G.particles.splash(this.pos.x, G.physics.waterLevel(this.pos.x, this.pos.z), this.pos.z, 3); }
         G.audio.sfx('step', { surface: surf, vol: wantRun ? 0.9 : 0.6 });
         if (surf === 'dirt' || (wantRun && surf !== 'wood')) G.particles.dust(this.pos.x, this.pos.y, this.pos.z, wantRun ? 4 : 2, surf === 'dirt' ? 0xb8a07a : 0x9aa070);
         if (surf === 'dirt') this.footprint();
@@ -308,6 +312,7 @@ export class Player {
     if (this.state === 'attack' && this.stateT < 0.15) return;
     if (this.s.stamina < 22 || this.swimming || this.mounted) return;
     this.s.stamina -= 22; this.staminaDelay = 0.8;
+    G.training?.add('endurance', 3);
     this.dodgeYaw = mag > 0.1 ? Math.atan2(dx, dz) : this.yaw; // standing still: roll forward
     if (mag > 0.1) this.yaw = this.dodgeYaw;
     this.setState('dodge');
@@ -427,6 +432,7 @@ export class Player {
     if (!o.fall) dmg = dmg * 100 / (100 + this.stats.def * 4);
     dmg = Math.max(1, Math.round(dmg));
     this.s.hp -= dmg;
+    G.training?.add('endurance', dmg * 0.5);
     this.lastHurt = 0;
     G.audio.sfx('hurt');
     G.ui.damageNumber(this.pos.x, this.pos.y + 2, this.pos.z, dmg, 'player');

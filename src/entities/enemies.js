@@ -107,6 +107,8 @@ export class Enemy {
           this.aggro = false; this.set('return'); break;
         }
         if (d.flee) { moveYaw = yToP + Math.PI + Math.sin(this.lifeT) * 0.6; move = this.speed(); if (this.lifeT > 45) this.despawn = true; break; }
+        // weak creatures fear a much stronger hero and run away
+        if (this.afraid) { moveYaw = yToP + Math.PI + Math.sin(this.lifeT) * 0.4; move = this.speed() * 0.9; if (dP > d.aggro * 1.6) { this.afraid = false; this.aggro = false; this.set('return'); } break; }
         moveYaw = yToP;
         const keep = d.keepDist;
         if (keep) {
@@ -166,7 +168,7 @@ export class Enemy {
     // aggro check
     if ((this.state === 'idle' || this.state === 'wander') && playerOk && sameLevel) {
       const range = d.aggro * (G.sky.night > 0.5 ? 1.2 : 1);
-      if (dP < range && !inVillage(P.pos.x, P.pos.z)) { this.aggro = true; this.set('chase'); if (this.boss) this.onBossAggro(); else if (d.model === 'wolf') G.audio.sfxAt('growl', this.pos.x, this.pos.z); }
+      if (dP < range && !inVillage(P.pos.x, P.pos.z)) { this.aggro = true; this.set('chase'); this.afraid = !this.boss && !this.raid && !this.def.guardian && this.level + 6 <= G.state.player.level; if (this.boss) this.onBossAggro(); else if (d.model === 'wolf') G.audio.sfxAt('growl', this.pos.x, this.pos.z); }
     }
     if (this.state === 'return' && dP < d.aggro * 0.6 && playerOk && !inVillage(P.pos.x, P.pos.z) && this.hp > this.maxHp * 0.5) this.set('chase');
 

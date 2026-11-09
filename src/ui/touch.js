@@ -53,12 +53,7 @@ export class Touch {
       e.preventDefault();
     }, { passive: false });
     look.addEventListener('touchend', (e) => { if (e.targetTouches.length < 2) pinch = null; for (const tc of e.changedTouches) if (tc.identifier === lid) lid = null; });
-    // zoom buttons
-    const zoomBtns = document.createElement('div');
-    zoomBtns.className = 't-zoom';
-    zoomBtns.innerHTML = '<button data-z="-1">+</button><button data-z="1">−</button>';
-    this.el.appendChild(zoomBtns);
-    zoomBtns.querySelectorAll('button').forEach((b) => b.addEventListener('touchstart', (e) => { e.preventDefault(); e.stopPropagation(); I.wheel += +b.dataset.z * 2; }, { passive: false }));
+
     // buttons
     this.el.querySelectorAll('.tb').forEach((b) => {
       const a = b.dataset.a;

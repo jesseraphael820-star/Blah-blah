@@ -106,8 +106,8 @@ kbd { font-family: var(--pixel); font-size: 11px; padding: 1px 5px; border-radiu
 .create-actions { display: flex; justify-content: space-between; gap: 10px; margin-top: 16px; }
 
 /* ---------- HUD ---------- */
-#hud { position: absolute; inset: 0; pointer-events: none; z-index: 10; }
-#hud button, #hud .slot { pointer-events: auto; }
+#hud { position: absolute; inset: 0; pointer-events: none; z-index: 16; }
+#hud button, #hud .slot, #hud .minimap-wrap { pointer-events: auto; touch-action: manipulation; }
 .hud-tl { position: absolute; top: 14px; left: 14px; display: flex; gap: 10px; padding: 10px 12px; width: 340px; }
 .hud-portrait { position: relative; width: 56px; height: 56px; flex: none; border-radius: 8px; overflow: visible; background: #1d2433; border: 2px solid var(--line-strong); }
 .hud-portrait canvas { width: 52px; height: 52px; image-rendering: pixelated; border-radius: 6px; }
@@ -512,3 +512,8 @@ body.no-names .ntag { display: none !important; }
 .hud-terr { flex-wrap: wrap; }
 .hud-terr em.war { flex-basis: 100%; font-style: normal; font-size: 11px; color: #ff8a8a; animation: pulse 1.2s infinite; }
 .hud-terr em.war.aurora { color: var(--gold-2); }
+.buffs { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 2px; }
+.buff { font-size: 10px; font-weight: 800; padding: 1px 6px; border-radius: 99px; background: rgba(95,224,160,.18); border: 1px solid rgba(95,224,160,.5); white-space: nowrap; }
+.buff.tired { background: rgba(232,65,78,.18); border-color: rgba(232,65,78,.6); }
+.skill { margin-bottom: 8px; } .skill b { font-size: 13px; display: flex; justify-content: space-between; } .skill em { font-style: normal; color: var(--gold); font-family: var(--pixel); }
+.skill small { display: block; font-size: 11px; color: var(--muted); }

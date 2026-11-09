@@ -98,7 +98,7 @@ export function swordIcon(id) {
   cache.set(key, url);
   return url;
 }
-export const ITEM_ICON_COLORS = { potion_red: '#e03a3a', potion_big: '#ff3a6a', potion_blue: '#3a8aff', elixir: '#ffd36a' };
+export const ITEM_ICON_COLORS = { potion_red: '#e03a3a', potion_big: '#ff3a6a', potion_blue: '#3a8aff', elixir: '#ffd36a', drink_coffee: '#6a3a1a', drink_mead: '#e0a02a', drink_tea: '#6ab04a', drink_juice: '#ff9a2a' };
 export function itemIcon(id, def) {
   const ic = def?.icon || id;
   if (ITEM_ICON_COLORS[ic]) return icon('potion', ITEM_ICON_COLORS[ic]);

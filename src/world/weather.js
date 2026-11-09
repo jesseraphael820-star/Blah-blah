@@ -24,6 +24,7 @@ export class Weather {
     this.state = G.state.world.weather || 'clear';
     this.cur = { ...STATES[this.state] };
     this.timer = 60 + Math.random() * 90;
+    this.rainbowT = 0;
     this.flash = 0;
     this.nextBolt = 8;
     this.wind = 1;
@@ -47,10 +48,25 @@ export class Weather {
     scene.add(this.lines);
     this.boltLight = new THREE.DirectionalLight(0xc8d8ff, 0);
     scene.add(this.boltLight); scene.add(this.boltLight.target);
+    this.rainbow = this.makeRainbow(scene);
+    this.rainbowT = 0;
   }
 
+  makeRainbow(scene) {
+    const g = new THREE.Group();
+    const cols = [0xff3a3a, 0xff9a2a, 0xffe83a, 0x4ae04a, 0x3a9aff, 0x6a4aff, 0xb44aff];
+    cols.forEach((c, i) => {
+      const r = new THREE.Mesh(new THREE.RingGeometry(150 - i * 4, 154 - i * 4, 96, 1, 0, Math.PI), new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0, depthWrite: false, fog: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }));
+      g.add(r);
+    });
+    g.visible = false;
+    scene.add(g);
+    return g;
+  }
   set(state) {
     if (!STATES[state]) return;
+    // a rainbow appears when the rain stops during the day
+    if ((this.state === 'rain' || this.state === 'storm') && (state === 'clear' || state === 'cloudy')) this.rainbowT = 120;
     this.state = state;
     G.state.world.weather = state;
     G.bus.emit('weather', state);
@@ -161,6 +177,28 @@ export class Weather {
       }
     }
     this.flash = Math.max(0, this.flash - dt * 2.2);
+    // rainbow opposite the sun
+    this.rainbowT = Math.max(0, (this.rainbowT || 0) - dt);
+    const sunUp = G.sky.sunDir.y > 0.05;
+    const ra = under || !sunUp ? 0 : Math.min(1, this.rainbowT / 15, (120 - this.rainbowT) / 10) * 0.22 * (1 - c.rain);
+    this.rainbow.visible = ra > 0.005;
+    if (this.rainbow.visible) {
+      const sd = G.sky.sunDir;
+      this.rainbow.position.set(camPos.x - sd.x * 320, camPos.y - 40, camPos.z - sd.z * 320);
+      this.rainbow.lookAt(camPos.x, camPos.y - 40, camPos.z);
+      for (const m of this.rainbow.children) m.material.opacity = ra;
+    }
+    // low ground fog drifting at dawn and in foggy weather
+    const hour = G.state.world.time;
+    const mist = under ? 0 : Math.max(this.state === 'fog' ? 1 : 0, hour > 4.5 && hour < 8 ? 0.6 : 0, (1 - c.fog) * 0.6);
+    this.mistAcc = (this.mistAcc || 0) + dt * mist * (G.mobile ? 4 : 9);
+    while (this.mistAcc > 1) {
+      this.mistAcc--;
+      const a = Math.random() * 6.28, r = 6 + Math.random() * 30;
+      const x = camPos.x + Math.cos(a) * r, z = camPos.z + Math.sin(a) * r;
+      const y = Math.max(G.physics.terrainHeight(x, z), G.physics.waterLevel(x, z));
+      G.particles.solid.spawn(x, y + 0.4 + Math.random() * 1.5, z, this.wind * 0.6, 0.02, 0.2, 0xe8eef4, 2.2 + Math.random() * 2, 6, { drag: 0.05, alpha: 0.16, grow: 0.5 });
+    }
     if (this.bolts) for (let i = this.bolts.length - 1; i >= 0; i--) {
       const b = this.bolts[i]; b.t += dt;
       b.line.material.opacity = b.t < 0.08 || (b.t > 0.14 && b.t < 0.2) ? 1 : Math.max(0, 1 - b.t * 3);

@@ -53,6 +53,7 @@ export class Combat {
       let dmg = o.dmg * (crit ? 1.8 : 1) * (0.92 + Math.random() * 0.16);
       if (e.status.frozen > 0) dmg *= 1.3;
       e.takeDamage(dmg, { crit, knock: o.knock });
+      G.training?.add('combat', 3);
       hits++;
       this.applyEffect(o.effect, e, dmg, o.finisher);
       const hx = e.pos.x, hz = e.pos.z, hy = e.pos.y + 1;

@@ -118,6 +118,8 @@ export class PhysicsProps {
       // integrate
       const water = G.physics.waterLevel(b.pos.x, b.pos.z);
       b.vel.y -= 22 * dt;
+      if (b.pos.y < water && !b.wet && b.vel.y < -4) G.water.splash(b.pos.x, b.pos.z, 0.4);
+      b.wet = b.pos.y < water;
       if (T.float && b.pos.y < water) { b.vel.y += 30 * dt * Math.min(1, (water - b.pos.y) * 2); b.vel.multiplyScalar(Math.max(0, 1 - dt * 2.5)); }
       const ox = b.pos.x, oz = b.pos.z;
       G.physics.move(b.pos, b.vel.x * dt, b.vel.z * dt, T.r * 0.8, T.r * 2, false);

@@ -8,20 +8,42 @@ export const MAX_LEVEL = 30;
 
 export class Progression {
   get p() { return G.state.player; }
+  hours() { return G.state.world.day * 24 + G.state.world.time; }
+  // active buffs: rested (slept), coffee, mead, tea; tired after 2 days without sleep
+  buffs() {
+    const b = G.state.player.buffs || {}, h = this.hours();
+    const on = (k) => (b[k] || 0) > h;
+    const last = G.state.player.lastSleep ?? 0;
+    return { rested: on('rested'), coffee: on('coffee'), mead: on('mead'), tea: on('tea'), tired: h - last > 48 && !on('rested') };
+  }
+  addBuff(k, hours) {
+    const p = G.state.player;
+    p.buffs = p.buffs || {};
+    p.buffs[k] = Math.max(p.buffs[k] || 0, this.hours()) + hours;
+  }
   stats() {
     const p = this.p, a = p.attrs, l = p.level;
     const armor = ARMORS[G.state.inv.equipped.armor] || ARMORS.cloth;
+    const tb = G.training ? G.training.bonus() : {};
+    const bf = this.buffs();
+    const v = (k) => tb[k] || 0;
     return {
       level: l,
       str: a.str, vit: a.vit, spi: a.spi, agi: a.agi,
-      maxHp: 100 + (l - 1) * 12 + a.vit * 10,
-      maxEnergy: 60 + (l - 1) * 4 + a.spi * 6,
-      maxStamina: 100 + a.agi * 5,
-      atkMul: 1 + a.str * 0.05 + (l - 1) * 0.03,
-      powMul: 1 + a.spi * 0.06 + (l - 1) * 0.03,
-      crit: 0.05 + a.agi * 0.01,
-      def: armor.def + a.vit * 0.5,
+      maxHp: 100 + (l - 1) * 12 + a.vit * 10 + v('maxHp'),
+      maxEnergy: 60 + (l - 1) * 4 + a.spi * 6 + v('maxEnergy'),
+      maxStamina: 100 + a.agi * 5 + v('maxStamina'),
+      atkMul: (1 + a.str * 0.05 + (l - 1) * 0.03) * (1 + v('melee')) * (bf.mead ? 1.15 : 1),
+      powMul: (1 + a.spi * 0.06 + (l - 1) * 0.03) * (1 + v('power')),
+      crit: 0.05 + a.agi * 0.01 + v('crit'),
+      def: armor.def + a.vit * 0.5 + v('def'),
       speedMul: 1 + a.agi * 0.01,
+      runMul: 1 + v('runSpeed'), swimMul: 1 + v('swimSpeed'), horseMul: 1 + v('horseSpeed'),
+      drainMul: Math.max(0.3, 1 + v('staminaDrain')),
+      energyRegen: bf.rested ? 1.5 : bf.tired ? 0.7 : 1,
+      staminaRegen: (1 + v('staminaRegen')) * (bf.rested ? 1.25 : 1) * (bf.coffee ? 1.5 : 1) * (bf.tired ? 0.75 : 1),
+      hpRegen: bf.tea ? 3 : 1,
+      buffs: bf,
     };
   }
   weaponDps() {

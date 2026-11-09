@@ -27,6 +27,7 @@ import { Wildlife } from './entities/animals.js';
 import { Horses } from './entities/horses.js';
 import { Interiors } from './world/interiors.js';
 import { Territory } from './systems/territory.js';
+import { Training } from './systems/training.js';
 import { PLOTS } from './data/territory.js';
 import { house } from './world/structures.js';
 import { Pickups } from './entities/pickups.js';
@@ -142,6 +143,7 @@ export class Game {
       G.prog = new Progression();
       G.inv = new Inventory();
       G.powers = new Powers();
+      G.training = new Training();
       G.props = new Props(G.scene);
       await this.progress(0.25, t('load.village'));
       generateWorld(G.world);

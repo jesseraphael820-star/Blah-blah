@@ -9,6 +9,7 @@ import { QUESTS, QUEST_ORDER, ACHIEVEMENTS, RIVALS, DAILY_REWARDS } from '../dat
 import { WAYSTONES } from '../data/world.js';
 import { repTier } from '../data/npcs.js';
 import { regionAt } from '../data/territory.js';
+import { SKILLS, SKILL_MAX, skillNeed } from '../systems/training.js';
 import { saveSettings, deleteSave } from '../core/save.js';
 
 const TABS = ['inventory', 'character', 'swords', 'powers', 'journal', 'map', 'achievements', 'settings'];
@@ -204,6 +205,9 @@ export class Menu {
           </div>
           <div class="card"><h4>${t('char.attributes')} <span class="pts">${t('ui.points')}: ${p.attrPoints}</span></h4><div class="attrs">${attrs}</div>
             <table class="stats compact"><tr><td>${t('ui.maxHp')}</td><td>${st.maxHp}</td><td>${t('ui.maxEnergy')}</td><td>${st.maxEnergy}</td></tr><tr><td>${t('ui.crit')}</td><td>${Math.round(st.crit * 100)}%</td><td>${t('ui.defense')}</td><td>${st.def.toFixed(0)}</td></tr></table></div>
+          <div class="card"><h4>${t('train.title')} <span class="pts">${t('train.power')}: ${G.training.powerRating()}</span></h4>
+            ${Object.entries(SKILLS).map(([k, d]) => { const s = G.state.player.skills[k]; const need = skillNeed(s.lvl + 1); return `<div class="skill"><b>${d.icon} ${t('train.' + k)} <em>${t('ui.lv')}${s.lvl}</em></b><div class="bar mini"><i style="width:${s.lvl >= SKILL_MAX ? 100 : clamp(s.xp / need * 100, 0, 100)}%"></i></div><small>${t('train.' + k + 'How')} · ${t('train.' + k + 'Bonus')}</small></div>`; }).join('')}
+            <p class="hint">${t('train.hint')}</p></div>
           <div class="card"><h4>${t('char.titles')}</h4><div class="chips">${titles}</div></div>
           <div class="card"><h4>${t('char.reputation')}</h4>${['aurora', 'camp'].map((f) => { const v = G.state.rep[f] || 0; const tier = repTier(v); return `<div class="rep"><b>${t('rep.' + f)}</b><span>${t('repTier.' + tier.id)} (${v})</span><div class="bar mini"><i style="width:${clamp(v / 150 * 100, 0, 100)}%"></i></div><small>${t('ui.discount')} ${Math.round(tier.discount * 100)}%</small></div>`; }).join('')}</div>
         </div>

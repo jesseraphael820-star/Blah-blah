@@ -50,6 +50,10 @@ export const ACCESSORIES = {
   glasses: { price: 110 },
   backpack: { price: 240 },
   cape: { price: 520 },
+  necklace: { price: 450 },
+  bandana: { price: 160 },
+  earrings: { price: 300 },
+  flowerpin: { price: 120 },
   wings: { price: 6500, req: { level: 14 } },
 };
 
@@ -93,6 +97,10 @@ export const ITEMS = {
   bread:        { cat: 'consumable', price: 12, sell: 3, heal: 20, icon: 'bread' },
   apple:        { cat: 'consumable', price: 6, sell: 2, heal: 12, icon: 'apple' },
   stew:         { cat: 'consumable', price: 40, sell: 10, heal: 60, energy: 20, icon: 'stew' },
+  coffee:       { cat: 'consumable', price: 25, sell: 6, energy: 15, buff: 'coffee', hours: 3, icon: 'drink_coffee' },
+  mead:         { cat: 'consumable', price: 45, sell: 10, heal: 10, buff: 'mead', hours: 2, icon: 'drink_mead' },
+  herbal_tea:   { cat: 'consumable', price: 30, sell: 8, heal: 20, buff: 'tea', hours: 3, icon: 'drink_tea' },
+  apple_juice:  { cat: 'consumable', price: 15, sell: 4, energy: 25, icon: 'drink_juice' },
   slime_gel:    { cat: 'material', sell: 4, icon: 'gel' },
   wolf_pelt:    { cat: 'material', sell: 12, icon: 'pelt' },
   iron_ore:     { cat: 'material', sell: 10, icon: 'ore' },
@@ -127,3 +135,6 @@ export function itemCategory(id) {
   }
   return 'materials';
 }
+
+// horse prices at the Golden Crow (rarer = pricier)
+export const HORSE_PRICES = { common: 450, rare: 1400, epic: 3200, legendary: 7500, mythic: 16000 };

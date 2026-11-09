@@ -4,10 +4,13 @@ import { G } from '../core/context.js';
 import { t } from '../core/i18n.js';
 import { fmt } from '../core/utils.js';
 import { SHOPS, repTier } from '../data/npcs.js';
-import { SWORDS, ARMORS, HATS, ACCESSORIES, SKINS, PETS, POWERS, ITEMS } from '../data/items.js';
+import { SWORDS, ARMORS, HATS, ACCESSORIES, SKINS, PETS, POWERS, ITEMS, HORSE_PRICES } from '../data/items.js';
+import { BREEDS } from '../entities/horses.js';
 import { icon, swordIcon, powerIcon, itemIcon, img, rarityColor } from './icons.js';
 
-const DB = { swords: SWORDS, armors: ARMORS, hats: HATS, accessories: ACCESSORIES, skins: SKINS, pets: PETS, powers: POWERS, items: ITEMS };
+const HORSE_RARITY = { common: 'common', rare: 'rare', epic: 'epic', legendary: 'legendary', mythic: 'magic' };
+const HORSES = Object.fromEntries(Object.entries(HORSE_PRICES).map(([k, p]) => [k, { price: p, rarity: HORSE_RARITY[k] }]));
+const DB = { swords: SWORDS, armors: ARMORS, hats: HATS, accessories: ACCESSORIES, skins: SKINS, pets: PETS, powers: POWERS, items: ITEMS, horses: HORSES };
 const NAME = { swords: 'item', armors: 'armor', hats: 'hat', accessories: 'acc', skins: 'skin', powers: 'power', items: 'item' };
 
 export class Shop {
@@ -46,6 +49,7 @@ export class Shop {
     return Math.round(base * (this.def.markup || 1) * (1 - this.discount()));
   }
   owned(cat, id) {
+    if (cat === 'horses') return (G.state.inv.owned.horses || []).some((h) => h.breed === id);
     if (cat === 'items') return false;
     if (cat === 'powers') return G.powers.owned(id);
     return G.inv.owns(cat, id);
@@ -66,11 +70,11 @@ export class Shop {
     if (cat === 'armors') return icon('armor');
     if (cat === 'hats') return icon('hat', '#d8b850');
     if (cat === 'skins') return icon('shirt', '#' + (SKINS[id].pal?.shirt || 0x3f7fbf).toString(16).padStart(6, '0'));
-    if (cat === 'pets') return icon('paw');
+    if (cat === 'pets' || cat === 'horses') return icon('paw', cat === 'horses' ? '#c8955a' : undefined);
     return icon('star', '#ff7ab0');
   }
-  name(cat, id) { return cat === 'pets' ? t('pet.' + id) : t(`${NAME[cat]}.${id}.name`); }
-  desc(cat, id) { return cat === 'pets' ? t('pet.' + id + 'Desc') : t(`${NAME[cat]}.${id}.desc`); }
+  name(cat, id) { return cat === 'horses' ? t('shop.horseName', { breed: t('horse.' + id) }) : cat === 'pets' ? t('pet.' + id) : t(`${NAME[cat]}.${id}.name`); }
+  desc(cat, id) { return cat === 'horses' ? t('shop.horseDesc', { speed: BREEDS[id].speed }) : cat === 'pets' ? t('pet.' + id + 'Desc') : t(`${NAME[cat]}.${id}.desc`); }
 
   render() {
     const cats = Object.keys(this.def).filter((k) => Array.isArray(this.def[k]) && this.def[k].length);
@@ -87,6 +91,7 @@ export class Shop {
       if (this.cat === 'swords') stat = `⚔ ${d.dmg} · ⏱ ${d.speed.toFixed(2)}${d.effect ? ' · ✦ ' + t('effect.' + d.effect) : ''}`;
       if (this.cat === 'armors') stat = `🛡 ${d.def}`;
       if (this.cat === 'items') stat = `${t('ui.owned')}: ${G.inv.count(id)}`;
+      if (this.cat === 'horses') stat = `🐴 ${t('ui.speed')} ${BREEDS[id].speed}`;
       if (this.cat === 'powers') stat = `${img(icon('bolt'))} ${d.cost} · ⏱ ${d.cd}s`;
       return `<div class="shop-item ${own ? 'owned' : ''} ${req ? 'locked' : ''}" style="--rc:${rarityColor(rar)}">
         <div class="si-icon">${img(this.icon(this.cat, id), 'px big')}</div>
@@ -135,6 +140,7 @@ export class Shop {
     if (!G.prog.spendGold(price)) { G.audio.sfx('error'); return; }
     if (cat === 'items') G.inv.add(id, 1);
     else if (cat === 'powers') G.powers.unlock(id);
+    else if (cat === 'horses') G.horses.buy(id);
     else {
       G.inv.giveOwned(cat, id);
       const slot = { swords: 'sword', armors: 'armor', hats: 'hat', accessories: 'accessory', skins: 'skin', pets: 'pet' }[cat];

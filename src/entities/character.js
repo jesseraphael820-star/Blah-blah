@@ -159,6 +159,18 @@ export class Humanoid {
     if (a === 'scarf') {
       this.torso.add(part(0.7, 0.14, 0.44, 0xd83a3a, 0, 0.6, 0));
       const tail = part(0.16, 0.5, 0.06, 0xd83a3a, 0.16, 0.36, -0.22); this.scarf = tail; this.torso.add(tail);
+    } else if (a === 'necklace') {
+      this.torso.add(part(0.5, 0.06, 0.06, 0xffc83a, 0, 0.6, 0.19, 0x6a4a00));
+      this.torso.add(part(0.14, 0.16, 0.06, 0x4fd0ff, 0, 0.5, 0.21, 0x1a6a8a));
+    } else if (a === 'bandana') {
+      this.headTop.add(part(0.68, 0.14, 0.68, 0xc8323a, 0, -0.08, 0));
+      this.headTop.add(part(0.14, 0.3, 0.06, 0xc8323a, 0.12, -0.3, -0.36));
+    } else if (a === 'earrings') {
+      this.headTop.add(part(0.06, 0.12, 0.06, 0xffc83a, -0.34, -0.42, 0.02, 0x6a4a00));
+      this.headTop.add(part(0.06, 0.12, 0.06, 0xffc83a, 0.34, -0.42, 0.02, 0x6a4a00));
+    } else if (a === 'flowerpin') {
+      this.headTop.add(part(0.16, 0.16, 0.08, 0xff6aa0, 0.26, -0.02, 0.28));
+      this.headTop.add(part(0.06, 0.06, 0.04, 0xffe060, 0.26, -0.02, 0.33));
     } else if (a === 'backpack') {
       this.torso.add(part(0.5, 0.56, 0.24, 0x8a5a32, 0, 0.32, -0.3)); this.torso.add(part(0.4, 0.14, 0.08, 0x6a4422, 0, 0.18, -0.44));
     } else if (a === 'cape') {

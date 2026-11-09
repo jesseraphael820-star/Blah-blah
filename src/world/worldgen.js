@@ -151,6 +151,27 @@ export function generateWorld(W) {
     S.crate(B, x - 6, z + 4); S.barrel(B, x - 4.8, z + 5);
     S.bones(B, x + 6, z + 5);
   }
+  // ===== BAR & BOUTIQUE "O Corvo Dourado" (center of the map) =====
+  {
+    const bx = LOC.bar.x, bz = LOC.bar.z;
+    S.house(B, bx, bz, 0, { w: 12, d: 9, floors: 2, roof: 0x3a2a5a, wall: 0xe8d0a8, sign: 0xffc83a });
+    B.flag(bx - 14, bz - 10, bx + 24, bz + 14, FLAG.NOTREE);
+    // outdoor tables with stools and lanterns
+    for (const [tx, tz] of [[bx - 4, bz + 9], [bx + 4, bz + 9], [bx, bz + 13]]) {
+      const ty = B.ground(tx, tz);
+      B.box(tx - 0.9, ty + 1.0, tz - 0.9, tx + 0.9, ty + 1.15, tz + 0.9, 0x8a5a32, { col: true, noCam: true });
+      B.box(tx - 0.12, ty, tz - 0.12, tx + 0.12, ty + 1.0, tz + 0.12, 0x5a3a20);
+      for (const [sx, sz] of [[-1.4, 0], [1.4, 0], [0, -1.4], [0, 1.4]]) B.box(tx + sx - 0.3, ty, tz + sz - 0.3, tx + sx + 0.3, ty + 0.6, tz + sz + 0.3, 0x7a4a28, { col: true, noCam: true });
+      B.box(tx - 0.15, ty + 1.15, tz - 0.15, tx + 0.15, ty + 1.45, tz + 0.15, 0xffd070, { emit: 1, vary: 0 });
+      B.glow(tx, ty + 1.4, tz, 0xffb050, 1.6, true);
+    }
+    for (const [x, z] of [[bx - 7, bz + 5], [bx + 7, bz + 5]]) S.lampPost(B, x, z);
+    S.barrel(B, bx + 6.8, bz - 1); S.barrel(B, bx + 6.9, bz + 0.3); S.crate(B, bx - 7, bz - 2);
+    S.flagPole(B, bx - 8, bz + 9, 0xffc83a);
+    // horse corral next to the bar (horses for sale wait here)
+    S.fenceRect(B, bx + 10, bz - 6, bx + 22, bz + 8, [bx + 14, bz + 18]);
+    S.hay(B, bx + 20, bz - 4);
+  }
   // ===== VILLAGE (Vila Aurora) =====
   S.house(B, 6, 22, 0, { w: 10, d: 8, roof: 0x6a4a8a, wall: 0xe8dcc0, sign: 0x6a4a8a });          // elder Tomás
   S.house(B, 5, 42, 3, { w: 8, d: 7, roof: 0xd0609a, wall: 0xf4e6d4, sign: 0xe07ab0 });          // tailor Lia

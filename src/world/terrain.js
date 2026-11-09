@@ -54,6 +54,7 @@ function rawHeight(x, z) {
   h = flatten(h, x, z, LOC.wolfDen.x, LOC.wolfDen.z, LOC.wolfDen.r, 7, 14);
   h = flatten(h, x, z, LOC.mushroomRing.x, LOC.mushroomRing.z, 7, 5, 10);
   h = flatten(h, x, z, LOC.hermit.x, LOC.hermit.z, 6, 2, 8);
+  h = flatten(h, x, z, LOC.bar.x, LOC.bar.z, LOC.bar.r, LOC.bar.h, 14);
 
   // waterfall plateau (cliff on the south side)
   const P = LOC.plateau;

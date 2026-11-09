@@ -128,7 +128,42 @@ export class Water {
     this.fallPos = { x: 110.5, y: 0.2, z: -91.5 };
   }
 
+  // splash + expanding foam ring + ripples (falling or jumping into water)
+  splash(x, z, strength = 1) {
+    const y = G.physics.waterLevel(x, z);
+    if (!this.rings) this.rings = [];
+    const n = Math.round(16 + strength * 30);
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * 6.28, s = (1.5 + Math.random() * 3) * (0.6 + strength * 0.6);
+      G.particles.solid.spawn(x, y + 0.1, z, Math.cos(a) * s * 0.5, 3 + Math.random() * 5 * strength, Math.sin(a) * s * 0.5, Math.random() < 0.5 ? 0xffffff : 0xcfe8ff, 0.18 + Math.random() * 0.14, 0.8 + Math.random() * 0.5, { gravity: 14, alpha: 0.9 });
+    }
+    for (let i = 0; i < 14; i++) G.particles.solid.spawn(x + (Math.random() - 0.5), y + 0.15, z + (Math.random() - 0.5), (Math.random() - 0.5) * 2, 0.4, (Math.random() - 0.5) * 2, 0xffffff, 0.5, 1.4, { gravity: 0, drag: 2, alpha: 0.6, grow: 0.8 });
+    this.ripple(x, z, 1.4 + strength * 1.6, 0.9);
+    setTimeout(() => this.ripple(x, z, 1.0 + strength, 0.7), 180);
+    G.audio.sfxAt('splash', x, z, { vol: 0.6 + strength * 0.6 });
+    if (strength > 0.8) G.audio.sfxAt('land', x, z, { vol: 0.5 });
+  }
+  ripple(x, z, size = 1, alpha = 0.6) {
+    if (!this.rings) this.rings = [];
+    let r = this.rings.find((q) => q.t >= q.life);
+    if (!r) {
+      if (this.rings.length > 24) return;
+      const m = new THREE.Mesh(new THREE.RingGeometry(0.8, 1, 32).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xf4fbff, transparent: true, opacity: 0, depthWrite: false }));
+      m.renderOrder = 4; G.scene.add(m);
+      r = { m, t: 0, life: 1 }; this.rings.push(r);
+    }
+    r.m.position.set(x, G.physics.waterLevel(x, z) + 0.02, z);
+    r.t = 0; r.life = 1.1 + size * 0.3; r.size = size; r.a = alpha;
+    r.m.visible = true;
+  }
   update(dt, sky, rain) {
+    if (this.rings) for (const r of this.rings) {
+      if (r.t >= r.life) { r.m.visible = false; continue; }
+      r.t += dt;
+      const k = r.t / r.life;
+      r.m.scale.setScalar(0.3 + k * r.size * 2.4);
+      r.m.material.opacity = r.a * (1 - k);
+    }
     const t = G.time;
     for (const u of [this.uniforms, this.streamMat.uniforms]) {
       u.uTime.value = t;

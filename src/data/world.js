@@ -22,6 +22,7 @@ export const LOC = {
   peakShrine: { x: -60, z: -262, r: 6, h: 36 },
   dogSpot: { x: -128, z: 30 },
   treasure: { x: 104, z: -102 },
+  bar: { x: 2, z: -6, r: 13, h: 5 },
 };
 
 export const RIVER = [[150, -24], [198, 18], [214, 88], [200, 160], [228, 238], [300, 322]];
@@ -69,6 +70,7 @@ export const POIS = [
   { id: 'peakShrine', x: -60, z: -262, r: 10, xp: 80, gold: 60 },
   { id: 'mushroomRing', x: -252, z: 18, r: 8, xp: 40, gold: 30 },
   { id: 'hermitHut', x: 164, z: -60, r: 10, xp: 25, gold: 10 },
+  { id: 'bar', x: 2, z: -6, r: 16, xp: 15, gold: 10 },
 ];
 
 // Chests: id, position, rarity. Some contain fixed loot.

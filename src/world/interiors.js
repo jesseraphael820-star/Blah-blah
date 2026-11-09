@@ -132,6 +132,8 @@ export class Interiors {
       W.time = 7;
       const st = G.prog.stats();
       G.state.player.hp = st.maxHp; G.state.player.energy = st.maxEnergy; G.state.player.stamina = st.maxStamina;
+      G.prog.addBuff('rested', 15);
+      G.state.player.lastSleep = W.day * 24 + W.time;
       G.ui.toast(t('ui.slept', { n: W.day }), 'info');
       G.audio.sfx('heal');
       G.bus.emit('newDay', W.day);

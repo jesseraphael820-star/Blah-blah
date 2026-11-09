@@ -116,7 +116,7 @@ class Horse {
         if (dist2d(this.target.x, this.target.z, this.pos.x, this.pos.z) < 1) { this.target = null; this.wait = 3 + Math.random() * 6; }
       } else if (!this.owned) {
         this.wait -= dt;
-        if (this.wait <= 0) { const a = Math.random() * 6.28, r = Math.random() * 12; this.target = { x: this.home.x + Math.cos(a) * r, z: this.home.z + Math.sin(a) * r }; }
+        if (this.wait <= 0) { const a = Math.random() * 6.28, r = Math.random() * (this.pen ? 4 : 12); this.target = { x: this.home.x + Math.cos(a) * r, z: this.home.z + Math.sin(a) * r }; }
       }
       if (move > 0) {
         const vx = Math.sin(this.yaw) * move * dt, vz = Math.cos(this.yaw) * move * dt;
@@ -199,6 +199,8 @@ export class Horses {
     const rng = makeRng(808);
     HORSE_SPOTS.forEach(([x, z], i) => this.spawnWild(x, z, rng, i));
     this.spawnOwned();
+    // horses for sale wait in the corral next to the Golden Crow bar
+    this.display = ['rare', 'epic', 'legendary'].map((b, i) => { const h = new Horse(b, 15 + i * 3, -8 + i * 3); h.home = { x: 18, z: -5 }; h.pen = true; return h; });
     G.world.addInteractable({
       kind: 'myhorse', x: 0, y: 0, z: 0, r: 3, dynamic: true, pos: () => (this.mine ? this.mine.pos : { x: 1e5, y: 0, z: 1e5 }),
       label: () => t('ui.mountHorse'),
@@ -269,6 +271,17 @@ export class Horses {
     }
   }
 
+  // bought at the Golden Crow: delivered next to the hero, saddled and ready
+  buy(breed) {
+    const owned = G.state.inv.owned.horses;
+    const id = 'h' + Date.now().toString(36);
+    owned.push({ id, breed, coat: BREEDS[breed].coat[0] });
+    if (this.riding) this.dismount();
+    G.state.inv.equipped.horse = id;
+    this.spawnOwned();
+    G.ui.toast(t('ui.horseTamed', { breed: t('horse.' + breed) }), 'unlock');
+    G.game.autosave();
+  }
   mount() {
     if (!this.mine || this.riding) return;
     this.riding = true;
@@ -307,6 +320,7 @@ export class Horses {
     const P = G.player;
     if (this.riding && P.dead) this.dismount();
     for (const h of this.wild) h.update(dt, false);
+    for (const h of this.display) h.update(dt, false);
     if (this.mine) {
       this.mine.update(dt, this.riding);
       if (this.riding) {

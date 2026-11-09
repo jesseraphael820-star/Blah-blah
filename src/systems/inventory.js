@@ -50,10 +50,11 @@ export class Inventory {
     const d = ITEMS[id];
     if (!d || d.cat !== 'consumable' || this.count(id) <= 0) return false;
     const P = G.player, st = G.prog.stats();
-    if (d.heal && G.state.player.hp >= st.maxHp && !d.energy) { G.ui.toast(t('ui.fullHealth'), 'info'); return false; }
+    if (d.heal && G.state.player.hp >= st.maxHp && !d.energy && !d.buff) { G.ui.toast(t('ui.fullHealth'), 'info'); return false; }
     this.remove(id, 1);
     if (d.heal) P.heal(d.heal);
     if (d.energy) G.state.player.energy = Math.min(st.maxEnergy, G.state.player.energy + d.energy);
+    if (d.buff) { G.prog.addBuff(d.buff, d.hours || 2); G.ui.toast(t('buff.' + d.buff) + ' · ' + t('buff.' + d.buff + 'Desc'), 'power'); }
     G.audio.sfx(id.includes('potion') || id === 'elixir' ? 'drink' : 'pickup');
     G.audio.sfx('heal', { vol: 0.5 });
     return true;

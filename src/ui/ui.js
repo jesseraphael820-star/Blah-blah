@@ -39,6 +39,7 @@ export class UI {
           <div class="bar en"><i></i><em></em><span></span></div>
           <div class="bar st"><i></i></div>
           <div class="bar xp"><i></i><span></span></div>
+          <div class="buffs"></div>
         </div>
       </div>
       <div class="hud-tr">
@@ -120,6 +121,14 @@ export class UI {
     setBar(e.hp, s.hp, st.maxHp);
     setBar(e.en, s.energy, st.maxEnergy);
     setBar(e.st, s.stamina, st.maxStamina, false);
+    // active buffs (sleep, drinks, fatigue)
+    const bf = st.buffs, keys = ['rested', 'coffee', 'mead', 'tea', 'tired'].filter((k) => bf[k]);
+    const sig = keys.join();
+    if (sig !== this.buffSig) {
+      this.buffSig = sig;
+      const IC = { rested: '😴', coffee: '☕', mead: '🍺', tea: '🍵', tired: '🥱' };
+      this.hud.querySelector('.buffs').innerHTML = keys.map((k) => `<span class="buff ${k}" title="${t('buff.' + k + 'Desc')}">${IC[k]} ${t('buff.' + k)}</span>`).join('');
+    }
     const need = xpForLevel(s.level);
     e.xp.querySelector('i').style.width = clamp(s.xp / need * 100, 0, 100) + '%';
     e.xp.querySelector('span').textContent = `${fmt(s.xp)} / ${fmt(need)} XP`;

@@ -20,13 +20,24 @@ const N = 80; // overlay resolution
 
 // friendly golem that guards conquered land (and the village gate)
 class GuardGolem {
-  constructor(x, z) {
+  constructor(x, z, o = {}) {
+    this.patrol = o.patrol || null;
     this.m = makeEnemyModel({ model: 'golem', color: 0x8a96a8, crystal: 0xffc83a, scale: 1.35, boss: false });
     G.scene.add(this.m.group);
     this.pos = new THREE.Vector3(x, G.physics.groundAt(x, z, 200), z);
     this.home = this.pos.clone();
     this.yaw = Math.random() * 6; this.cd = 0; this.st = 'idle'; this.ph = 0;
-    G.physics.addCyl(x, z, 1.2, this.pos.y, this.pos.y + 3);
+    if (!this.patrol) G.physics.addCyl(x, z, 1.2, this.pos.y, this.pos.y + 3);
+    else {
+      // the village guard carries a lantern on its night rounds
+      this.lantern = new THREE.Group();
+      this.lantern.add(boxMesh(0.35, 0.45, 0.35, 0xffd070, { emissive: 0xffa030, ei: 1 }));
+      this.light = new THREE.PointLight(0xffb050, 0, 14, 1.6);
+      this.lantern.add(this.light);
+      this.lantern.position.set(1.0, 1.2, 0.6);
+      this.m.group.add(this.lantern);
+      this.wp = 0;
+    }
   }
   update(dt) {
     const P = G.player.pos;
@@ -40,8 +51,27 @@ class GuardGolem {
     }
     if (this.st === 'windup') { this.ph += dt / 0.7; if (this.ph >= 1) { this.st = 'attack'; this.ph = 0; if (foe) { foe.takeDamage(28 + G.state.player.level * 3, { knock: 6 }); G.particles.ring(foe.pos.x, foe.pos.y + 0.3, foe.pos.z, 0xffc83a, 3, 24); G.audio.sfxAt('slam', this.pos.x, this.pos.z, { vol: 0.6 }); } } }
     else if (this.st === 'attack') { this.ph += dt / 0.4; if (this.ph >= 1) this.st = 'idle'; }
+    // night rounds around the village, back to the gate at dawn
+    let walking = false;
+    if (this.patrol && this.st === 'idle' && !foe) {
+      const night = G.sky.isNight();
+      const tgt = night ? this.patrol[this.wp] : [this.home.x, this.home.z];
+      const dx = tgt[0] - this.pos.x, dz = tgt[1] - this.pos.z, d = Math.hypot(dx, dz);
+      if (d > 0.8) {
+        this.yaw = Math.atan2(dx, dz);
+        G.physics.move(this.pos, dx / d * 2.4 * dt, dz / d * 2.4 * dt, 1.0, 2.5, false);
+        this.pos.y = G.physics.groundAt(this.pos.x, this.pos.z, this.pos.y + 1.2);
+        walking = true;
+      } else if (night) this.wp = (this.wp + 1) % this.patrol.length;
+    }
+    if (this.light) {
+      const n = G.sky.night;
+      this.light.intensity = n * 6;
+      this.lantern.visible = n > 0.2;
+      if (n > 0.3 && Math.random() < dt * 3) G.particles.trail(this.pos.x, this.pos.y + 2.2, this.pos.z, 0xffc060, 0.12, 0.6);
+    }
     this.m.base(dt, null);
-    this.m.animate(dt, this.st, Math.min(1, this.ph), 0);
+    this.m.animate(dt, walking ? 'chase' : this.st, Math.min(1, this.ph), 0);
     this.m.group.position.copy(this.pos);
     this.m.group.rotation.y = this.yaw;
   }
@@ -90,7 +120,7 @@ export class Territory {
       this.paintBanner(op);
     }
     // the village gate always has a guardian golem
-    this.guards.push(new GuardGolem(46, 6));
+    this.guards.push(new GuardGolem(46, 6, { patrol: [[36, 26], [18, 34], [20, 54], [44, 56], [50, 40], [40, 14]] }));
     // capture progress UI
     this.capEl = document.createElement('div');
     this.capEl.className = 'capture hidden';
