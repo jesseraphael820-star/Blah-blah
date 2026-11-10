@@ -1,4 +1,5 @@
 /* Divine AI — catálogo de provedores e modelos */
+if (typeof window === "undefined") globalThis.window = {};
 window.DIVINE_PROVIDERS = [
   {
     id: "divine",
@@ -114,3 +115,73 @@ window.DIVINE_PROVIDERS = [
     ],
   },
 ];
+
+/*
+ * Rotas de API: para cada modelo da interface, o ID usado na API oficial do
+ * provedor ("direct") e o ID no OpenRouter ("openrouter"), que dá acesso a
+ * todos os provedores com uma única chave. null = rota indisponível.
+ * Se um provedor mudar o nome de um modelo, ajuste aqui.
+ */
+window.DIVINE_ROUTES = {
+  // Divine AI 1.0 usa um modelo-base configurável no servidor (DIVINE_BASE_MODEL)
+  "divine-1.0": { direct: null, openrouter: null },
+
+  "gpt-astra-6.1": { direct: "gpt-astra-6.1", openrouter: "openai/gpt-astra-6.1" },
+  "gpt-sol-6.1": { direct: "gpt-sol-6.1", openrouter: "openai/gpt-sol-6.1" },
+  "gpt-5.1": { direct: "gpt-5.1", openrouter: "openai/gpt-5.1" },
+  "gpt-5": { direct: "gpt-5", openrouter: "openai/gpt-5" },
+  "gpt-5-mini": { direct: "gpt-5-mini", openrouter: "openai/gpt-5-mini" },
+  "gpt-5-nano": { direct: "gpt-5-nano", openrouter: "openai/gpt-5-nano" },
+  "gpt-4.1": { direct: "gpt-4.1", openrouter: "openai/gpt-4.1" },
+  "gpt-4.1-mini": { direct: "gpt-4.1-mini", openrouter: "openai/gpt-4.1-mini" },
+  "gpt-4o": { direct: "gpt-4o", openrouter: "openai/gpt-4o" },
+  "gpt-4o-mini": { direct: "gpt-4o-mini", openrouter: "openai/gpt-4o-mini" },
+  "o3": { direct: "o3", openrouter: "openai/o3" },
+  "o3-pro": { direct: "o3-pro", openrouter: "openai/o3-pro" },
+  "o4-mini": { direct: "o4-mini", openrouter: "openai/o4-mini" },
+
+  "claude-opus-5-5": { direct: "claude-opus-5-5", openrouter: "anthropic/claude-opus-5.5" },
+  "claude-fable-5-2": { direct: "claude-fable-5-2", openrouter: "anthropic/claude-fable-5.2" },
+  "claude-fable-5-1": { direct: "claude-fable-5-1", openrouter: "anthropic/claude-fable-5.1" },
+  "claude-sonnet-5-5": { direct: "claude-sonnet-5-5", openrouter: "anthropic/claude-sonnet-5.5" },
+  "claude-haiku-5-5": { direct: "claude-haiku-5-5", openrouter: "anthropic/claude-haiku-5.5" },
+  "claude-opus-4-5": { direct: "claude-opus-4-5", openrouter: "anthropic/claude-opus-4.5" },
+  "claude-sonnet-4-5": { direct: "claude-sonnet-4-5", openrouter: "anthropic/claude-sonnet-4.5" },
+  "claude-haiku-4-5": { direct: "claude-haiku-4-5", openrouter: "anthropic/claude-haiku-4.5" },
+  "claude-opus-4-1": { direct: "claude-opus-4-1", openrouter: "anthropic/claude-opus-4.1" },
+
+  "grok-4.1": { direct: "grok-4.1", openrouter: "x-ai/grok-4.1" },
+  "grok-4.1-fast": { direct: "grok-4.1-fast", openrouter: "x-ai/grok-4.1-fast" },
+  "grok-4": { direct: "grok-4", openrouter: "x-ai/grok-4" },
+  "grok-code-fast": { direct: "grok-code-fast-1", openrouter: "x-ai/grok-code-fast-1" },
+  "grok-3": { direct: "grok-3", openrouter: "x-ai/grok-3" },
+  "grok-3-mini": { direct: "grok-3-mini", openrouter: "x-ai/grok-3-mini" },
+
+  "kimi-k2-thinking": { direct: "kimi-k2-thinking", openrouter: "moonshotai/kimi-k2-thinking" },
+  "kimi-k2": { direct: "kimi-k2-0905-preview", openrouter: "moonshotai/kimi-k2" },
+  "kimi-k1.5": { direct: "kimi-latest", openrouter: null },
+
+  "gemini-auto": { direct: "gemini-flash-latest", openrouter: "google/gemini-2.5-flash" },
+  "gemini-argon-4": { direct: "gemini-argon-4", openrouter: "google/gemini-argon-4" },
+  "gemini-3-pro": { direct: "gemini-3-pro-preview", openrouter: "google/gemini-3-pro-preview" },
+  "gemini-3-flash": { direct: "gemini-3-flash-preview", openrouter: "google/gemini-3-flash-preview" },
+  "gemini-2.5-pro": { direct: "gemini-2.5-pro", openrouter: "google/gemini-2.5-pro" },
+  "gemini-2.5-flash": { direct: "gemini-2.5-flash", openrouter: "google/gemini-2.5-flash" },
+  "gemini-2.5-flash-lite": { direct: "gemini-2.5-flash-lite", openrouter: "google/gemini-2.5-flash-lite" },
+  "gemini-2.0-flash": { direct: "gemini-2.0-flash", openrouter: "google/gemini-2.0-flash-001" },
+  "gemini-1.5-pro": { direct: "gemini-1.5-pro", openrouter: null },
+  "gemini-1.5-flash": { direct: "gemini-1.5-flash", openrouter: null },
+
+  "deepseek-flash-4.1": { direct: "deepseek-chat", openrouter: "deepseek/deepseek-flash-4.1" },
+  "deepseek-v3.2": { direct: "deepseek-chat", openrouter: "deepseek/deepseek-v3.2" },
+  "deepseek-v3.1": { direct: "deepseek-chat", openrouter: "deepseek/deepseek-chat-v3.1" },
+  "deepseek-r1": { direct: "deepseek-reasoner", openrouter: "deepseek/deepseek-r1" },
+  "deepseek-v3": { direct: "deepseek-chat", openrouter: "deepseek/deepseek-chat" },
+  "deepseek-coder-v2": { direct: null, openrouter: "deepseek/deepseek-coder" },
+  "deepseek-math": { direct: null, openrouter: null },
+  "deepseek-vl2": { direct: null, openrouter: null },
+};
+
+if (typeof module !== "undefined") {
+  module.exports = { providers: window.DIVINE_PROVIDERS, routes: window.DIVINE_ROUTES };
+}

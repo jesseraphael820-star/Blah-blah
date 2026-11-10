@@ -1,0 +1,13 @@
+{
+  "name": "divine-ai",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Divine AI — interface com o modelo Divine AI 1.0 e acesso a vários modelos de IA",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

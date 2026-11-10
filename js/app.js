@@ -20,6 +20,7 @@
     tab: "all",
     toggles: { web: false, think: false },
     busy: false,
+    available: null,
   };
 
   /* ---------- Model visual ---------- */
@@ -96,7 +97,7 @@
               <span class="mc-body">
                 <span class="mc-name">${divine ? `<span class="divine-glow">Divine AI</span> 1.0` : m.name}</span>
                 <span class="mc-desc">${m.desc}</span>
-                <span class="mc-tags">${m.tags.map((t) => `<i class="tag tag-${t.toLowerCase()}">${t}</i>`).join("")}<i class="tag ctx">${m.ctx} ctx</i></span>
+                <span class="mc-tags">${m.tags.map((t) => `<i class="tag tag-${t.toLowerCase()}">${t}</i>`).join("")}<i class="tag ctx">${m.ctx} ctx</i>${state.available && state.available[m.id] !== "ok" ? `<i class="tag nokey">${state.available[m.id] === "noapi" ? "Sem API" : "Sem chave"}</i>` : ""}</span>
               </span>
               ${active ? `<svg class="check" viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></svg>` : ""}
             </button>`;
@@ -222,40 +223,80 @@
     body.innerHTML = `<div class="typing">${state.toggles.think ? "<span class='think-label'>Raciocinando</span>" : ""}<i></i><i></i><i></i></div>`;
     scrollBottom();
 
-    await wait(state.toggles.think ? 1400 : 650);
-    const reply = mockReply(text, model);
+    // Histórico enviado à API (sem a mensagem vazia do assistente)
+    const history = chat.messages.map((m) => ({ role: m.role, content: m.content }));
     let out = "";
-    const words = reply.split(/(\s+)/);
-    for (const w of words) {
-      out += w;
-      body.innerHTML = renderMarkdown(out) + `<span class="caret"></span>`;
-      scrollBottom();
-      await wait(14 + Math.random() * 22);
+    let failed = null;
+    try {
+      const res = await fetch("api/chat", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ model: model.id, messages: history }),
+      });
+      if (!res.ok || !res.body) throw new Error(res.status === 404 || res.status === 405
+        ? "Servidor da Divine AI não encontrado. Rode `node server.js` e abra http://localhost:3000."
+        : `Erro ${res.status} do servidor.`);
+
+      const reader = res.body.getReader();
+      const dec = new TextDecoder();
+      let buf = "";
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        let i;
+        while ((i = buf.indexOf("\n\n")) >= 0) {
+          const line = buf.slice(0, i).trim();
+          buf = buf.slice(i + 2);
+          if (!line.startsWith("data:")) continue;
+          const ev = JSON.parse(line.slice(5));
+          if (ev.error) throw new Error(ev.error);
+          if (ev.t) {
+            out += ev.t;
+            body.innerHTML = renderMarkdown(out) + `<span class="caret"></span>`;
+            scrollBottom();
+          }
+        }
+      }
+      if (!out) throw new Error("O modelo não retornou texto.");
+      body.innerHTML = renderMarkdown(out);
+    } catch (e) {
+      failed = e.message === "Failed to fetch"
+        ? "Sem conexão com o servidor da Divine AI. Rode `node server.js` e abra http://localhost:3000."
+        : e.message;
     }
-    body.innerHTML = renderMarkdown(out);
-    chat.messages.push({ role: "assistant", content: reply, model: model.id });
+
+    if (failed) {
+      body.innerHTML = (out ? renderMarkdown(out) : "") + `<div class="msg-error">${renderMarkdown(failed)}</div>`;
+      // Não salva respostas com erro, e remove a pergunta se nada veio, para poder tentar de novo
+      if (!out) chat.messages.pop();
+    }
+    if (out) chat.messages.push({ role: "assistant", content: out, model: model.id });
+    if (!chat.messages.length) state.chats = state.chats.filter((c) => c !== chat);
     saveChats();
+    renderHistory();
     state.busy = false;
   }
 
-  function mockReply(text, model) {
-    const isDivine = model.provider.id === "divine";
-    const name = isDivine ? "Divine AI 1.0" : model.name;
-    const t = text.toLowerCase();
-    let core;
-    if (/(c[oó]digo|fun[cç][aã]o|javascript|python|programa)/.test(t)) {
-      core = "Aqui está um exemplo inicial:\n\n```js\nfunction validarCPF(cpf) {\n  cpf = cpf.replace(/\\D/g, '');\n  if (cpf.length !== 11 || /^(\\d)\\1+$/.test(cpf)) return false;\n  const calc = (n) => {\n    let soma = 0;\n    for (let i = 0; i < n; i++) soma += cpf[i] * (n + 1 - i);\n    return ((soma * 10) % 11) % 10;\n  };\n  return calc(9) == cpf[9] && calc(10) == cpf[10];\n}\n```\n\nA função remove caracteres não numéricos, descarta sequências repetidas e confere os dois dígitos verificadores.";
-    } else if (/(plano|estud|aprender)/.test(t)) {
-      core = "**Plano em 4 fases:**\n\n1. **Semana 1 — Base:** vocabulário essencial e pronúncia.\n2. **Semana 2 — Estrutura:** gramática do dia a dia.\n3. **Semana 3 — Imersão:** séries, podcasts e leitura.\n4. **Semana 4 — Prática:** conversação diária de 20 minutos.\n\nDedique 45 minutos por dia e revise com repetição espaçada.";
-    } else if (/(compar|melhor|modelo)/.test(t)) {
-      core = "Na Divine você pode alternar entre modelos a qualquer momento:\n\n- **Divine AI 1.0** — modelo próprio, equilibrado e rápido.\n- **Claude Opus 5.5** e **GPT Astra 6.1** — raciocínio complexo.\n- **DeepSeek Flash 4.1** e **Gemini Auto** — velocidade e custo.\n\nUse o seletor no topo (Ctrl K) para trocar.";
-    } else if (/(qu[aâ]ntic)/.test(t)) {
-      core = "Imagine uma moeda girando no ar: enquanto gira, ela não é **cara** nem **coroa** — é um pouco das duas. Um computador quântico usa *qubits*, que funcionam assim, e por isso consegue testar muitas possibilidades ao mesmo tempo.";
-    } else {
-      core = `Entendi sua mensagem: “${text.slice(0, 120)}”.\n\nPosso aprofundar, resumir ou transformar isso em um passo a passo. É só dizer como prefere.`;
+  /* ---------- Status da API ---------- */
+  async function loadStatus() {
+    const el = $(".status");
+    try {
+      const res = await fetch("api/status");
+      if (!res.ok) throw 0;
+      const st = await res.json();
+      state.available = st.available;
+      const n = Object.values(st.available).filter((v) => v === "ok").length;
+      el.classList.toggle("off", n === 0);
+      el.innerHTML = n
+        ? `<i></i> API conectada · ${n} modelos disponíveis`
+        : `<i></i> Nenhuma chave de API configurada`;
+    } catch {
+      state.available = null;
+      el.classList.add("off");
+      el.innerHTML = `<i></i> Servidor offline`;
     }
-    const web = state.toggles.web ? "\n\n_🔎 Pesquisa na web ativada._" : "";
-    return `${core}${web}\n\n> Modo demonstração — resposta simulada por **${name}**. Conecte uma API no arquivo \`js/app.js\` para respostas reais.`;
+    if (!$("#modelModal").hidden) renderModelList();
   }
 
   /* ---------- Helpers ---------- */
@@ -287,7 +328,6 @@
     close();
     return html.replace(/(<p>)?\u0000(\d+)\u0000(<\/p>)?/g, (_, a, i) => blocks[i]);
   }
-  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   const scrollBottom = () => { const c = $("#chat"); c.scrollTop = c.scrollHeight; };
   let toastT;
   function toast(msg) {
@@ -346,4 +386,5 @@
   renderProvidersMini();
   renderActiveModel();
   renderHistory();
+  loadStatus();
 })();
