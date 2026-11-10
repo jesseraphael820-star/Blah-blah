@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Divine AI</title>
+  <meta name="description" content="Divine AI — uma única interface com o modelo Divine AI 1.0 e acesso aos principais modelos de IA do mundo." />
+  <meta name="theme-color" content="#000000" />
+  <link rel="icon" href="assets/divine-icon.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div class="bg-grid" aria-hidden="true"></div>
+  <div class="bg-aura" aria-hidden="true"></div>
+
+  <div class="app">
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-top">
+        <a class="brand" href="#" aria-label="Divine AI">
+          <span class="brand-icon" data-icon="divine"></span>
+          <span class="brand-name">Divine <span>AI</span></span>
+        </a>
+        <button class="icon-btn only-mobile" id="closeSidebar" aria-label="Fechar menu">
+          <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+
+      <button class="new-chat" id="newChat">
+        <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+        Nova conversa
+        <kbd>Ctrl N</kbd>
+      </button>
+
+      <div class="side-section">
+        <div class="side-label">Conversas</div>
+        <ul class="history" id="history"></ul>
+      </div>
+
+      <div class="side-section">
+        <div class="side-label">Provedores</div>
+        <ul class="providers-mini" id="providersMini"></ul>
+      </div>
+
+      <div class="sidebar-bottom">
+        <div class="plan-card">
+          <div class="plan-head">
+            <span class="badge-pro">PRO</span>
+            <span>Divine Pro</span>
+          </div>
+          <div class="usage">
+            <div class="usage-bar"><span style="width:38%"></span></div>
+            <div class="usage-meta"><span>380k / 1M tokens</span><span>38%</span></div>
+          </div>
+        </div>
+        <div class="user">
+          <div class="avatar">U</div>
+          <div class="user-info">
+            <strong>Usuário</strong>
+            <small>Workspace pessoal</small>
+          </div>
+          <button class="icon-btn" aria-label="Configurações" id="openSettings">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main -->
+    <main class="main">
+      <header class="topbar">
+        <button class="icon-btn only-mobile" id="openSidebar" aria-label="Abrir menu">
+          <svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+        </button>
+
+        <button class="model-pill" id="modelPill" aria-haspopup="dialog">
+          <span class="pill-icon" id="pillIcon"></span>
+          <span class="pill-name" id="pillName"></span>
+          <span class="pill-provider" id="pillProvider"></span>
+          <svg class="chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+
+        <div class="topbar-right">
+          <span class="status"><i></i> Todos os sistemas operacionais</span>
+          <button class="ghost-btn" id="shareBtn">
+            <svg viewBox="0 0 24 24"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M16 6l-4-4-4 4M12 2v14"/></svg>
+            Compartilhar
+          </button>
+        </div>
+      </header>
+
+      <section class="chat" id="chat">
+        <!-- Welcome -->
+        <div class="welcome" id="welcome">
+          <div class="hero-logo">
+            <span class="hero-icon" data-icon="divine"></span>
+          </div>
+          <h1>
+            <span class="divine-glow">Divine AI</span>
+          </h1>
+          <p class="lead">Um modelo próprio. Todas as inteligências do mundo. <br/>Uma única interface.</p>
+
+          <div class="stats">
+            <div><strong id="statModels">0</strong><span>modelos</span></div>
+            <div><strong id="statProviders">0</strong><span>provedores</span></div>
+            <div><strong>2M</strong><span>tokens de contexto</span></div>
+            <div><strong>99.9%</strong><span>uptime</span></div>
+          </div>
+
+          <div class="suggestions" id="suggestions">
+            <button data-prompt="Explique computação quântica como se eu tivesse 12 anos.">
+              <span class="sg-title">Explicar</span>
+              <span class="sg-text">Computação quântica para iniciantes</span>
+            </button>
+            <button data-prompt="Escreva uma função em JavaScript que valide CPF.">
+              <span class="sg-title">Programar</span>
+              <span class="sg-text">Função que valida CPF em JavaScript</span>
+            </button>
+            <button data-prompt="Crie um plano de estudos de 30 dias para aprender inglês.">
+              <span class="sg-title">Planejar</span>
+              <span class="sg-text">Plano de 30 dias para aprender inglês</span>
+            </button>
+            <button data-prompt="Compare os melhores modelos de IA para escrever código.">
+              <span class="sg-title">Comparar</span>
+              <span class="sg-text">Melhores modelos para escrever código</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="messages" id="messages"></div>
+      </section>
+
+      <footer class="composer-wrap">
+        <form class="composer" id="composer">
+          <div class="composer-model" id="composerModel"></div>
+          <textarea id="input" rows="1" placeholder="Pergunte qualquer coisa à Divine AI..." autocomplete="off"></textarea>
+          <div class="composer-actions">
+            <div class="left">
+              <button type="button" class="tool-btn" title="Anexar arquivo">
+                <svg viewBox="0 0 24 24"><path d="M21 12.5l-8.5 8.5a5 5 0 0 1-7-7L14 5.5a3.5 3.5 0 0 1 5 5L10.5 19a2 2 0 0 1-3-3L15 8.5"/></svg>
+              </button>
+              <button type="button" class="tool-btn toggle" data-toggle="web" title="Pesquisa na web">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>
+                <span>Web</span>
+              </button>
+              <button type="button" class="tool-btn toggle" data-toggle="think" title="Raciocínio estendido">
+                <svg viewBox="0 0 24 24"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.7.7 1 1.5 1 2.5h6c0-1 .3-1.8 1-2.5A6 6 0 0 0 12 3z"/></svg>
+                <span>Raciocínio</span>
+              </button>
+            </div>
+            <button type="submit" class="send" id="send" aria-label="Enviar" disabled>
+              <svg viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+            </button>
+          </div>
+        </form>
+        <p class="disclaimer">A Divine AI pode cometer erros. Verifique informações importantes.</p>
+      </footer>
+    </main>
+  </div>
+
+  <!-- Model picker -->
+  <div class="modal" id="modelModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden>
+    <div class="modal-backdrop" data-close></div>
+    <div class="modal-panel">
+      <div class="modal-head">
+        <div>
+          <h2 id="modalTitle">Escolher modelo</h2>
+          <p>Selecione entre o modelo próprio da Divine e os principais modelos do mercado.</p>
+        </div>
+        <button class="icon-btn" data-close aria-label="Fechar">
+          <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+      <div class="search">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+        <input id="modelSearch" type="text" placeholder="Buscar modelos..." autocomplete="off" />
+        <kbd>Ctrl K</kbd>
+      </div>
+      <div class="tabs" id="providerTabs"></div>
+      <div class="model-list" id="modelList"></div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" role="status"></div>
+
+  <script src="js/icons.js"></script>
+  <script src="js/models.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
