@@ -43,22 +43,39 @@ export class Pickups {
   scatterWorldCoins() {
     const rng = makeRng(31337);
     let placed = 0;
-    for (let k = 0; k < 600 && placed < 70; k++) {
-      const x = (rng() - 0.5) * (WORLD.size - 60), z = (rng() - 0.5) * (WORLD.size - 60);
+    // coin piles everywhere (fields, forests, hills, beaches, mountains), plus rarer Gold sacks
+    this.sackGeo = new THREE.BoxGeometry(0.55, 0.6, 0.5);
+    this.sackMat = new THREE.MeshLambertMaterial({ color: 0x8a5a30 });
+    this.tieMat = new THREE.MeshLambertMaterial({ color: 0xffc83a, emissive: 0x8a5a00, emissiveIntensity: 0.6 });
+    for (let k = 0; k < 2400 && placed < 220; k++) {
+      const x = (rng() - 0.5) * (WORLD.size - 40), z = (rng() - 0.5) * (WORLD.size - 40);
       const h = G.physics.terrainHeight(x, z);
-      if (h < 1.5 || h > 34) continue;
-      if (dist2d(x, z, 30, 40) < 50) continue;
+      if (h < 0.5 || h > 44) continue;
+      if (G.physics.waterLevel(x, z) > h) continue;
+      if (dist2d(x, z, 30, 40) < 24) continue;
+      const gy = G.physics.groundAt(x, z, 200);
+      if (gy - h > 0.6) continue; // not on top of trees, roofs or rocks
       const id = 'coin_' + placed;
+      const sack = rng() < 0.12, big = !sack && rng() < 0.25;
       const g = new THREE.Group();
-      for (let i = 0; i < 3; i++) {
-        const c = new THREE.Mesh(this.coinGeo, this.coinMat);
-        c.position.set((i - 1) * 0.25, 0.55 + (i % 2) * 0.2, 0);
-        c.castShadow = true;
-        g.add(c);
+      if (sack) {
+        const b = new THREE.Mesh(this.sackGeo, this.sackMat); b.position.y = 0.3; b.castShadow = true;
+        const tie = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.14, 0.3), this.tieMat); tie.position.y = 0.66;
+        const c = new THREE.Mesh(this.coinGeo, this.coinMat); c.position.set(0.32, 0.1, 0.1); c.rotation.x = 1.4;
+        g.add(b, tie, c);
+      } else {
+        const n = big ? 6 : 3;
+        for (let i = 0; i < n; i++) {
+          const c = new THREE.Mesh(this.coinGeo, this.coinMat);
+          c.position.set(((i % 3) - 1) * 0.25, 0.55 + (i % 2) * 0.2 + Math.floor(i / 3) * 0.3, Math.floor(i / 3) * 0.12);
+          c.castShadow = true;
+          g.add(c);
+        }
       }
-      g.position.set(x, G.physics.groundAt(x, z, 200), z);
+      g.position.set(x, gy, z);
       this.scene.add(g);
-      this.world.push({ id, g, x, z, v: 6 + Math.floor(rng() * 10) });
+      const v = sack ? 60 + Math.floor(rng() * 90) : big ? 20 + Math.floor(rng() * 20) : 6 + Math.floor(rng() * 10);
+      this.world.push({ id, g, x, z, v: Math.round(v * (1 + Math.max(0, h - 10) * 0.03)), sack });
       placed++;
     }
   }
@@ -109,11 +126,13 @@ export class Pickups {
       w.g.visible = ready;
       if (!ready) continue;
       if (Math.abs(w.x - pp.x) > 60 || Math.abs(w.z - pp.z) > 60) continue;
-      w.g.rotation.y += dt * 1.5;
+      if (!w.sack) w.g.rotation.y += dt * 1.5;
+      if (Math.random() < dt * (w.sack ? 1.5 : 0.8)) G.particles.glow.spawn(w.x + (Math.random() - 0.5) * 0.6, w.g.position.y + 0.5 + Math.random() * 0.6, w.z + (Math.random() - 0.5) * 0.6, 0, 0.6, 0, 0xffe27a, 0.22, 0.6);
       if (dist2d(w.x, w.z, pp.x, pp.z) < 1.4 && Math.abs(w.g.position.y - pp.y) < 2) {
         G.state.world.harvested[w.id] = G.state.world.day * 24 + G.state.world.time;
         this.spawnCoins(w.x, w.g.position.y + 0.8, w.z, w.v);
-        G.audio.sfx('pickup');
+        G.audio.sfx(w.sack ? 'chest' : 'pickup');
+        if (w.sack) G.ui.toast('💰 +' + w.v + ' Gold', 'gold');
       }
     }
   }

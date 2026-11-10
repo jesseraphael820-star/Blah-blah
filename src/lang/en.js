@@ -29,7 +29,7 @@ export default {
     talkTo: 'Talk to {name}', openChest: 'Open chest ({r})', chestOpened: '{r} chest opened!', fastTravel: 'Fast travel', activate: 'Activate waystone', waystoneOn: 'Waystone activated: {name}', harvest: 'Harvest', mine: 'Mine', gather: 'Gather',
     touchAltar: 'Touch the altar', altarSilent: 'The altar is silent... for now.', activateRune: 'Activate rune', runeDormant: 'The rune is dormant. Ísis may know how to awaken it.', drawSword: 'Draw the sword', swordStuck: 'The blade won\'t move. It isn\'t time yet.', sealedDoor: 'Magic seal', sealHint: 'An ancient seal blocks the way. The village blacksmith knows legends about this cave.',
     enterCave: 'Enter the Echo Cave', exitCave: 'Leave the cave', catchChicken: 'Catch chicken', petDog: 'Pet the dog',
-    dodged: 'Dodged!', parry: 'PARRY!', defeated: 'You were defeated', lostGold: 'You lost {n} Gold.', respawn: 'Respawn',
+    dodged: 'Dodged!', parry: 'PARRY!', defeated: 'You were defeated', lostGold: 'Nothing was lost — your Gold and items are safe!', respawn: 'Respawn',
     questStarted: 'New quest', questComplete: 'Quest complete!', discovered: 'Location discovered', event: 'Special event', achievement: 'Achievement: {name}', newTitle: 'New title: {title}', unlocked: 'Unlocked: {name}', powerUnlocked: 'New power: {name}!', powerUpgraded: '{name} reached level {n}!', petUnlocked: 'New companion: {name}!', bossEnraged: '{name} is enraged!',
     noEnergy: 'Not enough energy', noPowerSlot: 'No power in this slot', noPotions: 'No healing items!', fullHealth: 'Health is already full',
     need_max: 'Max level', need_level: 'Level too low', need_gold: 'Not enough Gold', need_essence: 'Not enough Essence',

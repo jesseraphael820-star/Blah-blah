@@ -513,9 +513,8 @@ export class Player {
     G.audio.sfx('die');
     this.model.setExpression('hurt');
     G.state.ach.stats.deaths++;
-    const lost = Math.floor(this.s.gold * 0.1);
-    this.s.gold -= lost;
-    G.ui.showDefeat(lost);
+    // no penalty: you keep all your Gold and items when defeated
+    G.ui.showDefeat(0);
   }
   updateDead(dt) {
     this.deadT += dt;
