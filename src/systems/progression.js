@@ -34,8 +34,8 @@ export class Progression {
       maxHp: 100 + (l - 1) * 12 + a.vit * 10 + v('maxHp'),
       maxEnergy: 60 + (l - 1) * 4 + a.spi * 6 + v('maxEnergy'),
       maxStamina: 100 + a.agi * 5 + v('maxStamina'),
-      atkMul: (1 + a.str * 0.05 + (l - 1) * 0.03) * (1 + v('melee')) * (bf.mead ? 1.15 : 1) * (1 + (geneMult() - 1) * 0.5),
-      powMul: (1 + a.spi * 0.06 + (l - 1) * 0.03) * (1 + v('power')) * (1 + (geneMult() - 1) * 0.5),
+      atkMul: (1 + a.str * 0.05 + (l - 1) * 0.03) * (1 + v('melee')) * (bf.mead ? 1.15 : 1) * (1 + (geneMult() - 1) * 0.5) * (G.retro?.active ? 1.2 : 1),
+      powMul: (1 + a.spi * 0.06 + (l - 1) * 0.03) * (1 + v('power')) * (1 + (geneMult() - 1) * 0.5) * (G.retro?.active ? 1.2 : 1),
       crit: 0.05 + a.agi * 0.01 + v('crit'),
       def: armor.def + a.vit * 0.5 + v('def'),
       speedMul: 1 + a.agi * 0.01,
@@ -43,7 +43,7 @@ export class Progression {
       drainMul: Math.max(0.3, 1 + v('staminaDrain')),
       energyRegen: bf.rested ? 1.5 : bf.tired ? 0.7 : 1,
       staminaRegen: (1 + v('staminaRegen')) * (bf.rested ? 1.25 : 1) * (bf.coffee ? 1.5 : 1) * (bf.tired ? 0.75 : 1),
-      hpRegen: bf.tea ? 3 : 1,
+      hpRegen: (bf.tea ? 3 : 1) * (G.retro?.active ? 1.5 : 1),
       buffs: bf,
     };
   }
@@ -90,6 +90,7 @@ export class Progression {
   }
 
   addGold(n, o = {}) {
+    if (G.retro?.active && o.source !== 'sell' && o.source !== 'retro') n *= 1.25; // Retro Fantasy: more Gold all day
     n = Math.round(n);
     if (n <= 0) return;
     this.p.gold += n;

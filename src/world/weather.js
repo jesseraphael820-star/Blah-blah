@@ -154,12 +154,31 @@ export class Weather {
         this.linePos[o + 3] = x - slant * 0.03; this.linePos[o + 4] = y + len; this.linePos[o + 5] = z;
       }
       this.attr.needsUpdate = true;
-      // ground splashes near player
+      // raindrops hitting the ground, roofs and water: tiny crown splashes and rings
       const p = G.player.pos;
-      for (let s = 0; s < rain * 3; s++) {
-        const sx = p.x + (Math.random() - 0.5) * 20, sz = p.z + (Math.random() - 0.5) * 20;
-        const sy = Math.max(G.physics.terrainHeight(sx, sz), G.physics.waterLevel(sx, sz) - 0.1);
-        G.particles.solid.spawn(sx, sy + 0.05, sz, 0, 1.2, 0, 0xc8d8ec, 0.12, 0.25, { gravity: 8, alpha: 0.7 });
+      if (!snow) {
+        const n = rain * (G.mobile ? 5 : 10);
+        for (let s = 0; s < n; s++) {
+          const sx = p.x + (Math.random() - 0.5) * 22, sz = p.z + (Math.random() - 0.5) * 22;
+          const wl = G.physics.waterLevel(sx, sz);
+          const gy = G.physics.groundAt(sx, sz, 200);
+          if (wl > gy) { if (Math.random() < 0.35) G.water.ripple(sx, sz, 0.25 + Math.random() * 0.2, 0.35); continue; }
+          const k = 2 + (Math.random() * 2 | 0);
+          for (let j = 0; j < k; j++) {
+            const a = Math.random() * 6.28;
+            G.particles.solid.spawn(sx, gy + 0.04, sz, Math.cos(a) * 0.9, 1.4 + Math.random() * 0.8, Math.sin(a) * 0.9, 0xd8e6f6, 0.05, 0.22, { gravity: 10, alpha: 0.75 });
+          }
+          if (Math.random() < 0.15) G.particles.ring(sx, gy + 0.05, sz, 0xc8d8ec, 0.18, 6, { life: 0.3, size: 0.04, speed: 1.2, up: 0 });
+        }
+        // drops bursting on the hero's head and shoulders (only when not under a roof)
+        const P = G.player;
+        const covered = G.physics.groundAt(p.x, p.z, 200) > p.y + 2.2 || G.sky.indoor;
+        if (!covered && !P.swimming && Math.random() < rain * 0.5) {
+          const top = P.visualY + (P.mounted ? 2.9 : 1.95);
+          const side = (Math.random() - 0.5) * 0.7;
+          const hx = p.x + Math.cos(P.yaw) * side, hz = p.z - Math.sin(P.yaw) * side, hy = Math.abs(side) > 0.25 ? top - 0.55 : top;
+          for (let j = 0; j < 3; j++) { const a = Math.random() * 6.28; G.particles.solid.spawn(hx, hy, hz, Math.cos(a) * 0.7, 0.8 + Math.random() * 0.6, Math.sin(a) * 0.7, 0xe0ecff, 0.045, 0.22, { gravity: 9, alpha: 0.85 }); }
+        }
       }
     }
 

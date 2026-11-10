@@ -185,6 +185,12 @@ export class AudioSys {
       case 'freeze': this.noiseBurst(t, 0.5, 0.3 * v, o, 'highpass', 4000, 2); [1760, 2093, 2637].forEach((f, i) => this.osc('sine', f, t + i * 0.05, 0.5, 0.06 * v, o)); break;
       case 'blink': this.osc('sine', 300, t, 0.2, 0.2 * v, o, { to: 2000 }); this.noiseBurst(t, 0.2, 0.15 * v, o, 'bandpass', 3000, 3); break;
       case 'heal': [523, 784, 1047].forEach((f, i) => this.osc('sine', f, t + i * 0.08, 0.4, 0.12 * v, o)); break;
+      case 'retro': {
+        // dreamy synth arpeggio with a soft pad
+        [261.6, 329.6, 392, 523.3, 659.3, 784, 1046.5, 784].forEach((f, i) => this.osc('sawtooth', f, t + i * 0.11, 0.5, 0.05 * v, o, { lp: 1800 }));
+        [130.8, 196, 261.6].forEach((f) => this.osc('triangle', f, t, 2.4, 0.07 * v, o, { lp: 1200 }));
+        break;
+      }
       case 'legend': {
         // deep boom, rising choir chord and a shimmering bell
         this.osc('sine', 70, t, 1.6, 0.5 * v, o, { to: 40 });

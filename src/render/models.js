@@ -54,7 +54,7 @@ export function chestModel(rarity) {
     vb.box(-0.7, 0, -0.45, 0.7, 0.6, 0.45, c.body, { vary: 0.03 });
     vb.box(-0.72, 0, -0.47, -0.55, 0.62, 0.47, c.band); vb.box(0.55, 0, -0.47, 0.72, 0.62, 0.47, c.band);
     vb.box(-0.12, 0.35, 0.45, 0.12, 0.6, 0.52, c.band);
-    vb.box(-0.66, 0.5, -0.41, 0.66, 0.6, 0.41, 0x1a1008);
+    vb.box(-0.66, 0.5, -0.41, 0.66, 0.612, 0.41, 0x1a1008); // slightly above the rim: no z-fighting flicker
   });
   const lid = buildMesh((vb) => {
     vb.box(-0.7, 0, -0.9, 0.7, 0.32, 0, c.body, { vary: 0.03 });

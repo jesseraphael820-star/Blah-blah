@@ -30,6 +30,8 @@ import { Territory } from './systems/territory.js';
 import { Training } from './systems/training.js';
 import { Adventurers } from './systems/adventurers.js';
 import { Fishing } from './systems/fishing.js';
+import { WallHits } from './systems/wallHits.js';
+import { RetroFantasy } from './systems/retroFantasy.js';
 import { Lineage } from './systems/lineage.js';
 import { Cinematics } from './render/auras.js';
 import { ArmorFinds } from './systems/armorFinds.js';
@@ -207,6 +209,8 @@ export class Game {
       G.lineage = new Lineage();
       G.armorFinds = new ArmorFinds();
       G.fishing = new Fishing();
+      G.wallHits = new WallHits();
+      G.retro = new RetroFantasy();
       G.mapSys = new MapSys(G.world.terrain.mapCanvas());
       G.menu = new Menu();
       G.shop = new Shop();
@@ -428,6 +432,8 @@ export class Game {
       G.horses.update(sim);
       G.adventurers.update(sim);
       G.lineage.update(sim);
+      G.wallHits.update(sim);
+      G.retro.update(sim);
       G.armorFinds.update(sim);
       G.territory.update(sim);
       G.interiors.update();

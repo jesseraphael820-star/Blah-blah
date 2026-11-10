@@ -601,3 +601,18 @@ body.no-names .ntag { display: none !important; }
 @keyframes goldBump { 40% { transform: scale(1.18); filter: brightness(1.4) drop-shadow(0 0 6px #ffd23a); } }
 body.cine-on #hud, body.cine-on #touch, body.cine-on #toasts, body.cine-on #dialogue { opacity: 0; pointer-events: none; transition: opacity .5s; }
 #hud, #touch { transition: opacity .5s; }
+
+/* ---------- Retro Fantasy weather ---------- */
+#retro-fx { position: fixed; inset: 0; pointer-events: none; z-index: 4; opacity: 0;
+  background:
+    repeating-linear-gradient(0deg, rgba(255,255,255,.035) 0 1px, transparent 1px 3px),
+    linear-gradient(180deg, rgba(255,80,180,.22) 0%, rgba(160,80,255,.10) 40%, transparent 60%, rgba(40,220,230,.16) 100%),
+    radial-gradient(ellipse at center, transparent 55%, rgba(90,20,120,.38) 100%);
+  mix-blend-mode: screen; }
+.banner.retro b.retro-title { font-family: var(--pixel); letter-spacing: .18em; color: #fff; text-shadow: 0 0 6px #ff5fd2, 0 0 18px #ff5fd2, 0 0 34px #8a5aff, 3px 3px 0 #2ad8e8; animation: retroFlicker 3s ease-in-out infinite; }
+.banner.retro small { color: #8af0ff; text-shadow: 0 0 8px #2ad8e8; }
+.banner.retro em { color: #ffd0f0; }
+@keyframes retroFlicker { 0%, 100% { opacity: 1; } 47% { opacity: 1; } 48% { opacity: .55; } 50% { opacity: 1; } 72% { opacity: .85; } }
+body.retro .hud-gold { box-shadow: 0 0 12px rgba(255,95,210,.55); }
+.banner.retro small, .banner.retro b, .banner.retro em { display: block; text-align: center; }
+.banner.retro b.retro-title { font-size: clamp(26px, 5vw, 48px); margin: 4px 0; }

@@ -95,7 +95,7 @@ class Adventurer {
   get model() { return this.m; }
   get role() { return `${GENES[this.gene].icon} ${t('gene.' + this.gene)} · ${t('cls.' + this.cls().id)}`; }
   level() { return Math.min(40, this.baseLevel + Math.floor((G.state.world.day - 1) / 3)); }
-  power() { return Math.round(this.level() * 10 * GENES[this.gene].mult + this.baseLevel * 3); }
+  power() { return Math.round((this.level() * 10 * GENES[this.gene].mult + this.baseLevel * 3) * (G.retro?.active ? 1.2 : 1)); }
   cls() { return classOf(this.power()); }
   following() { return this.s.helpUntil > G.prog.hours(); }
 

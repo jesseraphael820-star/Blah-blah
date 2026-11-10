@@ -9,7 +9,7 @@ varying vec3 vDir;
 void main(){ vDir = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); gl_Position.z = gl_Position.w; }`;
 const SKY_FS = `
 uniform vec3 uTop; uniform vec3 uHorizon; uniform vec3 uBottom; uniform vec3 uSunDir; uniform vec3 uMoonDir;
-uniform vec3 uSunCol; uniform float uStars; uniform float uTime; uniform float uCloudy;
+uniform vec3 uSunCol; uniform float uStars; uniform float uTime; uniform float uCloudy; uniform float uRetro; uniform vec3 uRetroDir;
 varying vec3 vDir;
 float hash(vec3 p){ return fract(sin(dot(p, vec3(12.9898, 78.233, 37.719))) * 43758.5453); }
 void main(){
@@ -33,6 +33,25 @@ void main(){
   float st = hash(sq);
   float tw = 0.6 + 0.4 * sin(uTime * 3.0 + st * 100.0);
   col += vec3(step(0.9965, st) * tw) * uStars * smoothstep(0.0, 0.25, h) * (1.0 - uCloudy);
+  // Retro Fantasy: giant striped synthwave sun low on the horizon + neon horizon line
+  if (uRetro > 0.001) {
+    vec3 rd = normalize(uRetroDir);
+    vec3 rt = normalize(cross(vec3(0.0, 1.0, 0.0), rd));
+    vec3 up = cross(rd, rt);
+    vec3 qd = normalize(floor(d * 260.0) / 260.0);
+    float fwd = dot(qd, rd);
+    vec2 sp = vec2(dot(qd, rt), dot(qd, up)) / 0.2;
+    float r = length(sp);
+    float yy = sp.y * 0.5 + 0.5;
+    vec3 scol = mix(vec3(1.0, 0.16, 0.55), vec3(1.0, 0.88, 0.32), smoothstep(0.05, 0.95, yy));
+    float band = 1.0;
+    if (yy < 0.55) { float f = fract((yy - uTime * 0.03) * 10.0); band = step(mix(0.6, 0.06, yy / 0.55), f); }
+    float disc = step(r, 1.0) * band * step(0.0, fwd);
+    col += vec3(1.0, 0.3, 0.65) * smoothstep(2.2, 0.9, r) * 0.35 * step(0.0, fwd) * uRetro;
+    col = mix(col, scol, disc * uRetro);
+    col += vec3(1.0, 0.35, 0.8) * exp(-abs(h) * 70.0) * 0.55 * uRetro;
+    col += vec3(0.25, 0.9, 1.0) * exp(-abs(h + 0.02) * 40.0) * 0.18 * uRetro * step(h, 0.0);
+  }
   gl_FragColor = vec4(col, 1.0);
 }`;
 
@@ -60,7 +79,7 @@ export class Sky {
     this.uniforms = {
       uTop: { value: new THREE.Color() }, uHorizon: { value: new THREE.Color() }, uBottom: { value: new THREE.Color() },
       uSunDir: { value: new THREE.Vector3() }, uMoonDir: { value: new THREE.Vector3() }, uSunCol: { value: new THREE.Color() },
-      uStars: { value: 0 }, uTime: { value: 0 }, uCloudy: { value: 0 },
+      uStars: { value: 0 }, uTime: { value: 0 }, uCloudy: { value: 0 }, uRetro: { value: 0 }, uRetroDir: { value: new THREE.Vector3(1, 0.12, 0) },
     };
     const mat = new THREE.ShaderMaterial({ vertexShader: SKY_VS, fragmentShader: SKY_FS, uniforms: this.uniforms, side: THREE.BackSide, depthWrite: false, fog: false });
     this.dome = new THREE.Mesh(new THREE.SphereGeometry(900, 32, 16), mat);

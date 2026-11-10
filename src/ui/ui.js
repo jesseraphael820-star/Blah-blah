@@ -136,11 +136,11 @@ export class UI {
     setBar(e.en, s.energy, st.maxEnergy);
     setBar(e.st, s.stamina, st.maxStamina, false);
     // active buffs (sleep, drinks, fatigue)
-    const bf = { ...st.buffs, sneak: G.player.sneaking }, keys = ['sneak', 'rested', 'coffee', 'mead', 'tea', 'tired'].filter((k) => bf[k]);
+    const bf = { ...st.buffs, sneak: G.player.sneaking, retro: G.retro?.active }, keys = ['retro', 'sneak', 'rested', 'coffee', 'mead', 'tea', 'tired'].filter((k) => bf[k]);
     const sig = keys.join();
     if (sig !== this.buffSig) {
       this.buffSig = sig;
-      const IC = { sneak: '🥷', rested: '😴', coffee: '☕', mead: '🍺', tea: '🍵', tired: '🥱' };
+      const IC = { retro: '🌆', sneak: '🥷', rested: '😴', coffee: '☕', mead: '🍺', tea: '🍵', tired: '🥱' };
       this.hud.querySelector('.buffs').innerHTML = keys.map((k) => `<span class="buff ${k}" title="${t('buff.' + k + 'Desc')}">${IC[k]} ${t('buff.' + k)}</span>`).join('');
     }
     const need = xpForLevel(s.level);

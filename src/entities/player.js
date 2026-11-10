@@ -260,7 +260,7 @@ export class Player {
       if (this.breathT <= 0) {
         this.breathT = this.speedNow > 6 ? 0.9 : 1.8;
         const hx = this.pos.x + Math.sin(this.yaw) * 0.45, hz = this.pos.z + Math.cos(this.yaw) * 0.45, hy = this.visualY + (this.mounted ? 2.9 : 1.85);
-        for (let i = 0; i < 3; i++) G.particles.solid.spawn(hx, hy, hz, Math.sin(this.yaw) * 0.6 + (Math.random() - 0.5) * 0.3, 0.25, Math.cos(this.yaw) * 0.6 + (Math.random() - 0.5) * 0.3, 0xe8f0ff, 0.2, 1.1, { alpha: 0.35, grow: 0.5, drag: 1.5 });
+        for (let i = 0; i < 2; i++) G.particles.solid.spawn(hx, hy, hz, Math.sin(this.yaw) * 0.6 + (Math.random() - 0.5) * 0.3, 0.25, Math.cos(this.yaw) * 0.6 + (Math.random() - 0.5) * 0.3, 0xe8f0ff, 0.07, 0.8, { alpha: 0.22, grow: 0.12, drag: 1.5 });
       }
     }
     if (this.pos.y < -30) this.respawnAt(this.s.respawn.x, this.s.respawn.z);
@@ -390,6 +390,7 @@ export class Player {
     this.startAttack(0);
   }
   startAttack(i) {
+    this.wallBounced = false;
     this.combo = i;
     this.queued = false;
     this.attackDur = this.attackDuration(i);
@@ -407,6 +408,13 @@ export class Player {
     const kinds = this.attackKinds();
     const kind = kinds[this.combo];
     const hitAt = kind === 'spin' ? 0.3 : kind === 'attack3' ? 0.45 : 0.36;
+    // the blade can't pass through walls: it bounces off and scratches the surface
+    if (!this.hitDone && kind !== 'spin' && G.wallHits?.check(this, p, hitAt, swordLength(G.state.inv.equipped.sword) + 0.6)) {
+      this.hitDone = true; this.queued = false;
+      this.setState('normal'); this.combo = 0; this.model.setExpression('hurt');
+      setTimeout(() => this.model.setExpression('neutral'), 350);
+      return;
+    }
     if (!this.hitDone && p >= hitAt) {
       this.hitDone = true;
       const s = this.sword;
