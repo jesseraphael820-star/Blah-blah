@@ -135,6 +135,18 @@ export class Player {
       if (this.mounted || this.swimming || this.state === 'dodge') this.sneaking = false;
       const base = this.sneaking ? 2.8 : horse ? (this.swimming ? 5 : horse.B.speed * st.horseMul * (I.isDown('run') ? 1.15 : 1)) : this.swimming ? 3.2 * st.swimMul * (wantRun ? 1.35 : 1) : wantRun ? 8.6 * st.runMul : 5.0;
       speed = base * (horse ? 1 : st.speedMul) * mag * (this.blocking && !horse ? 0.4 : 1);
+      // realism: wading through shallow water, running up/down slopes, recovering from a hard landing
+      if (!this.swimming) {
+        const wd = this.wadeDepth || 0;
+        if (wd > 0.15) speed *= horse ? 1 - Math.min(0.35, wd * 0.25) : 1 - Math.min(0.45, wd * 0.4);
+        if (this.onGround && mag > 0.05) {
+          const fx = Math.sin(this.yaw), fz = Math.cos(this.yaw);
+          const ph = G.physics, slope = (ph.terrainHeight(this.pos.x + fx * 2, this.pos.z + fz * 2) - ph.terrainHeight(this.pos.x - fx * 2, this.pos.z - fz * 2)) / 4;
+          this.slope = damp(this.slope || 0, Math.max(-0.6, Math.min(0.6, slope)), 4, dt);
+          speed *= 1 - Math.max(-0.12, Math.min(0.22, this.slope * (horse ? 0.25 : 0.4)));
+        }
+      }
+      if (this.landSlow > 0) { this.landSlow -= dt; speed *= 0.45; }
       if (wantRun && !horse) { s.stamina = Math.max(0, s.stamina - dt * (this.swimming ? 10 : 14) * st.drainMul); this.staminaDelay = 0.6; }
       if (mag > 0.05) {
         const targetYaw = Math.atan2(dx, dz);
@@ -225,6 +237,31 @@ export class Player {
       if (this.onGround) { this.fallStart = this.pos.y; this.lastSafe = this.lastSafe || {}; this.lastSafe.x = this.pos.x; this.lastSafe.y = this.pos.y; this.lastSafe.z = this.pos.z; }
       else this.fallStart = Math.max(this.fallStart, this.pos.y);
     }
+    // shallow water: depth at the feet, wake splashes, wet body
+    this.wadeDepth = !this.swimming && this.onGround ? Math.max(0, water - ground) : 0;
+    if (this.wadeDepth > 0.15 && this.speedNow > 1.2) {
+      this.wakeT = (this.wakeT || 0) - dt;
+      if (this.wakeT <= 0) {
+        this.wakeT = this.speedNow > 6 ? 0.12 : 0.25;
+        G.water.ripple(this.pos.x, this.pos.z, 0.5 + this.speedNow * 0.08, 0.35);
+        G.particles.splash(this.pos.x + Math.sin(this.yaw) * 0.4, water, this.pos.z + Math.cos(this.yaw) * 0.4, this.speedNow > 6 ? 4 : 2);
+      }
+    }
+    if (this.swimming || this.wadeDepth > 0.6 || ((G.weather?.wet || 0) > 0.5 && !G.sky.indoor && !G.sky.underground)) this.wetT = 8;
+    else this.wetT = Math.max(0, (this.wetT || 0) - dt);
+    if (this.wetT > 0 && !this.swimming && Math.random() < dt * this.wetT * 0.8) {
+      G.particles.solid.spawn(this.pos.x + (Math.random() - 0.5) * 0.6, this.visualY + 0.6 + Math.random() * 1.2, this.pos.z + (Math.random() - 0.5) * 0.6, 0, -1, 0, 0x9fd0ff, 0.1, 0.5, { gravity: 12, alpha: 0.8 });
+    }
+    // cold breath on snowy peaks, cold nights and snow weather
+    const hr = G.state.world.time, cold = this.pos.y > 30 || G.weather?.state === 'snow' || ((hr < 6 || hr > 21) && !G.sky.indoor);
+    if (cold && !this.swimming) {
+      this.breathT = (this.breathT || 0) - dt;
+      if (this.breathT <= 0) {
+        this.breathT = this.speedNow > 6 ? 0.9 : 1.8;
+        const hx = this.pos.x + Math.sin(this.yaw) * 0.45, hz = this.pos.z + Math.cos(this.yaw) * 0.45, hy = this.visualY + (this.mounted ? 2.9 : 1.85);
+        for (let i = 0; i < 3; i++) G.particles.solid.spawn(hx, hy, hz, Math.sin(this.yaw) * 0.6 + (Math.random() - 0.5) * 0.3, 0.25, Math.cos(this.yaw) * 0.6 + (Math.random() - 0.5) * 0.3, 0xe8f0ff, 0.2, 1.1, { alpha: 0.35, grow: 0.5, drag: 1.5 });
+      }
+    }
     if (this.pos.y < -30) this.respawnAt(this.s.respawn.x, this.s.respawn.z);
 
     // ---------- footsteps / dust / footprints ----------
@@ -289,6 +326,14 @@ export class Player {
     this.squash = Math.min(0.28, 0.08 + fall * 0.03);
     if (this.mounted) { this.mounted.landT = 0.35; if (fall > 1.5) { G.cam.shake(Math.min(0.35, fall * 0.04)); G.particles.dust(this.pos.x, ground, this.pos.z, 12); G.audio.sfx('land', { vol: 0.8 }); } }
     if (fall > 1.5) { G.audio.sfx('land', { vol: Math.min(1, fall / 6) }); G.particles.dust(this.pos.x, ground, this.pos.z, 8); }
+    if (!this.mounted && fall > 4.5) {
+      // hard landing: legs absorb the impact, short stagger, camera thump; carrying momentum softens it
+      const roll = Math.hypot(this.hv.x, this.hv.z) > 6;
+      this.landSlow = roll ? 0.15 : Math.min(0.6, 0.2 + (fall - 4.5) * 0.06);
+      this.squash = Math.min(0.32, this.squash + 0.06);
+      G.cam.shake(Math.min(0.4, fall * 0.03));
+      this.hv.x *= roll ? 0.8 : 0.3; this.hv.z *= roll ? 0.8 : 0.3;
+    }
     if (fall > (this.mounted ? 14 : 8)) {
       const dmg = Math.floor((fall - 8) * 7);
       this.damage(dmg, null, { fall: true });
@@ -505,7 +550,17 @@ export class Player {
     m.root.scale.set(1 + k * 0.6, 1 - k, 1 + k * 0.6);
     m.root.rotation.order = 'YXZ';
     m.root.rotation.y = this.yaw;
-    m.root.rotation.x = this.mounted ? this.mounted.m.body.rotation.x * 0.8 : 0;
+    // lean into turns (centripetal) and forward when accelerating / climbing
+    const yawRate = Math.atan2(Math.sin(this.yaw - (this.prevYaw ?? this.yaw)), Math.cos(this.yaw - (this.prevYaw ?? this.yaw))) / Math.max(dt, 1e-4);
+    this.prevYaw = this.yaw;
+    const ground = this.onGround && !this.swimming && this.state === 'normal';
+    const sp = Math.min(1, this.speedNow / 9);
+    this.leanZ = damp(this.leanZ || 0, ground ? Math.max(-0.22, Math.min(0.22, -yawRate * sp * 0.05)) : 0, 8, dt);
+    const hs = Math.hypot(this.hv.x, this.hv.z);
+    const accel = (hs - (this.prevHs ?? hs)) / Math.max(dt, 1e-4); this.prevHs = hs;
+    this.leanX = damp(this.leanX || 0, ground && !this.mounted ? Math.max(-0.08, Math.min(0.16, sp * 0.07 + accel * 0.006 + (this.slope || 0) * 0.12)) : 0, 6, dt);
+    m.root.rotation.x = this.mounted ? this.mounted.m.body.rotation.x * 0.8 : this.leanX;
+    m.root.rotation.z = this.mounted ? this.leanZ * 0.6 : this.leanZ;
     let pose = 'idle', phase = 0;
     const armed = true;
     switch (this.state) {
