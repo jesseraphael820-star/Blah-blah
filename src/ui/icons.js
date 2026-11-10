@@ -54,6 +54,8 @@ const SHAPES = {
   user: ['....kkkk....', '...keeeek...', '..keekkeek..', '..keeeeeek..', '...keeeek...', '....kkkk....', '..kkAAAAkk..', '.kAAAAAAAAk.', 'kAAAAAAAAAAk', 'kAAAAAAAAAAk', 'kkkkkkkkkkkk', '............'],
   travel: ['....kkkk....', '...kccccDk..', '..kcwccccDk.', '..kcwcccDDk.', '...kcccDDk..', '....kcDDk...', '.....kDk....', '..kkkkkkkk..', '.kSSSSSSSSk.', 'kSSSSSSSSSSk', 'kkkkkkkkkkkk', '............'],
   quest: ['....kkkk....', '...kyyyyk...', '...kyyyyk...', '...kyyyyk...', '...kyyyyk...', '....kyyk....', '....kyyk....', '....kkkk....', '............', '....kkkk....', '....kyyk....', '....kkkk....'],
+  fish: ['............', '............', '.......kk...', '..kkkkkAAk..', '.kAAAAAAAAkk', 'kAwkAAAAAAkA', 'kAAAAALAAkAk', '.kAAAADDDAkk', '..kkkkkDDk..', '.......kk...', '............', '............'],
+  boot: ['............', '...kkkk.....', '...knnk.....', '...knnk.....', '...knnk.....', '...knnk.....', '...knnkkkk..', '..knnnnnnnk.', '..knnnnnnnnk', '..kNNNNNNNNk', '..kkkkkkkkkk', '............'],
   lock: ['....kkkk....', '...kSkkSk...', '...kSk.kSk..', '..kkkkkkkk..', '..kyyyyyyk..', '..kyyYYyyk..', '..kyyYYyyk..', '..kyyyyyyk..', '..kYYYYYYk..', '..kkkkkkkk..', '............', '............'],
 };
 
@@ -102,6 +104,7 @@ export const ITEM_ICON_COLORS = { potion_red: '#e03a3a', potion_big: '#ff3a6a', 
 export function itemIcon(id, def) {
   const ic = def?.icon || id;
   if (ITEM_ICON_COLORS[ic]) return icon('potion', ITEM_ICON_COLORS[ic]);
+  if (ic === 'fish') return icon('fish', def?.color);
   const map = { core_gold: ['core'], basket: ['basket'], mushroom: ['mushroom'], star: ['star'] };
   if (map[ic]) return icon(map[ic][0]);
   return icon(ic);

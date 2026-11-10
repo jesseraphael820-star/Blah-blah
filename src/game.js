@@ -29,6 +29,7 @@ import { Interiors } from './world/interiors.js';
 import { Territory } from './systems/territory.js';
 import { Training } from './systems/training.js';
 import { Adventurers } from './systems/adventurers.js';
+import { Fishing } from './systems/fishing.js';
 import { PLOTS } from './data/territory.js';
 import { house } from './world/structures.js';
 import { Pickups } from './entities/pickups.js';
@@ -199,6 +200,7 @@ export class Game {
       G.wildlife = new Wildlife(G.scene);
       G.horses = new Horses();
       G.adventurers = new Adventurers();
+      G.fishing = new Fishing();
       G.mapSys = new MapSys(G.world.terrain.mapCanvas());
       G.menu = new Menu();
       G.shop = new Shop();
@@ -410,6 +412,7 @@ export class Game {
     G.sky.underground = G.player.pos.x > 600; G.sky.indoor = G.player.pos.x > 800;
     if (!paused) {
       G.events.update(sim);
+      G.fishing.update(sim);
       G.player.update(sim);
       G.pet?.update(sim);
       G.entities.npcs.update(sim);

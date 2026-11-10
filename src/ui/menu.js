@@ -433,7 +433,7 @@ export class Menu {
       const s = G.state.ach.stats;
       const pt = G.state.playTime;
       body = this.statRows([
-        [t('stats.playTime'), `${Math.floor(pt / 3600)}h ${Math.floor(pt / 60) % 60}m`], [t('stats.kills'), s.kills], [t('stats.bosses'), s.bosses.length],
+        [t('stats.playTime'), `${Math.floor(pt / 3600)}h ${Math.floor(pt / 60) % 60}m`], [t('stats.kills'), s.kills], [t('fish.level'), (G.state.fishing?.lvl || 1)], [t('fish.total'), (G.state.fishing?.total || 0)], [t('fish.best'), G.state.fishing?.best ? `${t('item.' + G.state.fishing.best.id + '.name')} · ${G.state.fishing.best.size} cm` : '—'], [t('stats.bosses'), s.bosses.length],
         [t('stats.chests'), s.chests], [t('stats.gold'), fmt(s.goldEarned)], [t('stats.distance'), fmt(s.distance) + ' m'], [t('stats.powers'), s.powersUsed],
         [t('stats.deaths'), s.deaths], [t('stats.quests'), G.state.quests.done.length], [t('stats.discovered'), G.state.world.discovered.length], [t('stats.days'), G.state.world.day],
       ]);

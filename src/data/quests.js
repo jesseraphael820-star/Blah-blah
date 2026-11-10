@@ -164,6 +164,9 @@ export const DAILY_REWARDS = [
 ];
 
 export const ACHIEVEMENTS = [
+  { id: 'fish1', stat: 'fish', n: 1, gold: 15, icon: 'fish' },
+  { id: 'fish50', stat: 'fish', n: 50, gold: 300, icon: 'fish', title: 'angler' },
+  { id: 'fishRare', stat: 'fishRare', n: 1, gold: 400, icon: 'fish' },
   { id: 'firstBlood', stat: 'kills', n: 1, gold: 10, icon: 'sword' },
   { id: 'slimes20', stat: 'slimes', n: 20, gold: 60, icon: 'gel', title: 'slimeBane' },
   { id: 'wolves25', stat: 'wolves', n: 25, gold: 120, icon: 'pelt', title: 'wolfslayer' },

@@ -5,7 +5,7 @@ export default {
     tagline: 'An open-world RPG in the untamed lands', continue: 'Continue', newGame: 'New Game', createHero: 'Create your hero', namePh: 'Hero name', begin: 'Begin adventure', defaultName: 'Hero',
     hintKeys: 'WASD move · Mouse camera · Click attack · Right click block · Space jump · Shift run · Ctrl dodge · E interact · 1-4 powers',
     hintTouch: 'Joystick to move · Drag on the right for camera · Buttons for actions',
-    novice: 'Novice', adventurer: 'Adventurer', slimeBane: 'Moss Bane', wolfslayer: 'Wolfslayer', warrior: 'Warrior', legend: 'Living Legend', tycoon: 'Tycoon', explorer: 'Explorer', treasureHunter: 'Treasure Hunter', fashion: 'Fashion Icon', archmage: 'Archmage', veteran: 'Veteran', goodSamaritan: 'Good Samaritan', hero: 'Hero of Aurora', friendOfAurora: 'Friend of Aurora',
+    angler: 'Angler', novice: 'Novice', adventurer: 'Adventurer', slimeBane: 'Moss Bane', wolfslayer: 'Wolfslayer', warrior: 'Warrior', legend: 'Living Legend', tycoon: 'Tycoon', explorer: 'Explorer', treasureHunter: 'Treasure Hunter', fashion: 'Fashion Icon', archmage: 'Archmage', veteran: 'Veteran', goodSamaritan: 'Good Samaritan', hero: 'Hero of Aurora', friendOfAurora: 'Friend of Aurora',
   },
   menu: {
     inventory: 'Inventory', character: 'Character', swords: 'Swords', powers: 'Powers', journal: 'Journal', map: 'Map', achievements: 'Achievements', settings: 'Settings',
@@ -18,6 +18,7 @@ export default {
   attr: { str: 'Strength', vit: 'Vitality', spi: 'Spirit', agi: 'Agility', strDesc: '+5% sword damage', vitDesc: '+10 health, +defense', spiDesc: '+6 energy, +magic damage', agiDesc: '+stamina, crit and speed' },
   hair: { short: 'Short', long: 'Long', spiky: 'Spiky', ponytail: 'Ponytail', bun: 'Bun', braid: 'Braid', messy: 'Messy', bald: 'Bald' },
   char: { horse: 'Horse', noHorse: 'Tame a wild horse in the fields (50% chance each try).', name: 'Name', hair: 'Hair', skin: 'Skin tone', eyes: 'Eyes', clothes: 'Clothes', shirt: 'Shirt', pants: 'Pants', outfit: 'Equipped look', armor: 'Armor', hats: 'Hats', accessories: 'Accessories', pet: 'Companion', attributes: 'Attributes', titles: 'Titles', reputation: 'Reputation', shopHint: 'New skins, hats and accessories at Lia\'s shop in the village.' },
+  fish: { cast: 'Fish', reel: 'Pull at the right time!', hint: 'Click / E when the needle is in the green', hintTouch: 'Tap when the needle is in the green', bite: 'Bite! Pull now!', missed: 'The fish let go of the bait...', escaped: 'The fish escaped!', early: 'You pulled too early.', caught: 'You caught: {name}', junk: 'You caught... {name}', treasure: 'Sunken chest! +{n} Gold', lvlUp: 'Fishing level {n}!', level: 'Fishing level', total: 'Fish caught', best: 'Biggest fish' },
   ui: {
     sneakAttack: 'SNEAK ATTACK!',
     fullscreenBlocked: "This browser didn't allow full screen. Use Claude's expand button (⤢) or open the link directly in the browser.",
@@ -71,6 +72,18 @@ export default {
   pet: { dog: 'Biscuit (Dog)', cat: 'Nina (Cat)', fox: 'Spark (Fox)', dogDesc: 'Loyal and brave, bites your enemies.', catDesc: 'Purrs and slowly heals you.', foxDesc: 'Clever, finds hidden Gold.' },
   petAbility: { fetch: 'Attacks nearby enemies', heal: 'Gradual healing', gold: 'Finds Gold' },
   item: {
+    minnow: { name: 'Minnow', desc: 'A common little fish. Heals a bit.' },
+    perch: { name: 'Perch', desc: 'A tasty lake fish.' },
+    carp: { name: 'Carp', desc: 'Likes calm lakes.' },
+    trout: { name: 'Trout', desc: 'Only in mountain streams.' },
+    catfish: { name: 'Catfish', desc: 'Comes out at night.' },
+    salmon: { name: 'Salmon', desc: 'Rises in the rain.' },
+    goldfish: { name: 'Goldfish', desc: 'Shines like Gold. Worth a lot.' },
+    glowfish: { name: 'Glowfish', desc: 'Glows in the dark. Restores energy.' },
+    pike_king: { name: 'Pike King', desc: 'Legendary terror of the lake.' },
+    aurora_koi: { name: 'Aurora Koi', desc: 'Magic! Night only, extremely rare.' },
+    old_boot: { name: 'Old Boot', desc: 'Someone lost this...' },
+    seaweed: { name: 'Seaweed', desc: 'Wet and green.' },
     coffee: { name: "Strong Coffee", desc: "More stamina for 3 hours." },
     mead: { name: "Mead", desc: "+15% damage for 2 hours." },
     herbal_tea: { name: "Herbal Tea", desc: "Heals and regenerates health for 3 hours." },
@@ -116,6 +129,7 @@ export default {
     blink: { name: 'Blink', desc: 'Instant short teleport in your move direction, with invulnerability.', how: 'Final quest or Ísis\'s Library.' },
   },
   ach: {
+    fish1: { name: 'First Bite', desc: 'Catch your first fish.' }, fish50: { name: 'Master Angler', desc: 'Catch {n} fish.' }, fishRare: { name: 'Lake Legend', desc: 'Catch a legendary or magic fish.' },
     firstBlood: { name: 'First Fight', desc: 'Defeat your first enemy.' }, slimes20: { name: 'Moss Cleaner', desc: 'Defeat {n} Mosslings.' }, wolves25: { name: 'Silenced Howl', desc: 'Defeat {n} wolves.' }, kills100: { name: 'Hundred', desc: 'Defeat {n} enemies.' },
     boss1: { name: 'Boss Hunter', desc: 'Defeat a boss.' }, bossAll: { name: 'Legend of the Lands', desc: 'Defeat all {n} bosses.' }, rich: { name: 'Full Pockets', desc: 'Earn {n} Gold in total.' }, tycoon: { name: 'Tycoon', desc: 'Earn {n} Gold in total.' },
     explorer: { name: 'Explorer', desc: 'Discover {n} locations.' }, chests10: { name: 'Treasure Hunter', desc: 'Open {n} chests.' }, swords5: { name: 'Collector', desc: 'Own {n} swords.' }, skins3: { name: 'Fashionista', desc: 'Own {n} skins.' },

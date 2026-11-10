@@ -526,3 +526,13 @@ body.no-names .ntag { display: none !important; }
 .people { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 10px; }
 .person { padding: 10px 12px; border-radius: 10px; background: rgba(255,255,255,.04); border: 2px solid rgba(255,255,255,.07); font-size: 13px; display: flex; flex-direction: column; gap: 3px; }
 .person .p-head { display: flex; justify-content: space-between; align-items: center; } .person b { font-family: var(--pixel); font-size: 15px; } .person em { font-style: normal; color: var(--good); font-weight: 800; }
+
+/* ---------- Fishing mini-game ---------- */
+#fishui { position: fixed; left: 50%; bottom: 118px; transform: translateX(-50%); width: min(420px, 78vw); padding: 10px 14px 12px; background: rgba(14, 18, 30, 0.82); border: 2px solid #4aa8ff; border-radius: 10px; text-align: center; pointer-events: auto; z-index: 30; box-shadow: 0 6px 20px rgba(0,0,0,.45); cursor: pointer; touch-action: none; }
+#fishui.hidden { display: none; }
+#fishui .fish-title { font-weight: 700; color: #fff; margin-bottom: 8px; letter-spacing: .5px; }
+#fishui .fish-bar { position: relative; height: 22px; background: linear-gradient(90deg, #1a3a5a, #23507a); border: 2px solid #0b1626; border-radius: 6px; overflow: hidden; }
+#fishui .fish-zone { position: absolute; top: 0; bottom: 0; background: rgba(79, 216, 106, 0.75); box-shadow: inset 0 0 0 2px #b6ffc0; }
+#fishui .fish-needle { position: absolute; top: -3px; bottom: -3px; width: 4px; margin-left: -2px; background: #ffd23a; box-shadow: 0 0 6px #ffd23a; }
+#fishui .fish-pips { margin-top: 8px; font-size: 14px; letter-spacing: 2px; }
+#fishui .fish-hint { margin-top: 4px; font-size: 11px; opacity: .75; color: #cfe6ff; }

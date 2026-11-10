@@ -5,7 +5,7 @@ export default {
     tagline: 'Un RPG de mundo abierto en las tierras salvajes', continue: 'Continuar', newGame: 'Nueva partida', createHero: 'Crea a tu héroe', namePh: 'Nombre del héroe', begin: 'Comenzar aventura', defaultName: 'Héroe',
     hintKeys: 'WASD mover · Ratón cámara · Clic atacar · Clic derecho bloquear · Espacio saltar · Shift correr · Ctrl esquivar · E interactuar · 1-4 poderes',
     hintTouch: 'Joystick para moverte · Arrastra a la derecha para la cámara · Botones para acciones',
-    novice: 'Novato', adventurer: 'Aventurero', slimeBane: 'Azote de los Musguitos', wolfslayer: 'Matalobos', warrior: 'Guerrero', legend: 'Leyenda Viva', tycoon: 'Magnate', explorer: 'Explorador', treasureHunter: 'Cazatesoros', fashion: 'Icono de la Moda', archmage: 'Archimago', veteran: 'Veterano', goodSamaritan: 'Buen Samaritano', hero: 'Héroe de Aurora', friendOfAurora: 'Amigo de Aurora',
+    angler: 'Pescador', novice: 'Novato', adventurer: 'Aventurero', slimeBane: 'Azote de los Musguitos', wolfslayer: 'Matalobos', warrior: 'Guerrero', legend: 'Leyenda Viva', tycoon: 'Magnate', explorer: 'Explorador', treasureHunter: 'Cazatesoros', fashion: 'Icono de la Moda', archmage: 'Archimago', veteran: 'Veterano', goodSamaritan: 'Buen Samaritano', hero: 'Héroe de Aurora', friendOfAurora: 'Amigo de Aurora',
   },
   menu: {
     inventory: 'Inventario', character: 'Personaje', swords: 'Espadas', powers: 'Poderes', journal: 'Diario', map: 'Mapa', achievements: 'Logros', settings: 'Ajustes',
@@ -18,6 +18,7 @@ export default {
   attr: { str: 'Fuerza', vit: 'Vitalidad', spi: 'Espíritu', agi: 'Agilidad', strDesc: '+5% daño con espada', vitDesc: '+10 vida, +defensa', spiDesc: '+6 energía, +daño mágico', agiDesc: '+aguante, crítico y velocidad' },
   hair: { short: 'Corto', long: 'Largo', spiky: 'Puntiagudo', ponytail: 'Coleta', bun: 'Moño', braid: 'Trenza', messy: 'Despeinado', bald: 'Calvo' },
   char: { horse: 'Caballo', noHorse: 'Doma un caballo salvaje en los campos (50% de probabilidad cada intento).', name: 'Nombre', hair: 'Cabello', skin: 'Tono de piel', eyes: 'Ojos', clothes: 'Ropa', shirt: 'Camisa', pants: 'Pantalón', outfit: 'Aspecto equipado', armor: 'Armadura', hats: 'Sombreros', accessories: 'Accesorios', pet: 'Compañero', attributes: 'Atributos', titles: 'Títulos', reputation: 'Reputación', shopHint: 'Nuevos aspectos, sombreros y accesorios en la tienda de Lia, en la aldea.' },
+  fish: { cast: 'Pescar', reel: '¡Tira en el momento justo!', hint: 'Clic / E cuando la aguja esté en el verde', hintTouch: 'Toca cuando la aguja esté en el verde', bite: '¡Picó! ¡Tira ya!', missed: 'El pez soltó el cebo...', escaped: '¡El pez escapó!', early: 'Tiraste muy pronto.', caught: 'Pescaste: {name}', junk: 'Pescaste... {name}', treasure: '¡Cofre hundido! +{n} Gold', lvlUp: '¡Pesca nivel {n}!', level: 'Nivel de pesca', total: 'Peces pescados', best: 'Pez más grande' },
   ui: {
     sneakAttack: '¡ATAQUE SIGILOSO!',
     fullscreenBlocked: 'Este navegador no permitió la pantalla completa. Usa el botón de expandir de Claude (⤢) o abre el enlace directamente en el navegador.',
@@ -71,6 +72,18 @@ export default {
   pet: { dog: 'Galleta (Perro)', cat: 'Nina (Gata)', fox: 'Chispa (Zorro)', dogDesc: 'Leal y valiente, muerde a tus enemigos.', catDesc: 'Ronronea y te cura poco a poco.', foxDesc: 'Astuta, encuentra Oro escondido.' },
   petAbility: { fetch: 'Ataca enemigos cercanos', heal: 'Curación gradual', gold: 'Encuentra Oro' },
   item: {
+    minnow: { name: 'Pececillo', desc: 'Un pez común. Cura un poco.' },
+    perch: { name: 'Perca', desc: 'Pez de lago sabroso.' },
+    carp: { name: 'Carpa', desc: 'Le gustan los lagos tranquilos.' },
+    trout: { name: 'Trucha', desc: 'Solo en arroyos de montaña.' },
+    catfish: { name: 'Bagre', desc: 'Sale de noche.' },
+    salmon: { name: 'Salmón', desc: 'Sube con la lluvia.' },
+    goldfish: { name: 'Pez Dorado', desc: 'Brilla como el Gold. Vale mucho.' },
+    glowfish: { name: 'Pez Luz', desc: 'Brilla en la oscuridad. Da energía.' },
+    pike_king: { name: 'Rey Lucio', desc: 'Legendario terror del lago.' },
+    aurora_koi: { name: 'Koi Aurora', desc: '¡Mágico! Solo de noche, rarísimo.' },
+    old_boot: { name: 'Bota Vieja', desc: 'Alguien perdió esto...' },
+    seaweed: { name: 'Alga', desc: 'Mojada y verde.' },
     coffee: { name: "Café Fuerte", desc: "Más aguante durante 3 horas." },
     mead: { name: "Hidromiel", desc: "+15% de daño durante 2 horas." },
     herbal_tea: { name: "Té de Hierbas", desc: "Cura y regenera vida durante 3 horas." },
@@ -116,6 +129,7 @@ export default {
     blink: { name: 'Teletransporte', desc: 'Salto instantáneo en la dirección del movimiento, con invulnerabilidad.', how: 'Misión final o Biblioteca de Ísis.' },
   },
   ach: {
+    fish1: { name: 'Primera Picada', desc: 'Pesca tu primer pez.' }, fish50: { name: 'Maestro Pescador', desc: 'Pesca {n} peces.' }, fishRare: { name: 'Leyenda del Lago', desc: 'Pesca un pez legendario o mágico.' },
     firstBlood: { name: 'Primer Combate', desc: 'Derrota a tu primer enemigo.' }, slimes20: { name: 'Limpiamusgo', desc: 'Derrota a {n} Musguitos.' }, wolves25: { name: 'Aullido Silenciado', desc: 'Derrota a {n} lobos.' }, kills100: { name: 'Centena', desc: 'Derrota a {n} enemigos.' },
     boss1: { name: 'Cazajefes', desc: 'Derrota a un jefe.' }, bossAll: { name: 'Leyenda de las Tierras', desc: 'Derrota a los {n} jefes.' }, rich: { name: 'Bolsillos Llenos', desc: 'Gana {n} de Oro en total.' }, tycoon: { name: 'Magnate', desc: 'Gana {n} de Oro en total.' },
     explorer: { name: 'Explorador', desc: 'Descubre {n} lugares.' }, chests10: { name: 'Cazatesoros', desc: 'Abre {n} cofres.' }, swords5: { name: 'Coleccionista', desc: 'Ten {n} espadas.' }, skins3: { name: 'Fashionista', desc: 'Ten {n} aspectos.' },

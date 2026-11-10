@@ -40,6 +40,7 @@ export function newState(appearance) {
       harvested: {}, explored: '', weather: 'clear',
     },
     rep: { aurora: 0, camp: 0 },
+    fishing: { caught: {}, total: 0, best: null, lvl: 1, xp: 0 },
     ach: { unlocked: [], titles: ['novice'], stats: { kills: 0, slimes: 0, wolves: 0, bosses: [], chests: 0, goldEarned: 0, powersUsed: 0, distance: 0, deaths: 0, events: 0 } },
     daily: { lastClaim: null, streak: 0, challengesDay: null, challenges: [] },
   };
