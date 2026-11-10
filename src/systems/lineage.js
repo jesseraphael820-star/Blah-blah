@@ -89,6 +89,7 @@ export class Lineage {
   update(dt) {
     this.T += dt;
     const P = G.player;
+    if (this.ritual && this.ritual.src) this.updateRitual(dt);
     if (Math.abs(P.pos.x - this.pos.x) > 140 || Math.abs(P.pos.z - this.pos.z) > 140) { if (this.aura) this.aura.update(dt); return; }
     const c = this.crystal;
     c.rotation.y += dt * (this.busy ? 6 : 0.8);
@@ -97,7 +98,7 @@ export class Lineage {
     c.material.color.setHex(col);
     for (const r of this.runes) { r.material.color.setHex(col); r.material.opacity = 0.5 + Math.sin(this.T * 3 + r.position.x) * 0.4; }
     if (Math.random() < dt * 5) G.particles.glow.spawn(this.pos.x + (Math.random() - 0.5) * 3, this.pos.y + 0.5, this.pos.z + (Math.random() - 0.5) * 3, 0, 1 + Math.random(), 0, col, 0.15, 1.8);
-    if (this.ritual) this.updateRitual(dt);
+    if (this.ritual && !this.ritual.src) this.updateRitual(dt);
     if (this.aura) this.aura.update(dt);
   }
 
@@ -150,7 +151,18 @@ export class Lineage {
     G.ui.banner(`<small>${t('lin.ritual')}</small><b>${GENES[id].icon} ${t('gene.' + id)}</b>`, 'gold', 3.8);
   }
 
+  // a friend shares their lineage with the hero (asked through dialogue)
+  shareFrom(adv, ok) {
+    const id = adv.gene;
+    this.busy = true;
+    this.ritual = { id, ok, t: 0, color: parseInt(GENES[id].color.slice(1), 16), dur: 4.2, src: adv, baseY: G.player.pos.y, from: adv.name };
+    G.state.ach.stats.lineageTries = (G.state.ach.stats.lineageTries || 0) + 1;
+    G.audio.sfx('orb');
+    G.ui.banner(`<small>${t('lin.sharing', { name: adv.name })}</small><b>${GENES[id].icon} ${t('gene.' + id)}</b>`, 'gold', 3.8);
+  }
+
   updateRitual(dt) {
+    if (this.ritual.src) return this.updateShare(dt);
     const R = this.ritual, P = G.player;
     R.t += dt;
     const k = R.t / R.dur;
@@ -171,6 +183,25 @@ export class Lineage {
       G.particles.glow.spawn(c.x, c.y, c.z, (P.pos.x - c.x) * 1.8, (P.pos.y + 1 - c.y) * 1.8, (P.pos.z - c.z) * 1.8, R.color, 0.25, 0.55);
     }
     if (!R.tick || R.t - R.tick > 0.45) { R.tick = R.t; G.audio.sfx('blip'); G.cam.shake(0.05 + k * 0.12); }
+    if (R.t >= R.dur) this.resolve();
+  }
+
+  updateShare(dt) {
+    const R = this.ritual, P = G.player, A = R.src;
+    R.t += dt;
+    const k = R.t / R.dur;
+    P.yaw = Math.atan2(A.pos.x - P.pos.x, A.pos.z - P.pos.z);
+    A.yaw = Math.atan2(P.pos.x - A.pos.x, P.pos.z - A.pos.z);
+    A.atkT = 0.3; // casting pose
+    P.hv.x = 0; P.hv.z = 0; P.vy = 0;
+    P.pos.y = R.baseY + Math.sin(Math.min(1, k) * Math.PI) * 1.1;
+    // a stream of lineage energy flows from the friend into the hero
+    for (let i = 0; i < 3; i++) if (Math.random() < dt * 14) {
+      const sx = A.pos.x, sy = A.pos.y + 1.3, sz = A.pos.z;
+      G.particles.glow.spawn(sx, sy, sz, (P.pos.x - sx) * 1.9, (P.pos.y + 1 - sy) * 1.9 + 0.6, (P.pos.z - sz) * 1.9, R.color, 0.18, 0.5);
+    }
+    for (let i = 0; i < 3; i++) { const a = R.t * 5 + i * 2.1, rr = 1.3 * (1 - (R.t % 1)); G.particles.glow.spawn(P.pos.x + Math.sin(a) * rr, P.pos.y + 0.4 + (R.t * 2 % 2.2), P.pos.z + Math.cos(a) * rr, 0, 0.5, 0, R.color, 0.14, 0.6); }
+    if (!R.tick || R.t - R.tick > 0.45) { R.tick = R.t; G.audio.sfx('blip'); G.cam.shake(0.04 + k * 0.1); }
     if (R.t >= R.dur) this.resolve();
   }
 

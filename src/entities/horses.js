@@ -93,6 +93,29 @@ class Horse {
       if (gh > pos.y + (airborne ? 0.3 : 1.15) && ox !== undefined) { pos.x = ox; pos.z = oz; }
     }
   }
+  // the ground under the horse is a wide floor (bridge, deck), not a thin fence rail
+  onSolidFloor() {
+    const y = this.pos.y;
+    let n = 0;
+    for (const [dx, dz] of [[0.8, 0], [-0.8, 0], [0, 0.8], [0, -0.8]]) if (Math.abs(G.physics.groundAt(this.pos.x + dx, this.pos.z + dz, y + 0.2) - y) < 0.25) n++;
+    return n >= 3;
+  }
+  // move to the nearest free spot of open ground around (x, z)
+  unstick(x, z, nearPlayer) {
+    const ph = G.physics;
+    for (let r = nearPlayer ? 3 : 1.5; r < 9; r += 1) for (let a = 0; a < 6.28; a += 0.6) {
+      const px = x + Math.sin(a) * r, pz = z + Math.cos(a) * r;
+      const th = ph.terrainHeight(px, pz), gy = ph.groundAt(px, pz, th + 1.2);
+      if (Math.abs(gy - th) > 0.05 || ph.waterLevel(px, pz) > th + 0.5) continue;
+      const p = { x: px, y: gy, z: pz };
+      ph.resolve(p, 0.7, 2, 1.1);
+      if (Math.hypot(p.x - px, p.z - pz) > 0.05) continue;
+      this.pos.set(px, gy, pz); this.air = false; this.vy = 0;
+      G.particles.dust(px, gy, pz, 6);
+      return true;
+    }
+    return false;
+  }
   update(dt, ridden) {
     const P = G.player;
     const dP = dist2d(P.pos.x, P.pos.z, this.pos.x, this.pos.z);
@@ -120,15 +143,28 @@ class Horse {
       }
       if (move > 0) {
         const vx = Math.sin(this.yaw) * move * dt, vz = Math.cos(this.yaw) * move * dt;
-        const blocked = G.physics.move(this.pos, vx, vz, 0.7, 2, false);
+        const ox = this.pos.x, oz = this.pos.z;
+        let blocked = G.physics.move(this.pos, vx, vz, 0.7, 2, !!this.air);
+        if (Math.hypot(this.pos.x - ox, this.pos.z - oz) < move * dt * 0.3) blocked = true;
         if (blocked) this.target = null;
+        // a called horse jumps fences on its way to you; if still stuck it trots around
+        if (blocked && this.called && !this.air) { this.vy = this.B.jump || 11; this.air = true; this.jumpT = 0; }
+        this.stuckT = blocked && this.called ? (this.stuckT || 0) + dt : 0;
+        if (this.stuckT > 2.5) { this.stuckT = 0; this.unstick(P.pos.x, P.pos.z, true); }
         if (!this.called && !this.owned && G.physics.waterLevel(this.pos.x, this.pos.z) - G.physics.terrainHeight(this.pos.x, this.pos.z) > 1) { this.pos.x -= vx * 2; this.pos.z -= vz * 2; this.target = null; }
       }
       this.speed = move;
-      this.keepBodyClear(this.pos, this.yaw, false);
+      this.keepBodyClear(this.pos, this.yaw, !!this.air);
       const wl = G.physics.waterLevel(this.pos.x, this.pos.z);
-      const gy = G.physics.groundAt(this.pos.x, this.pos.z, Math.max(this.pos.y, wl) + 1.2);
-      this.pos.y = wl - gy > 1.2 ? wl - 1.15 : gy; // floats in deep water
+      if (this.air) {
+        this.vy -= 28 * dt; this.pos.y += this.vy * dt;
+        const g2 = G.physics.groundAt(this.pos.x, this.pos.z, this.pos.y, 0.3, Math.max(0.3, -this.vy * dt + 0.15));
+        if (this.pos.y <= g2 && this.vy <= 0) { this.pos.y = g2; this.air = false; this.vy = 0; this.landT = 0.3; G.particles.dust(this.pos.x, g2, this.pos.z, 8); }
+      }
+      const gy = this.air ? this.pos.y : G.physics.groundAt(this.pos.x, this.pos.z, Math.max(this.pos.y, wl) + 1.2);
+      if (!this.air) this.pos.y = wl - gy > 1.2 ? wl - 1.15 : gy; // floats in deep water
+      // never left balancing on top of a fence or post
+      if (!this.air && gy - G.physics.terrainHeight(this.pos.x, this.pos.z) > 0.5 && !this.onSolidFloor()) this.unstick(this.pos.x, this.pos.z, false);
       // a horse left in deep water swims to the nearest shore by itself
       if (wl - gy > 1.2 && !this.called && move === 0) {
         let best = null;
@@ -297,7 +333,12 @@ export class Horses {
     const side = P.yaw + Math.PI / 2;
     const x = P.pos.x + Math.sin(side) * 1.4, z = P.pos.z + Math.cos(side) * 1.4;
     this.mine.pos.copy(P.pos);
+    this.mine.air = false; this.mine.vy = 0;
     P.teleport(x, G.physics.groundAt(x, z, P.pos.y + 1.2), z, P.yaw);
+    // dismounting on a fence or in a tight spot: the horse steps out to open ground
+    const m = this.mine, ph = G.physics;
+    const probe = { x: m.pos.x, y: m.pos.y, z: m.pos.z }; ph.resolve(probe, 0.7, 2, 1.1);
+    if (Math.hypot(probe.x - m.pos.x, probe.z - m.pos.z) > 0.1 || (m.pos.y - ph.terrainHeight(m.pos.x, m.pos.z) > 0.5 && !m.onSolidFloor())) m.unstick(m.pos.x, m.pos.z, false);
     G.audio.sfx('land', { vol: 0.5 });
   }
   // H / T key or the horse button: mount, dismount or call your horse

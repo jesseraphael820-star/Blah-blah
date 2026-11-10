@@ -7,6 +7,7 @@ import { G } from '../core/context.js';
 import { t } from '../core/i18n.js';
 import { Humanoid } from '../entities/character.js';
 import { GeneAura, AURA } from '../render/auras.js';
+import { TRIALS } from './lineage.js';
 import { makeRng, dist2d, dampAngle, shade } from '../core/utils.js';
 
 // genetics: power multiplier, look, combat style
@@ -75,7 +76,7 @@ class Adventurer {
     this.m = new Humanoid(this.look);
     G.scene.add(this.m.root);
     this.pos = new THREE.Vector3(this.home.x, G.physics.groundAt(this.home.x, this.home.z, 200), this.home.z);
-    if (AURA[this.gene]) { const self = this; this.aura = new GeneAura({ pos: this.pos, get model() { return self.m; }, look: this.look, name: this.name }, this.gene); }
+    if (AURA[this.gene]) { const self = this; this.aura = new GeneAura({ pos: this.pos, get model() { return self.m; }, look: this.look, name: this.name, calm: () => !self.following() || (G.cinematics?.active?.aura === self.aura) }, this.gene); }
     this.yaw = rng() * 6.28;
     this.def = { pitch: 0.8 + rng() * 0.6, scale: 1 };
     this.id = 'adv_' + i;
@@ -144,14 +145,38 @@ class Adventurer {
         if (dP < 6) this.yaw = dampAngle(this.yaw, Math.atan2(P.pos.x - this.pos.x, P.pos.z - this.pos.z), 3, dt);
       }
     }
+    let blocked = false;
     if (move > 0) {
-      const blocked = G.physics.move(this.pos, Math.sin(this.yaw) * move * dt, Math.cos(this.yaw) * move * dt, 0.38, 1.8, false);
+      const ox = this.pos.x, oz = this.pos.z;
+      blocked = G.physics.move(this.pos, Math.sin(this.yaw) * move * dt, Math.cos(this.yaw) * move * dt, 0.38, 1.8, !!this.air);
+      // barely moved = something is in the way (fence, wall, rock)
+      if (Math.hypot(this.pos.x - ox, this.pos.z - oz) < move * dt * 0.3) blocked = true;
       if (blocked && !follow) this.target = null;
       pose = move > 5 ? 'run' : 'walk';
+      // jump over low obstacles, like the hero
+      if (blocked && follow && !this.air) { this.vy = 10.5; this.air = true; G.particles.dust(this.pos.x, this.pos.y, this.pos.z, 4); }
+    }
+    // stuck for a while while following: catch up next to the hero
+    this.stuckT = blocked && follow ? (this.stuckT || 0) + dt : Math.max(0, (this.stuckT || 0) - dt * 2);
+    if (follow && (this.stuckT > 1.8 || (dP > 22 && this.stuckT > 0.6))) {
+      const a = P.yaw + Math.PI + (this.i % 2 ? 0.7 : -0.7);
+      for (let r = 2.5; r < 6; r += 1) {
+        const x = P.pos.x + Math.sin(a) * r, z = P.pos.z + Math.cos(a) * r, gy = G.physics.groundAt(x, z, P.pos.y + 1.5);
+        if (Math.abs(gy - P.pos.y) < 1.6) { G.particles.burst(this.pos.x, this.pos.y + 1, this.pos.z, parseInt(GENES[this.gene].color.slice(1), 16), 14, 3); this.pos.set(x, gy, z); G.particles.burst(x, gy + 1, z, parseInt(GENES[this.gene].color.slice(1), 16), 14, 3); break; }
+      }
+      this.stuckT = 0; this.air = false; this.vy = 0;
     }
     const wl = G.physics.waterLevel(this.pos.x, this.pos.z);
-    const gy = G.physics.groundAt(this.pos.x, this.pos.z, this.pos.y + 1.2);
-    this.pos.y = wl - gy > 1.25 ? wl - 1.15 : gy;
+    if (this.air) {
+      this.vy -= 26 * dt;
+      this.pos.y += this.vy * dt;
+      const gy = G.physics.groundAt(this.pos.x, this.pos.z, this.pos.y, 0.3, Math.max(0.3, -this.vy * dt + 0.15));
+      if (this.pos.y <= gy && this.vy <= 0) { this.pos.y = gy; this.air = false; this.vy = 0; }
+      pose = 'jump';
+    } else {
+      const gy = G.physics.groundAt(this.pos.x, this.pos.z, this.pos.y + 1.2);
+      this.pos.y = wl - gy > 1.25 ? wl - 1.15 : gy;
+    }
     if (this.atkT > 0) { this.atkT -= dt; pose = GENES[this.gene].ranged ? 'cast_ball' : 'attack1'; }
     this.m.root.position.copy(this.pos);
     this.m.root.rotation.y = this.yaw;
@@ -194,6 +219,30 @@ export class Adventurers {
     const c = a.cls(), g = GENES[a.gene];
     return [t('adv.statLine', { power: a.power(), level: a.level(), cls: t('cls.' + c.id) }), t('adv.geneLine', { icon: g.icon, gene: t('gene.' + a.gene), mult: Math.round((g.mult - 1) * 100), desc: t('gene.' + a.gene + 'Desc') }), t('adv.friendLine', { tier: t('friend.' + friendTier(a.s.friend).id), n: a.s.friend })];
   }
+  // ask a friend to share their lineage: rarer genetics are harder to receive;
+  // best friends have better odds. One try per person per day, and it costs an offering.
+  geneOdds(a) {
+    const tr = TRIALS[a.gene];
+    const f = a.s.friend;
+    return { chance: Math.min(0.9, tr.chance * (f >= 85 ? 1.6 : 1.2)), gold: Math.round(tr.gold * 0.6) };
+  }
+  askGene(a, menu) {
+    const D = G.dialogue, day = G.state.world.day, g = t('gene.' + a.gene);
+    const { chance, gold } = this.geneOdds(a);
+    if (a.s.friend < 50) { D.open(a, [t('adv.geneNotFriends', { gene: g, n: a.s.friend })], menu()); return; }
+    if (a.s.geneTry === day) { D.open(a, [t('adv.geneTomorrow')], menu()); return; }
+    D.open(a, [t('adv.geneOffer', { gene: g, chance: (chance * 100).toFixed(chance < 0.1 ? 1 : 0), gold })], [
+      { label: t('adv.geneAccept', { gold }), act: () => {
+        if (!G.prog.spendGold(gold)) { D.open(a, [t('adv.noGold')], menu()); return; }
+        a.s.geneTry = day;
+        const ok = Math.random() < chance;
+        D.open(a, [t('adv.geneStart')], null);
+        setTimeout(() => { D.close?.(); G.lineage.shareFrom(a, ok); }, 1400);
+      } },
+      { label: t('adv.geneNo'), act: () => D.open(a, [t('adv.bye')], menu()) },
+    ]);
+  }
+
   talk(a) {
     const D = G.dialogue;
     const tier = friendTier(a.s.friend).id;
@@ -221,6 +270,7 @@ export class Adventurers {
           D.open(a, [t('adv.joins', { player: G.state.appearance.name })], null);
           G.ui.toast(t('adv.joined', { name: a.name }), 'unlock');
         } },
+      ...(a.gene !== 'human' && a.gene !== G.state.player.gene ? [{ label: `${GENES[a.gene].icon} ${t('adv.askGene', { gene: t('gene.' + a.gene) })}`, act: () => this.askGene(a, menu) }] : []),
       { label: t('dlg.bye'), act: () => D.open(a, [t('adv.bye')], null) },
     ];
     D.open(a, [greet], menu());

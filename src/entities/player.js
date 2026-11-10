@@ -346,7 +346,7 @@ export class Player {
     if (this.swimming) { this.vy = 6; this.pos.y += 0.3; this.swimming = false; return true; }
     const coyote = !this.onGround && (this.airT || 0) < 0.13 && this.vy <= 0;
     if ((!this.onGround && !coyote) || this.busy()) return false;
-    this.vy = this.mounted ? this.mounted.B.jump : 9.6;
+    this.vy = this.mounted ? this.mounted.B.jump * 1.08 : 10.6;
     if (this.mounted) { this.hv.x += Math.sin(this.yaw) * 2.5; this.hv.z += Math.cos(this.yaw) * 2.5; this.mounted.jumpT = 0; G.audio.sfx('growl', { vol: 0.25 }); }
     this.onGround = false;
     this.airT = 1;

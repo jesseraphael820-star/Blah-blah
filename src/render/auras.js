@@ -195,7 +195,7 @@ export class GeneAura {
     this.circle.material.opacity = (0.45 + night * 0.4) * pulse + 0.15;
     // particles
     if (near) {
-      const rate = d < 40 ? 22 : 8;
+      const rate = (d < 40 ? 22 : 8) * (this.o.calm ? this.full : 1);
       for (let i = 0; i < 3; i++) if (Math.random() < dt * rate) {
         const a = Math.random() * Math.PI * 2, r = 0.8 + Math.random() * 3.6;
         const x = p.x + Math.sin(a) * r, z = p.z + Math.cos(a) * r;
