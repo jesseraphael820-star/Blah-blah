@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { G } from '../core/context.js';
 import { t } from '../core/i18n.js';
 import { Humanoid } from '../entities/character.js';
+import { GeneAura, AURA } from '../render/auras.js';
 import { makeRng, dist2d, dampAngle, shade } from '../core/utils.js';
 
 // genetics: power multiplier, look, combat style
@@ -49,10 +50,10 @@ function lookFor(gene, rng) {
   const P = base.pal;
   switch (gene) {
     case 'magic': Object.assign(P, { shirt: 0x5a2a8a, pants: 0x2a1a4a, trim: 0xffc83a }); base.hat = 'wizard'; break;
-    case 'ghost': Object.assign(P, { skin: 0xdce8f4, hair: 0xf0f4ff, shirt: 0xcfe0f0, pants: 0xb8c8dc, shoes: 0xa8b8cc, eye: 0x6ac8ff }); base.glow = 0x9ad8ff; break;
+    case 'ghost': Object.assign(P, { skin: 0xdce8f4, hair: 0xf0f4ff, shirt: 0xcfe0f0, pants: 0xb8c8dc, shoes: 0xa8b8cc, eye: 0x6ac8ff }); base.glow = 0x9ad8ff; base.ghost = true; break;
     case 'angel': Object.assign(P, { shirt: 0xfff8e8, pants: 0xf0e8d0, shoes: 0xe8d8a8, hair: 0xffe08a, trim: 0xffc83a }); base.acc = 'wings'; base.glow = 0xffe8a0; base.halo = true; break;
-    case 'ancestral': Object.assign(P, { skin: 0xc8a878, shirt: 0x8a6a2a, pants: 0x5a4a2a, trim: 0xffc83a, hair: 0xe8e8e8, eye: 0xffc83a }); base.hat = 'crown'; base.beard = true; base.armor = 'guardian'; break;
-    case 'tech': Object.assign(P, { shirt: 0x5a6a7a, pants: 0x3a4a5a, trim: 0x4fd0ff, eye: 0x4fd0ff }); base.acc = 'backpack'; base.glasses = true; base.armor = 'chain'; break;
+    case 'ancestral': Object.assign(P, { skin: 0xc8a878, shirt: 0x8a6a2a, pants: 0x5a4a2a, trim: 0xffc83a, hair: 0xe8e8e8, eye: 0xffc83a }); base.hat = 'crown'; base.beard = true; base.armor = 'guardian'; base.crownGlow = true; break;
+    case 'tech': Object.assign(P, { shirt: 0x5a6a7a, pants: 0x3a4a5a, trim: 0x4fd0ff, eye: 0x4fd0ff }); base.acc = 'backpack'; base.glasses = true; base.armor = 'chain'; base.visor = true; break;
     case 'elemental': Object.assign(P, { shirt: 0xc8461a, pants: 0x5a1e10, trim: 0xffd15c, hair: 0xff8a2a }); base.glow = 0xff7a2a; break;
     case 'shadow': Object.assign(P, { shirt: 0x1e1a28, pants: 0x141018, shoes: 0x0a080c, trim: 0x8a3aaa, eye: 0xff3a6a }); base.hat = 'hood'; base.acc = 'cape'; base.capeColor = 0x2a1a3a; break;
     case 'dragon': Object.assign(P, { shirt: 0x8a1e1e, pants: 0x3a1010, trim: 0xffc83a, hair: 0x6a0a0a, eye: 0xffc83a }); base.armor = 'knight'; base.horns = true; break;
@@ -72,12 +73,9 @@ class Adventurer {
     this.home = { x: data[2], z: data[3] };
     this.look = lookFor(this.gene, rng);
     this.m = new Humanoid(this.look);
-    if (this.look.halo) { const h = new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.04, 6, 16), new THREE.MeshBasicMaterial({ color: 0xffe08a })); h.rotation.x = Math.PI / 2; h.position.y = 0.42; this.m.headTop.add(h); }
-    if (this.look.horns) for (const s of [-1, 1]) { const hm = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.24, 0.08), new THREE.MeshLambertMaterial({ color: 0xe8dcc0 })); hm.position.set(s * 0.22, 0.2, -0.05); hm.rotation.z = -s * 0.4; this.m.headTop.add(hm); }
-    if (this.look.ears) for (const s of [-1, 1]) { const em = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.18, 0.06), new THREE.MeshLambertMaterial({ color: this.look.pal.hair })); em.position.set(s * 0.24, 0.15, 0); this.m.headTop.add(em); }
-    if (this.gene === 'ghost') this.m.root.traverse((o) => { if (o.isMesh && o.material && !Array.isArray(o.material)) { o.material = o.material.clone(); o.material.transparent = true; o.material.opacity = 0.72; } });
     G.scene.add(this.m.root);
     this.pos = new THREE.Vector3(this.home.x, G.physics.groundAt(this.home.x, this.home.z, 200), this.home.z);
+    if (AURA[this.gene]) { const self = this; this.aura = new GeneAura({ pos: this.pos, get model() { return self.m; }, look: this.look, name: this.name }, this.gene); }
     this.yaw = rng() * 6.28;
     this.def = { pitch: 0.8 + rng() * 0.6, scale: 1 };
     this.id = 'adv_' + i;
@@ -172,7 +170,18 @@ export class Adventurers {
       return new Adventurer(i, r, S.advs[i]);
     });
   }
-  update(dt) { for (const a of this.list) a.update(dt); }
+  update(dt) {
+    for (const a of this.list) {
+      a.update(dt);
+      if (!a.aura) continue;
+      const d = a.aura.update(dt);
+      // first close encounter with a legendary lineage: cinematic reveal
+      if (a.aura.A.tier === 3 && d < 34 && !G.cinematics.seen.has(a.id) && G.cinematics.canStart()) {
+        const g = GENES[a.gene];
+        G.cinematics.start(a.id, a.aura, { name: a.name, sub: `${g.icon} ${t('gene.' + a.gene)} · ${t('cls.' + a.cls().id)} · ⚡${a.power()}` });
+      }
+    }
+  }
   companions() { return this.list.filter((a) => a.following()); }
 
   addFriend(a, n) {
@@ -220,7 +229,7 @@ export class Adventurers {
   // rankings
   ranking() {
     const rows = this.list.map((a) => ({ name: a.name, power: a.power(), gene: a.gene, level: a.level(), me: false }));
-    rows.push({ name: G.state.appearance.name, power: G.training.powerRating(), gene: PLAYER_GENE, level: G.state.player.level, me: true });
+    rows.push({ name: G.state.appearance.name, power: G.training.powerRating(), gene: G.state.player.gene || PLAYER_GENE, level: G.state.player.level, me: true });
     return rows.sort((x, y) => y.power - x.power);
   }
   geneRanking() {

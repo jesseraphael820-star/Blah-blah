@@ -185,6 +185,14 @@ export class AudioSys {
       case 'freeze': this.noiseBurst(t, 0.5, 0.3 * v, o, 'highpass', 4000, 2); [1760, 2093, 2637].forEach((f, i) => this.osc('sine', f, t + i * 0.05, 0.5, 0.06 * v, o)); break;
       case 'blink': this.osc('sine', 300, t, 0.2, 0.2 * v, o, { to: 2000 }); this.noiseBurst(t, 0.2, 0.15 * v, o, 'bandpass', 3000, 3); break;
       case 'heal': [523, 784, 1047].forEach((f, i) => this.osc('sine', f, t + i * 0.08, 0.4, 0.12 * v, o)); break;
+      case 'legend': {
+        // deep boom, rising choir chord and a shimmering bell
+        this.osc('sine', 70, t, 1.6, 0.5 * v, o, { to: 40 });
+        this.noiseBurst(t, 1.2, 0.35 * v, o, 'lowpass', 400, 1, { to: 80 });
+        [220, 277.2, 329.6, 440, 554.4].forEach((f, i) => { this.osc('triangle', f, t + 0.15 + i * 0.12, 2.6, 0.06 * v, o, { lp: 2500 }); this.osc('sine', f * 2, t + 0.3 + i * 0.12, 2.2, 0.03 * v, o); });
+        [1760, 2217, 2637, 3520].forEach((f, i) => this.osc('sine', f, t + 0.9 + i * 0.09, 1.2, 0.03 * v, o));
+        break;
+      }
       case 'drink': [0, 0.12, 0.24].forEach((d) => this.osc('sine', 300 + Math.random() * 100, t + d, 0.08, 0.15 * v, o, { to: 500 })); break;
       case 'thunder': this.noiseBurst(t, 2.5, 0.8 * v, o, 'lowpass', 300, 0.7, { to: 60, rate: 0.5 }); this.noiseBurst(t, 0.3, 0.5 * v, o, 'lowpass', 2000, 1); break;
       case 'howl': this.osc('sawtooth', 300, t, 1.8, 0.07 * v, o, { to: 560, slide: 0.7, lp: 1200, a: 0.3 }); break;

@@ -164,6 +164,10 @@ export const DAILY_REWARDS = [
 ];
 
 export const ACHIEVEMENTS = [
+  { id: 'lineage1', stat: 'lineage', n: 1, gold: 200, icon: 'star' },
+  { id: 'lineage2', stat: 'lineage', n: 2, gold: 1000, icon: 'crown' },
+  { id: 'armorRare1', stat: 'rareArmors', n: 1, gold: 150, icon: 'armor' },
+  { id: 'armorRare4', stat: 'rareArmors', n: 4, gold: 800, icon: 'armor' },
   { id: 'fish1', stat: 'fish', n: 1, gold: 15, icon: 'fish' },
   { id: 'fish50', stat: 'fish', n: 50, gold: 300, icon: 'fish', title: 'angler' },
   { id: 'fishRare', stat: 'fishRare', n: 1, gold: 400, icon: 'fish' },

@@ -32,7 +32,17 @@ export const ARMORS = {
   knight:   { def: 14, price: 1900, color: 0xc8ced6, trim: 0xd4a83a, pads: true, req: { level: 7 } },
   guardian: { def: 18, price: 0, color: 0xc9b98a, trim: 0x4fd0ff, pads: true, glow: 0x4fd0ff },
   shadow:   { def: 23, price: 4200, color: 0x2a2338, trim: 0xb66cff, pads: true, glow: 0xb66cff, req: { level: 12 } },
+  // ---- rare armors: never sold, only found (chests, enemies, bosses). The rarer, the lower the chance ----
+  bronze:    { def: 10, price: 0, rar: 'rare', find: 1 / 10, color: 0xb0783a, trim: 0xe0a85a, pads: true, fx: 'shine' },
+  verdant:   { def: 15, price: 0, rar: 'rare', find: 1 / 14, color: 0x3a7a3a, trim: 0x9ae86a, pads: true, glow: 0x7aff6a, fx: 'leaves' },
+  frost:     { def: 20, price: 0, rar: 'epic', find: 1 / 30, color: 0xbfe6ff, trim: 0x6ad8ff, pads: true, glow: 0x9ae8ff, fx: 'frost', crest: true },
+  ember:     { def: 21, price: 0, rar: 'epic', find: 1 / 34, color: 0x4a1a12, trim: 0xff6a1a, pads: true, glow: 0xff7a2a, fx: 'ember', crest: true },
+  storm:     { def: 27, price: 0, rar: 'legendary', find: 1 / 90, color: 0x2a3550, trim: 0x8ad8ff, pads: true, glow: 0xb0e8ff, fx: 'storm', crest: true, wings: false },
+  celestial: { def: 30, price: 0, rar: 'legendary', find: 1 / 120, color: 0xf4f0e0, trim: 0xffc83a, pads: true, glow: 0xfff0a0, fx: 'holy', crest: true, halo: true },
+  void:      { def: 36, price: 0, rar: 'magic', find: 1 / 320, color: 0x120c1e, trim: 0xb66cff, pads: true, glow: 0xd08aff, fx: 'void', crest: true },
+  aurora:    { def: 40, price: 0, rar: 'magic', find: 1 / 450, color: 0x1e2a4a, trim: 0x7affc8, pads: true, glow: 0x7affc8, fx: 'aurora', crest: true, halo: true },
 };
+export const RARE_ARMORS = Object.keys(ARMORS).filter((k) => ARMORS[k].find);
 
 export const HATS = {
   none: { price: 0 },

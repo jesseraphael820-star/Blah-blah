@@ -121,7 +121,7 @@ export class Menu {
   itemVisual(it) {
     switch (it.kind) {
       case 'sword': return { src: swordIcon(it.id), rar: SWORDS[it.id].rarity };
-      case 'armor': return { src: icon('armor'), rar: ARMORS[it.id].def >= 14 ? 'epic' : ARMORS[it.id].def >= 8 ? 'rare' : 'common' };
+      case 'armor': { const A = ARMORS[it.id]; return { src: A.fx ? icon('armorA', '#' + (A.trim >>> 0).toString(16).padStart(6, '0')) : icon('armor'), rar: A.rar || (A.def >= 14 ? 'epic' : A.def >= 8 ? 'rare' : 'common') }; }
       case 'hat': return { src: icon('hat', '#d8b850'), rar: (HATS[it.id].price || 0) > 900 ? 'epic' : 'common' };
       case 'acc': return { src: icon('star', '#ff7ab0'), rar: (ACCESSORIES[it.id].price || 0) > 1000 ? 'legendary' : 'rare' };
       case 'skin': return { src: icon('shirt', hx(SKINS[it.id].pal?.shirt || G.state.appearance.shirt)), rar: (SKINS[it.id].price || 0) > 2000 ? 'legendary' : (SKINS[it.id].price || 0) > 1000 ? 'epic' : 'rare' };

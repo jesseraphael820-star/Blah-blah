@@ -47,7 +47,8 @@ export class Training {
   powerRating() {
     const st = G.prog.stats();
     let skills = 0; for (const k of Object.keys(SKILLS)) skills += this.level(k);
-    return Math.round(G.state.player.level * 10 + skills * 4 + G.prog.weaponDps() * 1.5 + st.def * 2);
+    const g = G.state.player.gene, mult = g && G.adventurers ? ({ human: 1, beast: 1.12, magic: 1.25, ghost: 1.22, tech: 1.3, elemental: 1.32, shadow: 1.36, dragon: 1.45, angel: 1.5, ancestral: 1.7 }[g] || 1) : 1;
+    return Math.round((G.state.player.level * 10 + skills * 4 + G.prog.weaponDps() * 1.5 + st.def * 2) * mult);
   }
 
   // called every frame by the player with what the hero is doing

@@ -349,6 +349,37 @@ export class UI {
     clearTimeout(this.gpT);
     this.gpT = setTimeout(() => { d.className = 'gold-delta'; }, 1200);
   }
+  // a coin flies from the world to the Gold counter, with a floating +N
+  coinFly(pos, v) {
+    this.coinN = this.coinN || 0;
+    const v3 = this._cv3 || (this._cv3 = pos.clone());
+    v3.copy(pos).project(G.camera);
+    if (v3.z > 1) return;
+    const x = (v3.x * 0.5 + 0.5) * innerWidth, y = (-v3.y * 0.5 + 0.5) * innerHeight;
+    const gEl = this.el.gold?.closest('.hud-gold') || this.el.gold;
+    const r = gEl ? gEl.getBoundingClientRect() : { left: innerWidth - 60, top: 20, width: 20, height: 20 };
+    const plus = document.createElement('div');
+    plus.className = 'coin-plus'; plus.textContent = '+' + v;
+    plus.style.left = x + 'px'; plus.style.top = y + 'px';
+    document.body.appendChild(plus);
+    setTimeout(() => plus.remove(), 900);
+    if (this.coinN > 10) return;
+    this.coinN++;
+    const c = document.createElement('img');
+    c.className = 'coin-fly px'; c.src = icon('coin');
+    c.style.left = x + 'px'; c.style.top = y + 'px';
+    document.body.appendChild(c);
+    const tx = r.left + 14 - x, ty = r.top + r.height / 2 - y;
+    c.animate([
+      { transform: 'translate(-50%,-50%) scale(0.6) rotate(0deg)', opacity: 0.9 },
+      { transform: `translate(calc(-50% + ${tx * 0.35}px), calc(-50% + ${ty * 0.35 - 60}px)) scale(1.5) rotate(200deg)`, opacity: 1, offset: 0.35 },
+      { transform: `translate(calc(-50% + ${tx}px), calc(-50% + ${ty}px)) scale(0.8) rotate(540deg)`, opacity: 1 },
+    ], { duration: 650 + Math.random() * 150, easing: 'cubic-bezier(.5,0,.6,1)' }).onfinish = () => {
+      c.remove(); this.coinN--;
+      if (gEl) { gEl.classList.remove('bump'); void gEl.offsetWidth; gEl.classList.add('bump'); }
+    };
+  }
+
   banner(html, cls = '', dur = 3.2) {
     const b = this.el.banner;
     b.className = 'banner ' + cls;

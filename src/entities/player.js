@@ -1,6 +1,7 @@
 // Player controller: movement, jumping, swimming, sprint, dodge roll,
 // 3-hit sword combos, blocking/parry, powers and damage handling.
 import * as THREE from 'three';
+import { withGene } from '../systems/lineage.js';
 import { G } from '../core/context.js';
 import { Humanoid, playerLook } from './character.js';
 import { SKINS, SWORDS, ITEMS } from '../data/items.js';
@@ -56,7 +57,7 @@ export class Player {
     this.fpSide = 1;
   }
 
-  look() { return playerLook(G.state.appearance, G.state.inv.equipped, SKINS); }
+  look() { return withGene(playerLook(G.state.appearance, G.state.inv.equipped, SKINS)); }
   refreshLook() {
     const r = this.model.rot;
     this.model.build(this.look());
@@ -281,6 +282,7 @@ export class Player {
       if (this.stepAcc > 2.2) { this.stepAcc = 0; G.audio.sfx('step', { surface: 'water', vol: 0.6 }); }
     }
     this.updateFootprints(dt);
+    this.calmT = this.speedNow < 0.3 && this.onGround && this.state === 'normal' && !G.ui.blocksGameplay() ? (this.calmT || 0) + dt : 0;
 
     // ---------- shield bubble ----------
     this.shieldMesh.visible = this.shield > 0;

@@ -30,6 +30,9 @@ import { Territory } from './systems/territory.js';
 import { Training } from './systems/training.js';
 import { Adventurers } from './systems/adventurers.js';
 import { Fishing } from './systems/fishing.js';
+import { Lineage } from './systems/lineage.js';
+import { Cinematics } from './render/auras.js';
+import { ArmorFinds } from './systems/armorFinds.js';
 import { PLOTS } from './data/territory.js';
 import { house } from './world/structures.js';
 import { Pickups } from './entities/pickups.js';
@@ -199,7 +202,10 @@ export class Game {
       G.entities.npcs = new NPCManager();
       G.wildlife = new Wildlife(G.scene);
       G.horses = new Horses();
+      G.cinematics = new Cinematics();
       G.adventurers = new Adventurers();
+      G.lineage = new Lineage();
+      G.armorFinds = new ArmorFinds();
       G.fishing = new Fishing();
       G.mapSys = new MapSys(G.world.terrain.mapCanvas());
       G.menu = new Menu();
@@ -409,6 +415,7 @@ export class Game {
     const paused = G.paused || G.ui.overlay === 'title';
     let sim = dt;
     if (G.combat.hitstop > 0) { G.combat.hitstop -= dt; sim = dt * 0.15; }
+    if (G.cineSlow) sim *= G.cineSlow;
     G.sky.underground = G.player.pos.x > 600; G.sky.indoor = G.player.pos.x > 800;
     if (!paused) {
       G.events.update(sim);
@@ -420,6 +427,8 @@ export class Game {
       G.wildlife.update(sim);
       G.horses.update(sim);
       G.adventurers.update(sim);
+      G.lineage.update(sim);
+      G.armorFinds.update(sim);
       G.territory.update(sim);
       G.interiors.update();
       G.pickups.update(sim);
@@ -437,6 +446,7 @@ export class Game {
       G.entities.npcs.update(0.0001);
     }
     G.cam.update(dt);
+    G.cinematics.update(dt);
     const P = G.player.pos;
     G.sky.update(dt, G.camera.position, P);
     G.world.update(dt, G.camera.position, G.sky.night);

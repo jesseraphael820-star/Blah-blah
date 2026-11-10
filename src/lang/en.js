@@ -19,6 +19,9 @@ export default {
   hair: { short: 'Short', long: 'Long', spiky: 'Spiky', ponytail: 'Ponytail', bun: 'Bun', braid: 'Braid', messy: 'Messy', bald: 'Bald' },
   char: { horse: 'Horse', noHorse: 'Tame a wild horse in the fields (50% chance each try).', name: 'Name', hair: 'Hair', skin: 'Skin tone', eyes: 'Eyes', clothes: 'Clothes', shirt: 'Shirt', pants: 'Pants', outfit: 'Equipped look', armor: 'Armor', hats: 'Hats', accessories: 'Accessories', pet: 'Companion', attributes: 'Attributes', titles: 'Titles', reputation: 'Reputation', shopHint: 'New skins, hats and accessories at Lia\'s shop in the village.' },
   fish: { cast: 'Fish', reel: 'Pull at the right time!', hint: 'Click / E when the needle is in the green', hintTouch: 'Tap when the needle is in the green', bite: 'Bite! Pull now!', missed: 'The fish let go of the bait...', escaped: 'The fish escaped!', early: 'You pulled too early.', caught: 'You caught: {name}', junk: 'You caught... {name}', treasure: 'Sunken chest! +{n} Gold', lvlUp: 'Fishing level {n}!', level: 'Fishing level', total: 'Fish caught', best: 'Biggest fish' },
+  cine: { presence: 'A LEGENDARY PRESENCE' },
+  lin: { altar: 'Altar of Lineages', intro: 'Offer Gold and materials to try to awaken a lineage. The rarer it is, the lower the chance. If it fails, the offering is lost — but you can try again.', current: 'Your lineage', power: 'power', cant: 'Not enough Gold or materials for the offering.', ritual: 'The ritual has begun...', success: 'LINEAGE AWAKENED!', fail: 'The ritual failed', rejected: 'The lineage rejected you', tryAgain: 'Try again — luck changes.', awakened: 'Lineage awakened', close: 'Close' },
+  armorFind: { found: 'RARE ARMOR FOUND!', chance: 'Find chance:' },
   ui: {
     sneakAttack: 'SNEAK ATTACK!',
     fullscreenBlocked: "This browser didn't allow full screen. Use Claude's expand button (⤢) or open the link directly in the browser.",
@@ -110,6 +113,14 @@ export default {
     rune_fragment: { name: 'Rune Fragment', desc: 'Pulses with ancient energy.' }, guardian_core: { name: 'Guardian Core', desc: 'Resonates with the cave seal.' }, bread_basket: { name: 'Bread Basket', desc: 'Rosa\'s delivery for Caio.' }, old_map: { name: 'Old Map', desc: 'An X marked... behind the waterfall?' }, tower_key: { name: 'Tower Key', desc: 'Heavy and rusty.' },
   },
   armor: {
+    bronze: { name: 'Bronze Armor', desc: 'Gleams in the sun. Rare to find.' },
+    verdant: { name: 'Verdant Armor', desc: 'Living leaves sprout from it.' },
+    frost: { name: 'Glacial Armor', desc: 'Eternal ice: leaves a trail of cold mist.' },
+    ember: { name: 'Ember Armor', desc: 'Sparks rise like from a campfire.' },
+    storm: { name: 'Storm Armor', desc: 'Lightning crackles around its wearer.' },
+    celestial: { name: 'Celestial Armor', desc: 'Forged from starlight. Grants a halo.' },
+    void: { name: 'Void Armor', desc: 'The void swirls around you and pulls in the light.' },
+    aurora: { name: 'Aurora Armor', desc: 'The rarest of all: glows with the colors of the aurora.' },
     cloth: { name: 'Simple Clothes', desc: 'Comfortable, but no protection.' }, leather: { name: 'Leather Armor', desc: 'Light and flexible.' }, chain: { name: 'Chainmail', desc: 'Good protection against bites.' },
     knight: { name: 'Knight Armor', desc: 'Shining plates with golden trim.' }, guardian: { name: 'Guardian Armor', desc: 'Blue runes protect its wearer.' }, shadow: { name: 'Shadow Armor', desc: 'Forged with darkness essence.' },
   },
@@ -129,6 +140,7 @@ export default {
     blink: { name: 'Blink', desc: 'Instant short teleport in your move direction, with invulnerability.', how: 'Final quest or Ísis\'s Library.' },
   },
   ach: {
+    lineage1: { name: 'Awakened Blood', desc: 'Awaken a lineage at the Altar of Lineages.' }, lineage2: { name: 'Legendary Lineage', desc: 'Awaken Draconic, Angel or Ancestral.' }, armorRare1: { name: 'Rare Find', desc: 'Find a rare armor.' }, armorRare4: { name: 'Relic Collector', desc: 'Find {n} rare armors.' },
     fish1: { name: 'First Bite', desc: 'Catch your first fish.' }, fish50: { name: 'Master Angler', desc: 'Catch {n} fish.' }, fishRare: { name: 'Lake Legend', desc: 'Catch a legendary or magic fish.' },
     firstBlood: { name: 'First Fight', desc: 'Defeat your first enemy.' }, slimes20: { name: 'Moss Cleaner', desc: 'Defeat {n} Mosslings.' }, wolves25: { name: 'Silenced Howl', desc: 'Defeat {n} wolves.' }, kills100: { name: 'Hundred', desc: 'Defeat {n} enemies.' },
     boss1: { name: 'Boss Hunter', desc: 'Defeat a boss.' }, bossAll: { name: 'Legend of the Lands', desc: 'Defeat all {n} bosses.' }, rich: { name: 'Full Pockets', desc: 'Earn {n} Gold in total.' }, tycoon: { name: 'Tycoon', desc: 'Earn {n} Gold in total.' },

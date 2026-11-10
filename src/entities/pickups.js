@@ -115,8 +115,10 @@ export class Pickups {
       }
       if (d < 0.9 && c.t > 0.3) {
         G.prog.addGold(c.v, { source: 'coin' });
-        G.audio.sfx('coin', { vol: 0.7 });
-        G.particles.burst(c.m.position.x, c.m.position.y, c.m.position.z, 0xffd36a, 5, 2, { gravity: 0, life: 0.3, size: 0.15 });
+        G.audio.sfx('coin', { vol: 0.7, rate: 0.95 + Math.random() * 0.15 });
+        G.particles.burst(c.m.position.x, c.m.position.y, c.m.position.z, 0xffd36a, 8, 2.5, { gravity: 0, life: 0.35, size: 0.15 });
+        G.particles.ring(c.m.position.x, c.m.position.y - 0.2, c.m.position.z, 0xffe27a, 0.7, 10);
+        G.ui.coinFly?.(c.m.position, c.v);
         this.remove(i);
       } else if (c.t > 60) this.remove(i);
     }

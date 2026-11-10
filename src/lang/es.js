@@ -19,6 +19,9 @@ export default {
   hair: { short: 'Corto', long: 'Largo', spiky: 'Puntiagudo', ponytail: 'Coleta', bun: 'Moño', braid: 'Trenza', messy: 'Despeinado', bald: 'Calvo' },
   char: { horse: 'Caballo', noHorse: 'Doma un caballo salvaje en los campos (50% de probabilidad cada intento).', name: 'Nombre', hair: 'Cabello', skin: 'Tono de piel', eyes: 'Ojos', clothes: 'Ropa', shirt: 'Camisa', pants: 'Pantalón', outfit: 'Aspecto equipado', armor: 'Armadura', hats: 'Sombreros', accessories: 'Accesorios', pet: 'Compañero', attributes: 'Atributos', titles: 'Títulos', reputation: 'Reputación', shopHint: 'Nuevos aspectos, sombreros y accesorios en la tienda de Lia, en la aldea.' },
   fish: { cast: 'Pescar', reel: '¡Tira en el momento justo!', hint: 'Clic / E cuando la aguja esté en el verde', hintTouch: 'Toca cuando la aguja esté en el verde', bite: '¡Picó! ¡Tira ya!', missed: 'El pez soltó el cebo...', escaped: '¡El pez escapó!', early: 'Tiraste muy pronto.', caught: 'Pescaste: {name}', junk: 'Pescaste... {name}', treasure: '¡Cofre hundido! +{n} Gold', lvlUp: '¡Pesca nivel {n}!', level: 'Nivel de pesca', total: 'Peces pescados', best: 'Pez más grande' },
+  cine: { presence: 'UNA PRESENCIA LEGENDARIA' },
+  lin: { altar: 'Altar de los Linajes', intro: 'Ofrece Gold y materiales para intentar despertar una genética. Cuanto más rara, menor la probabilidad. Si falla, la ofrenda se pierde — pero puedes intentarlo de nuevo.', current: 'Tu genética', power: 'fuerza', cant: 'Faltan Gold o materiales para la ofrenda.', ritual: 'El ritual comenzó...', success: '¡GENÉTICA DESPERTADA!', fail: 'El ritual falló', rejected: 'El linaje te rechazó', tryAgain: 'Inténtalo de nuevo — la suerte cambia.', awakened: 'Genética despertada', close: 'Cerrar' },
+  armorFind: { found: '¡ARMADURA RARA ENCONTRADA!', chance: 'Probabilidad:' },
   ui: {
     sneakAttack: '¡ATAQUE SIGILOSO!',
     fullscreenBlocked: 'Este navegador no permitió la pantalla completa. Usa el botón de expandir de Claude (⤢) o abre el enlace directamente en el navegador.',
@@ -110,6 +113,14 @@ export default {
     rune_fragment: { name: 'Fragmento Rúnico', desc: 'Palpita con energía antigua.' }, guardian_core: { name: 'Núcleo del Guardián', desc: 'Resuena con el sello de la cueva.' }, bread_basket: { name: 'Cesta de Pan', desc: 'Entrega de Rosa para Caio.' }, old_map: { name: 'Mapa Antiguo', desc: 'Una X marcada... ¿detrás de la cascada?' }, tower_key: { name: 'Llave de la Torre', desc: 'Pesada y oxidada.' },
   },
   armor: {
+    bronze: { name: 'Armadura de Bronce', desc: 'Brilla al sol. Rara de encontrar.' },
+    verdant: { name: 'Armadura Verdeante', desc: 'De ella brotan hojas vivas.' },
+    frost: { name: 'Armadura Glacial', desc: 'Hielo eterno: deja un rastro de niebla fría.' },
+    ember: { name: 'Armadura de Brasa', desc: 'Chispas suben como de una hoguera.' },
+    storm: { name: 'Armadura de la Tormenta', desc: 'Relámpagos crepitan alrededor.' },
+    celestial: { name: 'Armadura Celestial', desc: 'Forjada con luz estelar. Otorga un halo.' },
+    void: { name: 'Armadura del Vacío', desc: 'El vacío gira a tu alrededor y atrae la luz.' },
+    aurora: { name: 'Armadura de la Aurora', desc: 'La más rara de todas: brilla con los colores de la aurora.' },
     cloth: { name: 'Ropa Sencilla', desc: 'Cómoda, pero sin protección.' }, leather: { name: 'Armadura de Cuero', desc: 'Ligera y flexible.' }, chain: { name: 'Cota de Malla', desc: 'Buena protección contra mordiscos.' },
     knight: { name: 'Armadura de Caballero', desc: 'Placas relucientes con detalles dorados.' }, guardian: { name: 'Armadura del Guardián', desc: 'Runas azules protegen a quien la viste.' }, shadow: { name: 'Armadura Sombría', desc: 'Forjada con esencia de las tinieblas.' },
   },
@@ -129,6 +140,7 @@ export default {
     blink: { name: 'Teletransporte', desc: 'Salto instantáneo en la dirección del movimiento, con invulnerabilidad.', how: 'Misión final o Biblioteca de Ísis.' },
   },
   ach: {
+    lineage1: { name: 'Sangre Despierta', desc: 'Despierta una genética en el Altar de los Linajes.' }, lineage2: { name: 'Linaje Legendario', desc: 'Despierta Dracónico, Ángel o Ancestral.' }, armorRare1: { name: 'Hallazgo Raro', desc: 'Encuentra una armadura rara.' }, armorRare4: { name: 'Coleccionista de Reliquias', desc: 'Encuentra {n} armaduras raras.' },
     fish1: { name: 'Primera Picada', desc: 'Pesca tu primer pez.' }, fish50: { name: 'Maestro Pescador', desc: 'Pesca {n} peces.' }, fishRare: { name: 'Leyenda del Lago', desc: 'Pesca un pez legendario o mágico.' },
     firstBlood: { name: 'Primer Combate', desc: 'Derrota a tu primer enemigo.' }, slimes20: { name: 'Limpiamusgo', desc: 'Derrota a {n} Musguitos.' }, wolves25: { name: 'Aullido Silenciado', desc: 'Derrota a {n} lobos.' }, kills100: { name: 'Centena', desc: 'Derrota a {n} enemigos.' },
     boss1: { name: 'Cazajefes', desc: 'Derrota a un jefe.' }, bossAll: { name: 'Leyenda de las Tierras', desc: 'Derrota a los {n} jefes.' }, rich: { name: 'Bolsillos Llenos', desc: 'Gana {n} de Oro en total.' }, tycoon: { name: 'Magnate', desc: 'Gana {n} de Oro en total.' },

@@ -1,5 +1,6 @@
 // XP, levels, attributes, gold economy and the generic reward granting pipeline.
 import { G } from '../core/context.js';
+import { geneMult } from './lineage.js';
 import { t } from '../core/i18n.js';
 import { ARMORS, SWORDS } from '../data/items.js';
 
@@ -33,8 +34,8 @@ export class Progression {
       maxHp: 100 + (l - 1) * 12 + a.vit * 10 + v('maxHp'),
       maxEnergy: 60 + (l - 1) * 4 + a.spi * 6 + v('maxEnergy'),
       maxStamina: 100 + a.agi * 5 + v('maxStamina'),
-      atkMul: (1 + a.str * 0.05 + (l - 1) * 0.03) * (1 + v('melee')) * (bf.mead ? 1.15 : 1),
-      powMul: (1 + a.spi * 0.06 + (l - 1) * 0.03) * (1 + v('power')),
+      atkMul: (1 + a.str * 0.05 + (l - 1) * 0.03) * (1 + v('melee')) * (bf.mead ? 1.15 : 1) * (1 + (geneMult() - 1) * 0.5),
+      powMul: (1 + a.spi * 0.06 + (l - 1) * 0.03) * (1 + v('power')) * (1 + (geneMult() - 1) * 0.5),
       crit: 0.05 + a.agi * 0.01 + v('crit'),
       def: armor.def + a.vit * 0.5 + v('def'),
       speedMul: 1 + a.agi * 0.01,

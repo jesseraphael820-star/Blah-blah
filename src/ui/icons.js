@@ -54,6 +54,7 @@ const SHAPES = {
   user: ['....kkkk....', '...keeeek...', '..keekkeek..', '..keeeeeek..', '...keeeek...', '....kkkk....', '..kkAAAAkk..', '.kAAAAAAAAk.', 'kAAAAAAAAAAk', 'kAAAAAAAAAAk', 'kkkkkkkkkkkk', '............'],
   travel: ['....kkkk....', '...kccccDk..', '..kcwccccDk.', '..kcwcccDDk.', '...kcccDDk..', '....kcDDk...', '.....kDk....', '..kkkkkkkk..', '.kSSSSSSSSk.', 'kSSSSSSSSSSk', 'kkkkkkkkkkkk', '............'],
   quest: ['....kkkk....', '...kyyyyk...', '...kyyyyk...', '...kyyyyk...', '...kyyyyk...', '....kyyk....', '....kyyk....', '....kkkk....', '............', '....kkkk....', '....kyyk....', '....kkkk....'],
+  armorA: ['............', '.kkk....kkk.', 'kDDDkkkkDDDk', 'kDLDDDDDDLDk', '.kDDLAALDDk.', '.kDAAwwAADk.', '.kDAAwwAADk.', '.kDDAAAADDk.', '.kDLDDDDLDk.', '..kDDDDDDk..', '...kkkkkk...', '............'],
   fish: ['............', '............', '.......kk...', '..kkkkkAAk..', '.kAAAAAAAAkk', 'kAwkAAAAAAkA', 'kAAAAALAAkAk', '.kAAAADDDAkk', '..kkkkkDDk..', '.......kk...', '............', '............'],
   boot: ['............', '...kkkk.....', '...knnk.....', '...knnk.....', '...knnk.....', '...knnk.....', '...knnkkkk..', '..knnnnnnnk.', '..knnnnnnnnk', '..kNNNNNNNNk', '..kkkkkkkkkk', '............'],
   lock: ['....kkkk....', '...kSkkSk...', '...kSk.kSk..', '..kkkkkkkk..', '..kyyyyyyk..', '..kyyYYyyk..', '..kyyYYyyk..', '..kyyyyyyk..', '..kYYYYYYk..', '..kkkkkkkk..', '............', '............'],

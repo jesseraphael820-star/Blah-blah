@@ -64,6 +64,14 @@ export class Humanoid {
       this.torso.add(part(0.7, 0.08, 0.44, armor.trim, 0, 0.6, 0, armor.glow || 0));
       this.torso.add(part(0.12, 0.3, 0.05, armor.trim, 0, 0.36, 0.22, armor.glow || 0));
     }
+    // rare armor details: glowing chest gem, shoulder crystals, belt runes (pulsing, animated in updateFace)
+    this.fxMats = [];
+    if (armor && armor.fx) {
+      const fm = (c, o = 0.9) => { const m = new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: o }); this.fxMats.push(m); return m; };
+      const gem = new THREE.Mesh(unitBox, fm(armor.glow || armor.trim)); gem.scale.set(0.14, 0.14, 0.06); gem.position.set(0, 0.42, 0.235); gem.rotation.z = Math.PI / 4; this.torso.add(gem);
+      for (const sx of [-0.2, 0.2]) { const r = new THREE.Mesh(unitBox, fm(armor.glow || armor.trim, 0.7)); r.scale.set(0.06, 0.06, 0.03); r.position.set(sx, 0.12, 0.225); this.torso.add(r); }
+      this.fxGem = gem;
+    }
     // head
     this.neck = new THREE.Group(); this.neck.position.y = 0.62; this.torso.add(this.neck);
     const faceMat = new THREE.MeshLambertMaterial({ map: this.faceTex });
@@ -82,6 +90,7 @@ export class Humanoid {
       g.add(part(0.2, 0.34, 0.22, shirt, 0, -0.15, 0, glow ? shade(glow, 0.3) : 0));
       g.add(part(0.18, 0.26, 0.2, skin, 0, -0.43, 0));
       if (armor && armor.pads) g.add(part(0.3, 0.16, 0.3, armor.trim, side * 0.02, 0.02, 0, armor.glow || 0));
+      if (armor && armor.fx && armor.crest) { const c = new THREE.Mesh(unitBox, this.fxMats[0]); c.scale.set(0.08, 0.2, 0.08); c.position.set(side * 0.1, 0.18, 0); c.rotation.z = -side * 0.35; g.add(c); }
       const hand = new THREE.Group(); hand.position.set(0, -0.54, 0.02); g.add(hand);
       this.torso.add(g);
       return { g, hand };
@@ -90,10 +99,27 @@ export class Humanoid {
     this.armL = L.g; this.armR = R.g; this.handL = L.hand; this.handR = R.hand;
     this.buildAccessory(look);
     this.buildTool(look);
+    this.buildGeneFeatures(look, armor);
     if (look.sword) this.setSword(look.sword);
     this.drawFace();
     this.root.traverse((o) => { if (o.isMesh) o.castShadow = true; });
     this.root.scale.setScalar(look.scale || 1);
+  }
+
+  // lineage (genetics) features and rare armor helmets
+  buildGeneFeatures(look, armor) {
+    const T = this.headTop;
+    const basic = (c, o = 1) => new THREE.MeshBasicMaterial({ color: c, transparent: o < 1, opacity: o });
+    if (look.halo || (armor && armor.halo)) {
+      const h = new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.04, 6, 16), basic(armor && armor.halo && !look.halo ? armor.glow : 0xffe08a));
+      h.rotation.x = Math.PI / 2; h.position.y = 0.42; T.add(h); this.halo = h;
+    }
+    if (look.horns) for (const s of [-1, 1]) { const hm = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.24, 0.08), new THREE.MeshLambertMaterial({ color: 0xe8dcc0 })); hm.position.set(s * 0.22, 0.2, -0.05); hm.rotation.z = -s * 0.4; T.add(hm); }
+    if (look.ears) for (const s of [-1, 1]) { const em = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.18, 0.06), new THREE.MeshLambertMaterial({ color: look.pal.hair })); em.position.set(s * 0.24, 0.15, 0); T.add(em); }
+    if (look.visor) { const v = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.1, 0.05), basic(0x4fd0ff, 0.9)); v.position.set(0, -0.2, 0.32); T.add(v); this.fxMats.push(v.material); }
+    if (look.crownGlow) { const c = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.1), basic(0xffc83a)); c.position.set(0, 0.34, 0.3); c.rotation.z = Math.PI / 4; T.add(c); this.fxMats.push(c.material); }
+    if (armor && armor.crest && !look.hat) { const c = new THREE.Mesh(unitBox, this.fxMats[0] || basic(armor.trim)); c.scale.set(0.06, 0.22, 0.4); c.position.set(0, 0.12, -0.02); T.add(c); }
+    if (look.ghost) this.root.traverse((o) => { if (o.isMesh && o.material && !Array.isArray(o.material)) { o.material = o.material.clone(); o.material.transparent = true; o.material.opacity = 0.72; } });
   }
 
   buildHair(look) {
@@ -282,6 +308,13 @@ export class Humanoid {
   }
 
   updateFace(dt) {
+    if (this.fxMats && this.fxMats.length) {
+      this.fxT = (this.fxT || Math.random() * 10) + dt;
+      const k = 0.55 + Math.sin(this.fxT * 3.2) * 0.3 + Math.sin(this.fxT * 7.7) * 0.1;
+      for (const m of this.fxMats) m.opacity = k;
+      if (this.fxGem) this.fxGem.rotation.z = Math.PI / 4 + Math.sin(this.fxT * 1.3) * 0.15;
+    }
+    if (this.halo) { this.halo.rotation.z += dt * 0.8; this.halo.position.y = 0.42 + Math.sin((this.fxT || 0) * 2) * 0.03; }
     const F = this.face;
     F.blinkT -= dt;
     if (F.blink > 0) { F.blink -= dt; if (F.blink <= 0) this.faceDirty = true; }
