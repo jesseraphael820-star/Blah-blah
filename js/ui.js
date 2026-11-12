@@ -58,10 +58,26 @@
     $('sideToggle').onclick = () => $('side').classList.toggle('closed');
     $('aiHead').onclick = (e) => { if (e.target.id === 'aiMin' || e.target.closest('#aiHead')) $('ai').classList.toggle('open'); };
     $('aiForm').onsubmit = (e) => { e.preventDefault(); const v = $('aiText').value.trim(); if (v) { $('aiText').value = ''; UI.ask(v); } };
-    $('cityName').onclick = () => {
-      const n = prompt('Novo nome da cidade:', S.name);
-      if (n && n.trim()) { S.name = n.trim().slice(0, 32); UI.update(); }
+    // renomear direto no topo (sem prompt(), que não funciona em todos os navegadores incorporados)
+    const cn = $('cityName');
+    cn.onclick = () => {
+      if (cn.isContentEditable) return;
+      cn.contentEditable = 'true'; cn.focus();
+      const r = document.createRange(); r.selectNodeContents(cn);
+      const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
     };
+    const commitName = () => {
+      const n = cn.textContent.trim();
+      if (n) S.name = n.slice(0, 32);
+      cn.contentEditable = 'false';
+      UI.update();
+    };
+    cn.addEventListener('blur', commitName);
+    cn.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); cn.blur(); }
+      if (e.key === 'Escape') { cn.textContent = S.name; cn.blur(); }
+      e.stopPropagation();
+    });
     $('btnSave').onclick = () => { C.game.save(); UI.toast('💾 Cidade salva!', 'good'); };
     $('btnDay').onclick = () => {
       const modes = ['auto', 'day', 'night'], names = { auto: '☀ Auto', day: '☀ Dia', night: '🌙 Noite' };
@@ -159,7 +175,8 @@
   // ---------- HUD ----------
   let lastPop = 0;
   UI.update = function () {
-    $('cityName').textContent = S.name; $('cityName2').textContent = S.name;
+    if (!$('cityName').isContentEditable) $('cityName').textContent = S.name;
+    $('cityName2').textContent = S.name;
     document.title = `${S.name} — Metrópolis`;
     $('date').textContent = S.dateStr();
     $('money').textContent = S.fmt(S.money);
