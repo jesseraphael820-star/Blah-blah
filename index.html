@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>Metrópolis — Construtor de Cidades</title>
+  <meta name="description" content="Jogo de construir cidades em 3D com assistente de IA.">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <canvas id="view"></canvas>
+
+  <!-- barra superior -->
+  <header id="topbar">
+    <div class="brand">
+      <div class="crest" aria-hidden="true"></div>
+      <div>
+        <div class="city-name" id="cityName" title="Clique para renomear">Nova Cidade</div>
+        <div class="date" id="date">1 Jan 2026</div>
+      </div>
+    </div>
+    <div class="speed" id="speed" role="group" aria-label="Velocidade">
+      <button data-s="0" title="Pausar (Espaço)"><svg viewBox="0 0 24 24"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg></button>
+      <button data-s="1" title="Normal"><svg viewBox="0 0 24 24"><path d="M8 5l11 7-11 7z"/></svg></button>
+      <button data-s="2" title="Rápido"><svg viewBox="0 0 24 24"><path d="M3 5l9 7-9 7zM12 5l9 7-9 7z"/></svg></button>
+      <button data-s="3" title="Muito rápido"><svg viewBox="0 0 24 24"><path d="M1 5l7 7-7 7zM8 5l7 7-7 7zM15 5l7 7-7 7z"/></svg></button>
+    </div>
+    <button class="chip-btn" id="btnDay" title="Ciclo dia/noite">☀ Auto</button>
+    <div class="spacer"></div>
+    <div class="stat">
+      <span class="lbl">Caixa</span>
+      <span class="val" id="money">§ 0</span>
+      <span class="sub" id="balance">+§ 0/mês</span>
+    </div>
+    <div class="stat pop-top">
+      <span class="lbl">Habitantes</span>
+      <span class="val" id="popTop">0</span>
+    </div>
+    <button class="chip-btn" id="btnSave" title="Salvar cidade">💾 Salvar</button>
+  </header>
+
+  <!-- painel lateral: população e indicadores -->
+  <aside id="side">
+    <button class="collapse" id="sideToggle" title="Recolher">‹</button>
+    <div class="panel-body">
+      <div class="pop-card">
+        <div class="lbl">População de <span id="cityName2">Nova Cidade</span></div>
+        <div class="pop-big" id="pop">0</div>
+        <div class="pop-trend" id="popTrend">—</div>
+        <canvas id="spark" width="240" height="56"></canvas>
+      </div>
+      <div class="row">
+        <div class="lbl">Felicidade</div>
+        <div class="bar"><i id="happyBar"></i></div>
+        <div class="num" id="happy">60%</div>
+      </div>
+      <div class="row">
+        <div class="lbl">⚡ Energia</div>
+        <div class="bar"><i id="powerBar"></i></div>
+        <div class="num" id="power">0/0</div>
+      </div>
+      <div class="row">
+        <div class="lbl">💧 Água</div>
+        <div class="bar"><i id="waterBar"></i></div>
+        <div class="num" id="water">0/0</div>
+      </div>
+      <div class="jobs">
+        <div><b id="jobsC">0</b><span>Comércio</span></div>
+        <div><b id="jobsI">0</b><span>Indústria</span></div>
+        <div><b id="jobsS">0</b><span>Serviços</span></div>
+      </div>
+      <div class="rci">
+        <div class="lbl">Demanda</div>
+        <div class="rci-bars">
+          <div class="rci-col"><div class="rci-track"><i id="dR" class="r"></i></div><span>R</span></div>
+          <div class="rci-col"><div class="rci-track"><i id="dC" class="c"></i></div><span>C</span></div>
+          <div class="rci-col"><div class="rci-track"><i id="dI" class="i"></i></div><span>I</span></div>
+        </div>
+      </div>
+      <div class="row tax">
+        <div class="lbl">Imposto</div>
+        <input type="range" id="tax" min="0" max="20" step="1" value="9">
+        <div class="num" id="taxVal">9%</div>
+      </div>
+      <div class="counts" id="counts"></div>
+    </div>
+  </aside>
+
+  <!-- assistente de IA -->
+  <section id="ai" class="open">
+    <header class="ai-head" id="aiHead">
+      <div class="orb" aria-hidden="true"></div>
+      <div class="ai-title"><b>Iara</b><span>Assistente IA da Prefeitura</span></div>
+      <button class="ai-min" id="aiMin" title="Minimizar">—</button>
+    </header>
+    <div class="ai-msgs" id="aiMsgs"></div>
+    <div class="ai-chips" id="aiChips"></div>
+    <form class="ai-input" id="aiForm" autocomplete="off">
+      <input id="aiText" placeholder="Peça algo para a cidade… ex: construa um hospital" maxlength="240">
+      <button type="submit" title="Enviar"><svg viewBox="0 0 24 24"><path d="M3 20l18-8L3 4v6l12 2-12 2z"/></svg></button>
+    </form>
+  </section>
+
+  <!-- barra de ferramentas -->
+  <nav id="toolbar">
+    <div id="tray" class="tray"></div>
+    <div id="cats" class="cats"></div>
+  </nav>
+
+  <div id="tooltip"></div>
+  <div id="toasts"></div>
+  <div id="info" class="info"></div>
+  <div id="help" class="help">
+    <b>Controles</b> · Botão direito / WASD: mover · Roda: zoom · Botão do meio / Q E: girar · R: girar prédio · Esc: cancelar
+  </div>
+
+  <!-- tela inicial -->
+  <div id="start" class="modal">
+    <div class="modal-card">
+      <div class="logo">METRÓPOLIS</div>
+      <div class="tag">Construa, planeje e governe a sua cidade — com a ajuda da Iara, sua IA.</div>
+      <label for="nameIn">Nome da cidade</label>
+      <input id="nameIn" maxlength="32" value="Nova Esperança">
+      <div class="modal-actions">
+        <button class="primary" id="btnNew">Fundar cidade</button>
+        <button id="btnLoad" hidden>Continuar cidade salva</button>
+      </div>
+      <div class="tips">Dica: conecte ruas à rodovia (à esquerda), crie zonas, garanta energia e água — ou simplesmente peça para a Iara.</div>
+    </div>
+  </div>
+
+  <div id="loading">Gerando terreno…</div>
+
+  <script src="lib/three.min.js"></script>
+  <script src="js/textures.js"></script>
+  <script src="js/models.js"></script>
+  <script src="js/world.js"></script>
+  <script src="js/sim.js"></script>
+  <script src="js/agents.js"></script>
+  <script src="js/ai.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
