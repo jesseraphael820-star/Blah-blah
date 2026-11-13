@@ -4,9 +4,8 @@ let W = 0, H = 0, DPR = 1;
 function resize() {
   DPR = Math.min(1.75, window.devicePixelRatio || 1); W = window.innerWidth; H = window.innerHeight;
   cv.width = W * DPR; cv.height = H * DPR; cv.style.width = W + 'px'; cv.style.height = H + 'px';
-  light.width = Math.ceil(W / 2); light.height = Math.ceil(H / 2);
+  if (R3.renderer) R3.resize();
 }
-const light = document.createElement('canvas'), lctx = light.getContext('2d');
 window.addEventListener('resize', resize);
 document.addEventListener('visibilitychange', () => { if (document.hidden && Game.running && !Game.paused) Game.togglePause(true); });
 const buzz = ms => { try { navigator.vibrate && navigator.vibrate(ms); } catch (e) { } };
@@ -16,7 +15,15 @@ const Input = { jx: 0, jy: 0, jm: 0, joyId: null, ox: 0, oy: 0, btn: {}, edge: {
 (function setupInput() {
   const zone = document.getElementById('joyZone'), base = document.getElementById('joyBase'), knob = document.getElementById('joyKnob');
   const R = 55;
+  // arrastar para girar a câmera (lado direito no celular, mouse em qualquer lugar no PC)
+  const look = document.getElementById('lookZone'); let lookId = null, lx = 0, ly = 0;
+  const lookStart = e => { if (lookId !== null) return; lookId = e.pointerId; lx = e.clientX; ly = e.clientY; e.preventDefault(); };
+  look.addEventListener('pointerdown', lookStart);
+  window.addEventListener('pointermove', e => { if (e.pointerId !== lookId) return; const k = e.pointerType === 'mouse' ? 0.8 : 1.15; CAM.look((e.clientX - lx) * k, (e.clientY - ly) * k); lx = e.clientX; ly = e.clientY; });
+  const lookEnd = e => { if (e.pointerId === lookId) lookId = null; };
+  window.addEventListener('pointerup', lookEnd); window.addEventListener('pointercancel', lookEnd);
   zone.addEventListener('pointerdown', e => {
+    if (e.pointerType === 'mouse') return lookStart(e);
     if (Input.joyId !== null) return; Input.joyId = e.pointerId; Input.ox = e.clientX; Input.oy = e.clientY;
     base.style.left = (e.clientX - 65) + 'px'; base.style.top = (e.clientY - 65) + 'px'; base.classList.add('on'); knob.style.transform = 'translate(0,0)';
     e.preventDefault();
@@ -36,7 +43,7 @@ const Input = { jx: 0, jy: 0, jm: 0, joyId: null, ox: 0, oy: 0, btn: {}, edge: {
     const up = () => { Input.btn[k] = false; b.classList.remove('down'); };
     b.addEventListener('pointerup', up); b.addEventListener('pointercancel', up); b.addEventListener('lostpointercapture', up);
   });
-  const map = { ' ': 'fire', Shift: 'run', f: 'enter', e: 'enter', q: 'weap', Control: 'hand' };
+  const map = { ' ': 'fire', Shift: 'run', f: 'enter', e: 'enter', q: 'weap', Control: 'hand', r: 'radio' };
   window.addEventListener('keydown', e => {
     const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
     if (!Input.keys[k]) { if (map[k]) Input.edge[map[k]] = true; if (k === 'Escape' || k === 'p') Game.togglePause(); }
@@ -51,7 +58,7 @@ function readInput() {
   const up = k.w || k.ArrowUp, dn = k.s || k.ArrowDown, lf = k.a || k.ArrowLeft, rt = k.d || k.ArrowRight;
   const r = { mx: Input.jx, my: Input.jy, mag: Input.jm, kb: false, up, dn, lf, rt,
     fire: Input.btn.fire || k[' '], run: Input.btn.run || k.Shift, hand: Input.btn.fire || k[' '] || k.Control, brake: Input.btn.run || k.Shift,
-    enter: Input.edge.enter, weap: Input.edge.weap };
+    enter: Input.edge.enter, weap: Input.edge.weap, radio: Input.edge.radio };
   if (up || dn || lf || rt) { r.kb = true; r.mx = (rt ? 1 : 0) - (lf ? 1 : 0); r.my = (dn ? 1 : 0) - (up ? 1 : 0); r.mag = Math.min(1, Math.hypot(r.mx, r.my)); }
   Input.edge = {};
   return r;
@@ -65,7 +72,7 @@ let PICKS = [];
 const Game = {
   running: false, paused: false, over: null, dialog: false,
   init() {
-    genWorld(); buildMinimap();
+    genWorld(); buildMinimap(); R3.init();
     for (const k in SPECIAL) SPOT[k] = spotOf(k);
     Object.assign(MISSION_SPOT, { x: SPOT.safe.x - 70, y: SPOT.safe.y });
     Object.assign(SAVE_SPOT, { x: SPOT.safe.x + 60, y: SPOT.safe.y });
@@ -83,12 +90,12 @@ const Game = {
     const car = makeCar(lotX(3) + 92, lotY(6) + 206, Math.PI / 2, 'sport'); car.col = '#e0281e'; G.cars.push(car);
     initPickups();
     M.active = null; M.cool = 0;
-    cam.x = pl.x; cam.y = pl.y; cam.z = 1;
+    CAM.snap();
     for (let i = 0; i < 30; i++) spawnPed({ x: pl.x + rand(-300, 300), y: pl.y + rand(-300, 300) });
     for (let i = 0; i < 14; i++) spawnTraffic(pl);
     this.over = null; this.running = true; this.paused = false;
     if (!s) {
-      showMsg('PORTO SOL', 'Use o analógico (esquerda) para andar', 4);
+      showMsg('PORTO SOL', 'Analógico à esquerda anda • arraste a direita para girar a câmera', 4);
       setTimeout(() => showHint('Toque ENTRAR perto de um carro para dirigir. Vá até o M amarelo no radar para começar uma missão.'), 4500);
     } else showMsg('BEM-VINDO DE VOLTA', '$' + G.money, 3);
   },
@@ -106,7 +113,7 @@ const Game = {
     G.money = Math.max(0, G.money - 100); G.ammo = [Infinity, 0, 0, 0]; G.weap = 0; G.armor = 0;
     setWanted(0);
     G.cars = G.cars.filter(c => !c.police); G.peds = G.peds.filter(p => p.kind !== 'cop' && p.kind !== 'gang');
-    this.over = null; cam.x = pl.x; cam.y = pl.y;
+    this.over = null; CAM.snap();
     showMsg(dead ? 'HOSPITAL' : 'DELEGACIA', '-$100 e armas perdidas', 3);
     Game.save();
   },
@@ -324,16 +331,17 @@ let aimT = null;
 function updatePlayer(dt, inp) {
   const pl = G.player;
   if (pl.hp <= 0) return;
-  if (inp.weap && pl.car) Radio.next();
-  else if (inp.weap) { const owned = [0, 1, 2, 3].filter(i => G.ammo[i] > 0); const i = owned.indexOf(G.weap); G.weap = owned[(i + 1) % owned.length]; SFX.pickup(); }
+  if (inp.radio) Radio.next();
+  if (inp.weap && !pl.car) { const owned = [0, 1, 2, 3].filter(i => G.ammo[i] > 0); const i = owned.indexOf(G.weap); G.weap = owned[(i + 1) % owned.length]; SFX.pickup(); }
   if (G.ammo[G.weap] <= 0) G.weap = 0;
   pl.weapon = G.weap;
   pl.cd -= dt;
   if (pl.car) return updateDriving(dt, inp);
   const run = inp.run || inp.mag > 0.92;
   const sp = inp.mag > 0.12 ? (run ? 170 : 100) * Math.min(1, inp.mag * 1.25) : 0;
+  pl.moving = sp > 0; pl.punchT = (pl.punchT || 0) - dt;
   if (sp > 0) {
-    const a = Math.atan2(inp.my, inp.mx); pl.x += Math.cos(a) * sp * dt; pl.y += Math.sin(a) * sp * dt; pl.a = a; pl.walk += sp * dt * 0.16;
+    const a = angN(Math.atan2(inp.my, inp.mx) + CAM.yaw + Math.PI / 2); pl.x += Math.cos(a) * sp * dt; pl.y += Math.sin(a) * sp * dt; pl.a = a; pl.walk += sp * dt * 0.16;
   }
   resolveCircle(pl, 8);
   for (const c of G.cars) {
@@ -347,10 +355,11 @@ function updatePlayer(dt, inp) {
     }
   }
   const w = WEAPONS[G.weap];
-  aimT = findTarget(pl, w.melee ? 40 : w.range, pl.a);
+  const facing = pl.moving || w.melee ? pl.a : CAM.yaw;
+  aimT = findTarget(pl, w.melee ? 40 : w.range, facing);
   if (inp.fire && pl.cd <= 0) {
-    const a = aimT ? Math.atan2(aimT.y - pl.y, aimT.x - pl.x) : pl.a;
-    pl.a = a; shoot(pl, a, G.weap); pl.cd = w.cd;
+    const a = aimT ? Math.atan2(aimT.y - pl.y, aimT.x - pl.x) : facing;
+    pl.a = a; shoot(pl, a, G.weap); pl.cd = w.cd; pl.punchT = 0.2;
     if (!w.melee) G.ammo[G.weap]--;
   }
   if (inp.enter) {
@@ -374,7 +383,7 @@ function enterCar(c) {
     if (c.police) crime(4);
   }
   c.driver = pl; c.ai = null; pl.car = c; c.siren = false; c.cops = 0; SFX.door(); Radio.next();
-  if (!G.droveHint) { G.droveHint = 1; showHint('Aponte o analógico para onde quer ir — o carro acelera sozinho. FREIO/RÉ para frear e dar ré, DRIFT para o freio de mão.', 7); }
+  if (!G.droveHint) { G.droveHint = 1; showHint('Analógico vira o volante. ACELERAR e FREIO/RÉ nos botões (ou analógico pra cima/baixo). FREIO DE MÃO para derrapar. A câmera volta sozinha pra trás do carro.', 8); }
   if (c.police) c.police = false;
   c.vx = Math.cos(c.a) * (c.spd || 0) * 0.3; c.vy = Math.sin(c.a) * (c.spd || 0) * 0.3;
 }
@@ -393,21 +402,15 @@ function updateDriving(dt, inp) {
   const pl = G.player, c = pl.car;
   pl.x = c.x; pl.y = c.y;
   if (inp.enter && c.spd < 140) { exitCar(); return; }
-  let thr = 0, steer = 0, brake = false;
-  if (inp.kb) {
-    thr = inp.up ? 1 : 0; brake = !!inp.dn; steer = (inp.rt ? 1 : 0) - (inp.lf ? 1 : 0);
-  } else if (inp.mag > 0.15) {
-    const ja = Math.atan2(inp.my, inp.mx);
-    const reversing = inp.brake && (c.fwd || 0) < 25;
-    const head = reversing ? c.a + Math.PI : c.a;
-    const diff = angN(ja - head);
-    steer = clamp(diff * 2.4, -1, 1) * (reversing ? -1 : 1);
-    if (reversing) { brake = true; }
-    else if (Math.abs(diff) > 2.3 && (c.fwd || 0) > 60) brake = true;
-    else thr = Math.min(1, inp.mag * 1.25) * (Math.abs(diff) > 1.6 ? 0.5 : 1);
-    if (inp.brake && !reversing) brake = true;
-  } else if (inp.brake) brake = true;
-  const hand = inp.kb ? !!(Input.keys[' '] || Input.keys.Control) : !!Input.btn.fire;
+  // estilo GTA: analógico (ou A/D) vira; ACELERAR / FREIO-RÉ nos botões; analógico pra cima/baixo também acelera/freia
+  let steer = inp.kb ? (inp.rt ? 1 : 0) - (inp.lf ? 1 : 0) : clamp(inp.mx * 1.25, -1, 1);
+  if (!inp.kb && Math.abs(steer) < 0.12) steer = 0;
+  const gas = Input.btn.fire || inp.up || (!inp.kb && inp.my < -0.45);
+  const brake = !!(Input.btn.run || inp.dn || (!inp.kb && inp.my > 0.55));
+  const thr = gas && !brake ? 1 : 0;
+  const hand = !!(Input.btn.weap || Input.keys[' '] || Input.keys.Control);
+  c.steerVis = lerp(c.steerVis || 0, steer, 1 - Math.exp(-10 * dt));
+  c.latVis = lerp(c.latVis || 0, steer * (c.fwd || 0), 1 - Math.exp(-5 * dt));
   driveCar(c, thr, steer, brake, hand, dt);
   if (c.fire > 0 && c.fire < 1.5 && !Game.over) showHint('O carro vai explodir! Toque SAIR!', 1);
 }
@@ -497,14 +500,7 @@ function update(dt) {
   if (bigMsg) { bigMsg.life -= dt; if (bigMsg.life <= 0) bigMsg = null; }
   if (hintMsg) { hintMsg.life -= dt; if (hintMsg.life <= 0) hintMsg = null; }
   starFlash = Math.max(0, starFlash - dt); G.shake = Math.max(0, G.shake - dt * 30); G.hurt = Math.max(0, (G.hurt || 0) - dt);
-  // câmera
   const me = pl.car || pl;
-  const look = pl.car ? 0.45 : 0;
-  cam.x = lerp(cam.x, me.x + (me.vx || 0) * look, 1 - Math.pow(0.002, dt));
-  cam.y = lerp(cam.y, me.y + (me.vy || 0) * look, 1 - Math.pow(0.002, dt));
-  const viewH = pl.car ? 600 + Math.min(320, pl.car.spd * 0.9) : 530;
-  const tz = Math.min(W, H * 1.6) / viewH;
-  cam.z = lerp(cam.z, tz, 1 - Math.pow(0.15, dt));
   let sirD = 1e9; for (const c of G.cars) if (c.siren && !c.wreck) sirD = Math.min(sirD, dist(c, me));
   SFX.update(dt, pl.car ? pl.car.spd : 0, !!pl.car, sirD < 900, sirD); Radio.update(!!pl.car && !Game.over);
   updateButtons();
@@ -541,100 +537,24 @@ function updateButtons() {
   const st = inCar + '|' + near + '|' + G.weap + '|' + G.ammo[G.weap];
   if (st === lastBtnState) return; lastBtnState = st;
   bEnter.textContent = inCar ? 'SAIR' : 'ENTRAR'; bEnter.classList.toggle('glow', near || inCar);
-  bRun.textContent = inCar ? 'FREIO/RÉ' : 'CORRER';
-  bFire.textContent = inCar ? 'DRIFT' : G.weap === 0 ? 'SOCO' : 'ATIRAR';
-  bWeap.innerHTML = inCar ? '<small>RÁDIO</small>📻' : `<small>ARMA</small>${WEAPONS[G.weap].icon}`;
+  bRun.textContent = inCar ? 'FREIO / RÉ' : 'CORRER';
+  bFire.textContent = inCar ? 'ACELERAR' : G.weap === 0 ? 'SOCO' : 'ATIRAR';
+  bWeap.innerHTML = inCar ? '<small>FREIO DE</small>MÃO' : `<small>ARMA</small>${WEAPONS[G.weap].icon}`;
+  document.getElementById('bRadio').classList.toggle('hidden', !inCar);
 }
 
 // ===== Render =====
-function render() {
-  const pl = G.player;
-  const z = cam.z, sx = G.shake ? rand(-G.shake, G.shake) * 0.5 : 0, sy = G.shake ? rand(-G.shake, G.shake) * 0.5 : 0;
-  ctx.setTransform(DPR * z, 0, 0, DPR * z, DPR * (W / 2 - (cam.x + sx) * z), DPR * (H / 2 - (cam.y + sy) * z));
-  const v = { x0: cam.x - W / 2 / z, x1: cam.x + W / 2 / z, y0: cam.y - H / 2 / z, y1: cam.y + H / 2 / z };
-  ctx.imageSmoothingEnabled = true;
-  drawGround(ctx, v);
-  for (const d of G.decals) { ctx.fillStyle = d.c; ctx.globalAlpha = Math.min(1, d.life / 5); ctx.beginPath(); ctx.arc(d.x, d.y, d.r, 0, 7); ctx.fill(); }
-  ctx.globalAlpha = 1;
-  ctx.fillStyle = 'rgba(15,15,15,.45)';
-  for (const s of G.skids) { if (s.x < v.x0 || s.x > v.x1 || s.y < v.y0 || s.y > v.y1) continue; ctx.save(); ctx.translate(s.x, s.y); ctx.rotate(s.a); ctx.globalAlpha = Math.min(1, s.life / 3) * 0.6; ctx.fillRect(-4, -2.5, 8, 5); ctx.restore(); }
-  ctx.globalAlpha = 1;
-  drawMarkers(ctx, false);
-  for (const k of G.pickups) {
-    if (k.respawn > 0 || k.x < v.x0 - 20 || k.x > v.x1 + 20 || k.y < v.y0 - 20 || k.y > v.y1 + 20) continue;
-    const b = Math.sin(G.t * 4 + k.x) * 2, [ch, col] = PK[k.type];
-    ctx.fillStyle = 'rgba(0,0,0,.3)'; ctx.beginPath(); ctx.ellipse(k.x, k.y + 6, 8, 3, 0, 0, 7); ctx.fill();
-    ctx.fillStyle = col; ctx.beginPath(); ctx.arc(k.x, k.y - 4 + b, 9, 0, 7); ctx.fill();
-    ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.stroke();
-    ctx.fillStyle = '#fff'; ctx.font = '900 11px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(ch, k.x, k.y - 3.5 + b);
-  }
-  const inV = o => o.x > v.x0 - 60 && o.x < v.x1 + 60 && o.y > v.y0 - 60 && o.y < v.y1 + 60;
-  for (const p of G.peds) if (p.hp <= 0 && inV(p)) drawPed(ctx, p);
-  for (const q of G.parts) if (q.type === 'blood') { ctx.fillStyle = '#a01010'; ctx.fillRect(q.x - 1.5, q.y - 1.5, 3, 3); }
-  for (const p of G.peds) if (p.hp > 0 && !p.car && inV(p)) drawPed(ctx, p);
-  if (!pl.car && pl.hp > 0) drawPed(ctx, pl);
-  if (!pl.car && pl.hp <= 0) drawPed(ctx, pl);
-  for (const c of G.cars) if (inV(c)) drawCar(ctx, c);
-  // alvo
-  if (aimT && !pl.car && aimT.hp !== undefined && (aimT.hp > 0)) {
-    ctx.strokeStyle = aimT.kind === 'civ' ? 'rgba(255,255,255,.8)' : 'rgba(255,60,60,.9)'; ctx.lineWidth = 2;
-    const r = 13 + Math.sin(G.t * 10) * 2; ctx.beginPath(); ctx.arc(aimT.x, aimT.y, r, 0, 7); ctx.stroke();
-    if (aimT.maxHp && aimT.hp < aimT.maxHp) { ctx.fillStyle = '#000'; ctx.fillRect(aimT.x - 14, aimT.y - 22, 28, 4); ctx.fillStyle = '#e33'; ctx.fillRect(aimT.x - 14, aimT.y - 22, 28 * aimT.hp / aimT.maxHp, 4); }
-  }
-  ctx.lineWidth = 1.5;
-  for (const t of G.tracers) { ctx.strokeStyle = `rgba(255,230,150,${t.life * 12})`; ctx.beginPath(); ctx.moveTo(t.x1, t.y1); ctx.lineTo(t.x2, t.y2); ctx.stroke(); }
-  const night = darkness() > 0.3;
-  drawBuildings(ctx, cam, v, night);
-  for (const q of G.parts) {
-    if (q.type === 'blood') continue;
-    const a = q.life / q.max;
-    if (q.type === 'smoke') { ctx.fillStyle = `rgba(60,60,60,${a * 0.45})`; ctx.beginPath(); ctx.arc(q.x, q.y, q.size, 0, 7); ctx.fill(); }
-    else if (q.type === 'fire') { ctx.fillStyle = `rgba(255,${120 + a * 120 | 0},30,${a})`; ctx.beginPath(); ctx.arc(q.x, q.y, q.size * (0.5 + a * 0.5), 0, 7); ctx.fill(); }
-    else if (q.type === 'spark') { ctx.fillStyle = '#ffdc6a'; ctx.fillRect(q.x - 1, q.y - 1, 2.5, 2.5); }
-    else if (q.type === 'flash') { ctx.fillStyle = 'rgba(255,240,180,.9)'; ctx.beginPath(); ctx.arc(q.x, q.y, q.size, 0, 7); ctx.fill(); }
-  }
-  drawMarkers(ctx, true);
-  ctx.textAlign = 'center'; ctx.font = '900 14px Arial';
-  for (const f of floats) { ctx.globalAlpha = Math.min(1, f.life * 2); ctx.fillStyle = '#000'; ctx.fillText(f.t, f.x + 1, f.y + 1); ctx.fillStyle = f.c; ctx.fillText(f.t, f.x, f.y); }
-  ctx.globalAlpha = 1;
-  // noite
-  const dk = darkness();
-  if (dk > 0.01) drawNight(dk, v, z);
-  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+function render(dt) {
+  R3.render(dt);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.clearRect(0, 0, W, H);
   if (G.hurt > 0) { ctx.fillStyle = `rgba(200,0,0,${G.hurt * 0.5})`; ctx.fillRect(0, 0, W, H); }
+  for (const f of floats) { const p = R3.project(f.x, 30 + (1.2 - f.life) * 25, f.y); if (!p) continue; ctx.globalAlpha = Math.min(1, f.life * 2); txt(f.t, p.x, p.y, 15, f.c, 'center', 3); }
+  ctx.globalAlpha = 1;
+  if (aimT && !G.player.car && aimT.maxHp && aimT.hp > 0 && aimT.hp < aimT.maxHp) {
+    const p = R3.project(aimT.x, 42, aimT.y);
+    if (p) { ctx.fillStyle = '#000'; ctx.fillRect(p.x - 20, p.y - 3, 40, 6); ctx.fillStyle = '#e33'; ctx.fillRect(p.x - 19, p.y - 2, 38 * aimT.hp / aimT.maxHp, 4); }
+  }
   drawHUD();
-}
-function drawNight(dk, v, z) {
-  const lw = light.width, lh = light.height, s = 0.5 * z;
-  const tx = x => (x - cam.x) * s + lw / 2, ty = y => (y - cam.y) * s + lh / 2;
-  lctx.globalCompositeOperation = 'source-over'; lctx.clearRect(0, 0, lw, lh);
-  lctx.fillStyle = `rgba(8,12,40,${dk})`; lctx.fillRect(0, 0, lw, lh);
-  lctx.globalCompositeOperation = 'destination-out';
-  const glow = (x, y, r, a) => { const g = lctx.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, `rgba(0,0,0,${a})`); g.addColorStop(1, 'rgba(0,0,0,0)'); lctx.fillStyle = g; lctx.fillRect(x - r, y - r, r * 2, r * 2); };
-  // postes nas esquinas
-  for (let i = Math.max(0, Math.floor(v.x0 / PT)); i <= Math.min(NB, Math.ceil(v.x1 / PT)); i++)
-    for (let j = Math.max(0, Math.floor(v.y0 / PT)); j <= Math.min(NB, Math.ceil(v.y1 / PT)); j++) {
-      glow(tx(i * PT + 140), ty(j * PT + 140), 90 * s, 0.75); glow(tx(i * PT - 12), ty(j * PT - 12), 90 * s, 0.75);
-    }
-  const me = G.player.car || G.player; glow(tx(me.x), ty(me.y), 110 * s, 0.5);
-  for (const c of G.cars) {
-    if (c.wreck || c.x < v.x0 - 200 || c.x > v.x1 + 200 || c.y < v.y0 - 200 || c.y > v.y1 + 200) continue;
-    const fx = Math.cos(c.a), fy = Math.sin(c.a);
-    for (let k = 1; k <= 3; k++) glow(tx(c.x + fx * (20 + k * 34)), ty(c.y + fy * (20 + k * 34)), (22 + k * 12) * s, 0.8);
-  }
-  for (const q of G.parts) if (q.type === 'fire' || q.type === 'flash') glow(tx(q.x), ty(q.y), 60 * s, 0.6);
-  for (const k of G.pickups) if (k.respawn <= 0 && k.x > v.x0 && k.x < v.x1 && k.y > v.y0 && k.y < v.y1) glow(tx(k.x), ty(k.y), 30 * s, 0.6);
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.drawImage(light, 0, 0, cv.width, cv.height);
-  // giroflex
-  ctx.globalCompositeOperation = 'lighter';
-  for (const c of G.cars) if (c.siren && !c.wreck) {
-    const X = ((c.x - cam.x) * z + W / 2) * DPR, Y = ((c.y - cam.y) * z + H / 2) * DPR;
-    if (X < -200 || Y < -200 || X > cv.width + 200 || Y > cv.height + 200) continue;
-    const red = Math.floor(G.t * 8) % 2; const g = ctx.createRadialGradient(X, Y, 0, X, Y, 90 * z * DPR);
-    g.addColorStop(0, red ? 'rgba(255,40,40,.35)' : 'rgba(40,80,255,.35)'); g.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = g; ctx.fillRect(X - 90 * z * DPR, Y - 90 * z * DPR, 180 * z * DPR, 180 * z * DPR);
-  }
-  ctx.globalCompositeOperation = 'source-over';
 }
 function markerList() {
   const out = [];
@@ -648,19 +568,6 @@ function markerList() {
   }
   return out;
 }
-function drawMarkers(c, top) {
-  for (const m of markerList()) {
-    const { x, y } = m.p, pulse = 1 + Math.sin(G.t * 5) * 0.08;
-    if (!top) {
-      c.fillStyle = `rgba(${m.c},.25)`; c.beginPath(); c.arc(x, y, m.r * pulse, 0, 7); c.fill();
-      c.strokeStyle = `rgba(${m.c},.9)`; c.lineWidth = 3; c.beginPath(); c.arc(x, y, m.r * pulse, 0, 7); c.stroke();
-    } else {
-      const g = c.createLinearGradient(x, y, x, y - 90); g.addColorStop(0, `rgba(${m.c},.45)`); g.addColorStop(1, `rgba(${m.c},0)`);
-      c.fillStyle = g; c.fillRect(x - m.r * 0.5, y - 90, m.r, 90);
-      if (m.l) { const by = y - 40 + Math.sin(G.t * 3) * 5; c.fillStyle = `rgb(${m.c})`; c.beginPath(); c.arc(x, by, 12, 0, 7); c.fill(); c.fillStyle = '#111'; c.font = '900 13px Arial'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(m.l, x, by + 1); }
-    }
-  }
-}
 function txt(t, x, y, size, col, align, stroke) {
   ctx.font = `900 ${size}px "Arial Black", Arial, sans-serif`; ctx.textAlign = align || 'left'; ctx.textBaseline = 'middle';
   ctx.lineWidth = stroke || Math.max(3, size / 5); ctx.strokeStyle = '#000'; ctx.lineJoin = 'round'; ctx.strokeText(t, x, y); ctx.fillStyle = col; ctx.fillText(t, x, y);
@@ -673,11 +580,15 @@ function drawHUD() {
   ctx.fillStyle = '#1a3f66'; ctx.fillRect(rx - R, ry - R, R * 2, R * 2);
   const ms = 2.2 * u, me = pl.car || pl;
   ctx.imageSmoothingEnabled = false;
-  ctx.drawImage(MINIMAP, rx - me.x / T * ms, ry - me.y / T * ms, MAP_TW * ms, MAP_TH * ms);
+  const rot = -(CAM.yaw + Math.PI / 2), rc = Math.cos(rot), rs = Math.sin(rot);
+  ctx.translate(rx, ry); ctx.rotate(rot);
+  ctx.drawImage(MINIMAP, -me.x / T * ms, -me.y / T * ms, MAP_TW * ms, MAP_TH * ms);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   ctx.imageSmoothingEnabled = true;
   ctx.restore();
   const blip = (x, y, col, sz, label, clampIt) => {
-    let dx = (x - me.x) / T * ms, dy = (y - me.y) / T * ms; const d = Math.hypot(dx, dy);
+    const ux = (x - me.x) / T * ms, uy = (y - me.y) / T * ms;
+    let dx = ux * rc - uy * rs, dy = ux * rs + uy * rc; const d = Math.hypot(dx, dy);
     if (d > R - 6) { if (!clampIt) return; dx *= (R - 6) / d; dy *= (R - 6) / d; }
     ctx.fillStyle = col; ctx.strokeStyle = '#000'; ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.arc(rx + dx, ry + dy, sz * u, 0, 7); ctx.fill(); ctx.stroke();
@@ -691,11 +602,11 @@ function drawHUD() {
   for (const p of G.peds) if (p.hp > 0 && (p.kind === 'cop' && G.wanted > 0 || p.kind === 'gang' && p.keep)) blip(p.x, p.y, p.kind === 'cop' ? '#69f' : '#e33', 2.5);
   if (!M.active && G.mIdx < MISSIONS.length) blip(MISSION_SPOT.x, MISSION_SPOT.y, '#fd2', 6, 'M', true);
   const tg = M.target(); if (tg) blip(tg.x, tg.y, M.cur().t === 'cp' ? '#f44' : '#fd2', 5.5, '', true);
-  ctx.save(); ctx.translate(rx, ry); ctx.rotate((pl.car ? pl.car.a : pl.a) + Math.PI / 2);
+  ctx.save(); ctx.translate(rx, ry); ctx.rotate((pl.car ? pl.car.a : pl.a) + Math.PI / 2 + rot);
   ctx.fillStyle = '#fff'; ctx.strokeStyle = '#000'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(0, -7 * u); ctx.lineTo(5 * u, 6 * u); ctx.lineTo(0, 3 * u); ctx.lineTo(-5 * u, 6 * u); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore();
   ctx.strokeStyle = '#111'; ctx.lineWidth = 4 * u; ctx.beginPath(); ctx.arc(rx, ry, R, 0, 7); ctx.stroke();
   ctx.strokeStyle = 'rgba(255,255,255,.5)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(rx, ry, R - 2 * u, 0, 7); ctx.stroke();
-  txt('N', rx, ry - R + 9 * u, 10 * u, '#fff', 'center', 3);
+  txt('N', rx + rs * (R - 9 * u), ry - rc * (R - 9 * u), 10 * u, '#fff', 'center', 3);
   // painel direito
   const X = W - 16 - (window.SAFE_R || 0); let y = 22 * u;
   const hh = Math.floor(G.time / 60), mm = Math.floor(G.time % 60);
@@ -725,16 +636,6 @@ function drawHUD() {
     ctx.fillStyle = 'rgba(0,0,0,.55)'; rr(ctx, W / 2 - tw / 2, H - 46 * u - 10, tw, 30 * u, 8); ctx.fill();
     txt(t, W / 2, H - 31 * u - 10, 14 * u, '#ffe27a', 'center', 3);
     if (s && s.time) { const tm = Math.max(0, M.timer); txt(`${Math.floor(tm / 60)}:${String(Math.floor(tm % 60)).padStart(2, '0')}`, W / 2, 30 * u, 26 * u, tm < 10 ? '#f55' : '#fff', 'center'); }
-    // seta para objetivo
-    if (tg) {
-      const z = cam.z, sx = (tg.x - cam.x) * z + W / 2, sy = (tg.y - cam.y) * z + H / 2;
-      if (sx < 0 || sx > W || sy < 0 || sy > H) {
-        const a = Math.atan2(sy - H / 2, sx - W / 2);
-        const ex = W / 2 + Math.cos(a) * (Math.min(W, H) / 2 - 40), ey = H / 2 + Math.sin(a) * (Math.min(W, H) / 2 - 40);
-        ctx.save(); ctx.translate(ex, ey); ctx.rotate(a); ctx.fillStyle = '#ffd23f'; ctx.strokeStyle = '#000'; ctx.lineWidth = 2;
-        ctx.beginPath(); ctx.moveTo(18, 0); ctx.lineTo(-8, -12); ctx.lineTo(-3, 0); ctx.lineTo(-8, 12); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore();
-      }
-    }
   }
   if (hintMsg) {
     ctx.font = `700 ${13 * u}px Arial`;
@@ -776,7 +677,7 @@ function frame(ts) {
     for (let i = 0; i < steps; i++) update(dt / steps);
     saveT += dt; if (saveT > 20) { saveT = 0; if (!M.active) Game.save(); }
   }
-  render();
+  render(dt);
 }
 Game.init();
 requestAnimationFrame(frame);
@@ -796,5 +697,7 @@ document.getElementById('dNo').onclick = () => closeDialog(false);
 document.getElementById('bPause').onclick = () => Game.togglePause();
 document.getElementById('pResume').onclick = () => Game.togglePause(false);
 document.getElementById('pSound').onclick = e => { SFX.on = !SFX.on; e.target.textContent = 'SOM: ' + (SFX.on ? 'LIGADO' : 'DESLIGADO'); };
+document.getElementById('pShadow').onclick = e => { R3.lockQ = true; R3.setShadows(!R3.shadows); e.target.textContent = 'SOMBRAS: ' + (R3.shadows ? 'LIGADAS' : 'DESLIGADAS'); };
+document.getElementById('bRadio').onclick = () => Radio.next();
 document.getElementById('pFull').onclick = () => { try { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen(); } catch (e) { } };
 document.getElementById('pMenu').onclick = () => { Game.save(); Game.running = false; Game.paused = false; document.getElementById('pause').classList.add('hidden'); document.getElementById('ui').classList.add('hidden'); document.getElementById('title').classList.remove('hidden'); if (Game.loadSave()) { bCont.classList.remove('hidden'); bCont.onclick = () => startGame(true); } };

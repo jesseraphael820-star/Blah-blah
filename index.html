@@ -14,6 +14,10 @@
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
   html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0b12; touch-action: none; font-family: "Arial Black", Arial, sans-serif; color: #fff; }
   canvas { display: block; position: fixed; inset: 0; }
+  #c3d { width: 100%; height: 100%; }
+  #c { pointer-events: none; }
+  #lookZone { position: absolute; inset: 0; pointer-events: auto; touch-action: none; }
+  #bRadio { position: absolute; top: 12px; left: calc(50% + 34px); pointer-events: auto; height: 34px; padding: 0 10px; border-radius: 8px; border: 2px solid rgba(120,200,255,.6); background: rgba(0,0,0,.4); color: #9df; font-family: inherit; font-size: 11px; }
   .hidden { display: none !important; }
   #ui { position: fixed; inset: 0; pointer-events: none; }
   #joyZone { position: absolute; left: 0; bottom: 0; width: 45%; height: 70%; pointer-events: auto; touch-action: none; }
@@ -65,8 +69,10 @@
 </style>
 </head>
 <body>
+<canvas id="c3d"></canvas>
 <canvas id="c"></canvas>
 <div id="ui" class="hidden">
+  <div id="lookZone"></div>
   <div id="joyZone"><div id="joyBase"><div id="joyKnob"></div></div></div>
   <div id="btns">
     <button class="btn" id="bEnter" data-k="enter">ENTRAR</button>
@@ -75,15 +81,16 @@
     <button class="btn" id="bFire" data-k="fire">SOCO</button>
   </div>
   <button id="bPause">❚❚</button>
+  <button id="bRadio" class="hidden">📻 RÁDIO</button>
   <div id="rotate">↻ Gire o celular para jogar melhor</div>
 </div>
 <div id="title" class="screen">
   <div class="sun"></div><div class="city"></div>
   <h1>PORTO SOL</h1>
-  <h2>CRIME • CARROS • CIDADE</h2>
+  <h2>CRIME • CARROS • CIDADE • 3D</h2>
   <button class="menuBtn hidden" id="bCont">CONTINUAR</button>
   <button class="menuBtn alt" id="bNew">NOVO JOGO</button>
-  <div class="help">Celular: analógico à esquerda, botões à direita • PC: WASD, Espaço atira, F entra/sai, Shift corre/freia, Q troca arma</div>
+  <div class="help">Celular: analógico à esquerda, botões à direita • Arraste o lado direito para girar a câmera • PC: WASD, mouse gira a câmera, Espaço atira/freio de mão, F entra/sai, Shift corre/freia, Q arma, R rádio</div>
 </div>
 <div id="dialog" class="screen hidden">
   <div class="card">
@@ -100,13 +107,16 @@
     <h2>PAUSADO</h2>
     <button class="menuBtn" id="pResume">CONTINUAR</button><br>
     <button class="menuBtn alt" id="pSound">SOM: LIGADO</button><br>
+    <button class="menuBtn alt" id="pShadow">SOMBRAS: LIGADAS</button><br>
     <button class="menuBtn alt" id="pFull">TELA CHEIA</button><br>
     <button class="menuBtn alt" id="pMenu">SALVAR E SAIR</button>
   </div>
 </div>
+<script src="js/vendor/three.min.js"></script>
 <script src="js/world.js"></script>
 <script src="js/audio.js"></script>
 <script src="js/entities.js"></script>
+<script src="js/render3d.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>

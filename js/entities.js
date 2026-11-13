@@ -232,7 +232,7 @@ function damageCar(c, dmg, src) {
 }
 function explode(c) {
   c.wreck = true; c.fire = 0; c.vx *= .3; c.vy *= .3; c.siren = false;
-  SFX.boom(); G.shake = Math.max(G.shake, dist(c, G.player.car || G.player) < 500 ? 14 : 4);
+  SFX.boom(); if (R3.flash) R3.flash(c.x, c.y); G.shake = Math.max(G.shake, dist(c, G.player.car || G.player) < 500 ? 14 : 4);
   for (let i = 0; i < 40; i++) { const a = rand(0, 7), s = rand(40, 260); G.parts.push({ x: c.x, y: c.y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: rand(.4, 1), max: 1, size: rand(8, 22), type: 'fire' }); }
   for (let i = 0; i < 20; i++) G.parts.push({ x: c.x + rand(-20, 20), y: c.y + rand(-20, 20), vx: rand(-30, 30), vy: rand(-30, 30), life: rand(1.5, 3), max: 3, size: rand(14, 30), type: 'smoke' });
   G.decals.push({ x: c.x, y: c.y, r: 40, life: 40, c: 'rgba(20,20,20,.6)' });
