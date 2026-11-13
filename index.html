@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0b0b12">
+<title>Porto Sol</title>
+<link rel="manifest" href="manifest.json">
+<style>
+  :root { --sl: env(safe-area-inset-left, 0px); --sr: env(safe-area-inset-right, 0px); --sb: env(safe-area-inset-bottom, 0px); }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0b12; touch-action: none; font-family: "Arial Black", Arial, sans-serif; color: #fff; }
+  canvas { display: block; position: fixed; inset: 0; }
+  .hidden { display: none !important; }
+  #ui { position: fixed; inset: 0; pointer-events: none; }
+  #joyZone { position: absolute; left: 0; bottom: 0; width: 45%; height: 70%; pointer-events: auto; touch-action: none; }
+  #joyBase { position: absolute; left: calc(40px + var(--sl)); bottom: 40px; width: 130px; height: 130px; border-radius: 50%; background: rgba(255,255,255,.08); border: 3px solid rgba(255,255,255,.25); opacity: .55; transition: opacity .15s; }
+  #joyBase.on { opacity: 1; bottom: auto; }
+  #joyKnob { position: absolute; left: 37px; top: 37px; width: 50px; height: 50px; border-radius: 50%; background: rgba(255,255,255,.55); box-shadow: 0 0 12px rgba(0,0,0,.5); }
+  #btns { position: absolute; right: calc(18px + var(--sr)); bottom: calc(18px + var(--sb)); width: 230px; height: 220px; pointer-events: none; }
+  .btn { position: absolute; pointer-events: auto; touch-action: none; border-radius: 50%; border: 3px solid rgba(255,255,255,.45); color: #fff; font-family: inherit; font-size: 12px; letter-spacing: .5px; background: rgba(20,20,30,.45); text-shadow: 0 1px 2px #000; display: flex; align-items: center; justify-content: center; flex-direction: column; padding: 0; }
+  .btn.down { background: rgba(255,255,255,.35); transform: scale(.94); }
+  #bFire { right: 0; bottom: 0; width: 96px; height: 96px; font-size: 14px; border-color: rgba(255,90,70,.8); background: rgba(150,30,20,.4); }
+  #bRun { right: 108px; bottom: 6px; width: 76px; height: 76px; font-size: 11px; }
+  #bEnter { right: 22px; bottom: 112px; width: 72px; height: 72px; border-color: rgba(255,210,60,.8); }
+  #bEnter.glow { background: rgba(200,150,20,.55); box-shadow: 0 0 16px rgba(255,210,60,.6); }
+  #bWeap { right: 120px; bottom: 98px; width: 60px; height: 60px; font-size: 16px; }
+  #bWeap small { font-size: 8px; opacity: .8; }
+  #bPause { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); pointer-events: auto; width: 44px; height: 34px; border-radius: 8px; border: 2px solid rgba(255,255,255,.4); background: rgba(0,0,0,.4); color: #fff; font-family: inherit; font-size: 14px; }
+  .screen { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; z-index: 10; }
+  #title { background: radial-gradient(ellipse at 50% 120%, #ff7a2a 0%, #c8325a 30%, #3a1a5a 60%, #0b0b12 100%); overflow: hidden; }
+  #title .sun { position: absolute; width: 60vmin; height: 60vmin; border-radius: 50%; bottom: -22vmin; left: 50%; transform: translateX(-50%); background: linear-gradient(#ffe25a, #ff6a2a); box-shadow: 0 0 80px #ff8a3a; }
+  #title .sun::after { content: ""; position: absolute; inset: 0; border-radius: 50%; background: repeating-linear-gradient(transparent 0 14px, #c8325a 14px 18px); mask: linear-gradient(transparent 45%, #000 46%); -webkit-mask: linear-gradient(transparent 45%, #000 46%); }
+  #title .city { position: absolute; bottom: 0; left: 0; right: 0; height: 28vh; background:
+    linear-gradient(#0b0b12,#0b0b12) 5% 100%/6% 70% no-repeat, linear-gradient(#0b0b12,#0b0b12) 12% 100%/5% 45% no-repeat,
+    linear-gradient(#0b0b12,#0b0b12) 20% 100%/7% 90% no-repeat, linear-gradient(#0b0b12,#0b0b12) 30% 100%/4% 55% no-repeat,
+    linear-gradient(#0b0b12,#0b0b12) 68% 100%/6% 80% no-repeat, linear-gradient(#0b0b12,#0b0b12) 76% 100%/8% 60% no-repeat,
+    linear-gradient(#0b0b12,#0b0b12) 86% 100%/5% 95% no-repeat, linear-gradient(#0b0b12,#0b0b12) 94% 100%/6% 50% no-repeat,
+    linear-gradient(transparent 85%, #0b0b12 85%); }
+  #title h1 { position: relative; margin: 0; font-size: min(18vw, 22vh); line-height: .9; letter-spacing: -2px; color: #ffe25a; text-shadow: 4px 4px 0 #c8325a, 8px 8px 0 #000; transform: rotate(-4deg); font-style: italic; }
+  #title h2 { position: relative; margin: 6px 0 22px; font-size: min(4.5vw, 5vh); letter-spacing: 6px; color: #fff; text-shadow: 2px 2px 0 #000; }
+  .menuBtn { position: relative; pointer-events: auto; font-family: inherit; font-size: 18px; color: #111; background: #ffe25a; border: 0; border-radius: 10px; padding: 12px 34px; margin: 6px; box-shadow: 0 5px 0 #b3881a, 0 8px 18px rgba(0,0,0,.5); min-width: 220px; }
+  .menuBtn:active { transform: translateY(3px); box-shadow: 0 2px 0 #b3881a; }
+  .menuBtn.alt { background: #fff; box-shadow: 0 5px 0 #999, 0 8px 18px rgba(0,0,0,.5); }
+  .help { position: relative; margin-top: 16px; font-family: Arial, sans-serif; font-weight: 700; font-size: 12px; opacity: .85; text-align: center; text-shadow: 1px 1px 0 #000; max-width: 90vw; }
+  #dialog, #pause { background: rgba(0,0,0,.55); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); }
+  .card { width: min(480px, 92vw); max-height: 92vh; overflow: auto; background: linear-gradient(#1c1c28, #12121a); border: 3px solid #ffe25a; border-radius: 14px; padding: 18px 20px; box-shadow: 0 10px 40px #000; text-align: center; }
+  .card h2 { margin: 0 0 8px; color: #ffe25a; font-size: 22px; text-shadow: 2px 2px 0 #000; }
+  .card p { font-family: Arial, sans-serif; font-weight: 700; line-height: 1.4; font-size: 14px; margin: 6px 0; }
+  #dReward { color: #5dd35d; }
+  .card .menuBtn { min-width: 140px; font-size: 15px; padding: 10px 20px; }
+  #dNo:empty { display: none; }
+  .shopItem { display: flex; justify-content: space-between; width: 100%; margin: 5px 0; padding: 10px 14px; border-radius: 8px; border: 2px solid #444; background: #22222e; color: #fff; font-family: inherit; font-size: 13px; }
+  .shopItem b { color: #5dd35d; }
+  .shopItem.no { border-color: #f44; background: #4a1a1a; }
+  #rotate { display: none; }
+  @media (orientation: portrait) and (pointer: coarse) {
+    #rotate { display: flex; position: fixed; top: 54px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,.7); padding: 6px 12px; border-radius: 8px; font-size: 11px; z-index: 5; pointer-events: none; white-space: nowrap; }
+    #btns { transform: scale(.85); transform-origin: right bottom; }
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="ui" class="hidden">
+  <div id="joyZone"><div id="joyBase"><div id="joyKnob"></div></div></div>
+  <div id="btns">
+    <button class="btn" id="bEnter" data-k="enter">ENTRAR</button>
+    <button class="btn" id="bWeap" data-k="weap"><small>ARMA</small>✊</button>
+    <button class="btn" id="bRun" data-k="run">CORRER</button>
+    <button class="btn" id="bFire" data-k="fire">SOCO</button>
+  </div>
+  <button id="bPause">❚❚</button>
+  <div id="rotate">↻ Gire o celular para jogar melhor</div>
+</div>
+<div id="title" class="screen">
+  <div class="sun"></div><div class="city"></div>
+  <h1>PORTO SOL</h1>
+  <h2>CRIME • CARROS • CIDADE</h2>
+  <button class="menuBtn hidden" id="bCont">CONTINUAR</button>
+  <button class="menuBtn alt" id="bNew">NOVO JOGO</button>
+  <div class="help">Celular: analógico à esquerda, botões à direita • PC: WASD, Espaço atira, F entra/sai, Shift corre/freia, Q troca arma</div>
+</div>
+<div id="dialog" class="screen hidden">
+  <div class="card">
+    <h2 id="dTitle"></h2>
+    <p id="dText"></p>
+    <p id="dReward"></p>
+    <div id="dExtra"></div>
+    <button class="menuBtn" id="dOk">COMEÇAR</button>
+    <button class="menuBtn alt" id="dNo">AGORA NÃO</button>
+  </div>
+</div>
+<div id="pause" class="screen hidden">
+  <div class="card">
+    <h2>PAUSADO</h2>
+    <button class="menuBtn" id="pResume">CONTINUAR</button><br>
+    <button class="menuBtn alt" id="pSound">SOM: LIGADO</button><br>
+    <button class="menuBtn alt" id="pFull">TELA CHEIA</button><br>
+    <button class="menuBtn alt" id="pMenu">SALVAR E SAIR</button>
+  </div>
+</div>
+<script src="js/world.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/entities.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
