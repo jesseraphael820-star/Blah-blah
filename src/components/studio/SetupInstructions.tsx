@@ -1,6 +1,14 @@
+import { STATIC_PREVIEW } from "@/lib/api-client";
+
 export function SetupInstructions() {
   return (
     <div className="space-y-3 text-sm" data-testid="setup-instructions">
+      {STATIC_PREVIEW && (
+        <p className="rounded-xl border border-brand-400/30 bg-brand-500/10 p-3 text-brand-200">
+          Esta é uma prévia estática do site, sem servidor. A edição com IA funciona na versão publicada (Vercel) com uma chave de API
+          configurada.
+        </p>
+      )}
       <p>
         Este app <strong>não simula</strong> edições: toda edição é gerada por um modelo real de IA no servidor. Para ativar, configure uma
         das integrações abaixo:

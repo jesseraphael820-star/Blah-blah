@@ -1,0 +1,14 @@
+@import "../src/app/globals.css";
+@source "../src";
+@source "./";
+
+:root {
+  --font-inter: "Inter";
+  --font-grotesk: "Space Grotesk";
+  color-scheme: dark;
+}
+body {
+  background-color: #06050a;
+  color: #ece9f6;
+  font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+}

@@ -3,6 +3,9 @@
 import type { FaceDetector } from "@mediapipe/tasks-vision";
 import type { FaceBox, FaceResult } from "./types";
 
+/** Na prévia estática os arquivos ficam ao lado da página (caminho relativo). */
+const ASSET_BASE = process.env.NEXT_PUBLIC_STATIC_PREVIEW === "1" ? "./" : "/";
+
 let detectorPromise: Promise<FaceDetector> | null = null;
 
 /** Carrega o detector BlazeFace (MediaPipe) — executa localmente no navegador. */
@@ -10,10 +13,10 @@ function getDetector(): Promise<FaceDetector> {
   if (!detectorPromise) {
     detectorPromise = (async () => {
       const { FaceDetector, FilesetResolver } = await import("@mediapipe/tasks-vision");
-      const fileset = await FilesetResolver.forVisionTasks("/mediapipe/wasm");
+      const fileset = await FilesetResolver.forVisionTasks(`${ASSET_BASE}mediapipe/wasm`);
       const create = (delegate: "GPU" | "CPU") =>
         FaceDetector.createFromOptions(fileset, {
-          baseOptions: { modelAssetPath: "/models/blaze_face_short_range.tflite", delegate },
+          baseOptions: { modelAssetPath: `${ASSET_BASE}models/blaze_face_short_range.tflite${process.env.NEXT_PUBLIC_STATIC_PREVIEW === "1" ? ".wasm" : ""}`, delegate },
           runningMode: "IMAGE",
           minDetectionConfidence: 0.5,
         });

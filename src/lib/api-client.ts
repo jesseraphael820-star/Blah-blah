@@ -8,7 +8,11 @@ export class EditRequestError extends Error {
   }
 }
 
+/** Prévia estática (sem servidor): a IA nunca está disponível e nada é enviado. */
+export const STATIC_PREVIEW = process.env.NEXT_PUBLIC_STATIC_PREVIEW === "1";
+
 export async function fetchStatus(): Promise<ApiStatus> {
+  if (STATIC_PREVIEW) return { configured: false, provider: null, model: null };
   const res = await fetch("/api/status", { cache: "no-store" });
   if (!res.ok) throw new Error("status indisponível");
   return res.json();

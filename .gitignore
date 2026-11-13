@@ -11,3 +11,4 @@ tests/output/
 tests/fixtures/*.jpg
 npm-debug.log*
 .DS_Store
+preview/dist/
