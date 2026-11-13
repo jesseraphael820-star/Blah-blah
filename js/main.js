@@ -2,12 +2,14 @@
 const cv = document.getElementById('c'), ctx = cv.getContext('2d');
 let W = 0, H = 0, DPR = 1;
 function resize() {
-  DPR = Math.min(2, window.devicePixelRatio || 1); W = window.innerWidth; H = window.innerHeight;
+  DPR = Math.min(1.75, window.devicePixelRatio || 1); W = window.innerWidth; H = window.innerHeight;
   cv.width = W * DPR; cv.height = H * DPR; cv.style.width = W + 'px'; cv.style.height = H + 'px';
   light.width = Math.ceil(W / 2); light.height = Math.ceil(H / 2);
 }
 const light = document.createElement('canvas'), lctx = light.getContext('2d');
 window.addEventListener('resize', resize);
+document.addEventListener('visibilitychange', () => { if (document.hidden && Game.running && !Game.paused) Game.togglePause(true); });
+const buzz = ms => { try { navigator.vibrate && navigator.vibrate(ms); } catch (e) { } };
 
 // ===== Entrada (toque + teclado) =====
 const Input = { jx: 0, jy: 0, jm: 0, joyId: null, ox: 0, oy: 0, btn: {}, edge: {}, keys: {} };
@@ -94,7 +96,7 @@ const Game = {
     try { localStorage.setItem('portosol_save', JSON.stringify({ money: G.money, mIdx: G.mIdx, ammo: G.ammo.slice(1), armor: G.armor })); } catch (e) { }
   },
   loadSave() { try { return JSON.parse(localStorage.getItem('portosol_save')); } catch (e) { return null; } },
-  wasted() { if (this.over) return; this.over = { type: 'dead', t: 4 }; SFX.fail(); if (M.active) M.fail('', true); },
+  wasted() { if (this.over) return; buzz(300); this.over = { type: 'dead', t: 4 }; SFX.fail(); if (M.active) M.fail('', true); },
   busted() { if (this.over) return; this.over = { type: 'busted', t: 4 }; SFX.fail(); if (M.active) M.fail('', true); },
   respawn() {
     const pl = G.player, dead = this.over.type === 'dead';
@@ -322,7 +324,8 @@ let aimT = null;
 function updatePlayer(dt, inp) {
   const pl = G.player;
   if (pl.hp <= 0) return;
-  if (inp.weap) { const owned = [0, 1, 2, 3].filter(i => G.ammo[i] > 0); const i = owned.indexOf(G.weap); G.weap = owned[(i + 1) % owned.length]; SFX.pickup(); }
+  if (inp.weap && pl.car) Radio.next();
+  else if (inp.weap) { const owned = [0, 1, 2, 3].filter(i => G.ammo[i] > 0); const i = owned.indexOf(G.weap); G.weap = owned[(i + 1) % owned.length]; SFX.pickup(); }
   if (G.ammo[G.weap] <= 0) G.weap = 0;
   pl.weapon = G.weap;
   pl.cd -= dt;
@@ -370,7 +373,8 @@ function enterCar(c) {
     G.peds.push(d);
     if (c.police) crime(4);
   }
-  c.driver = pl; c.ai = null; pl.car = c; c.siren = false; c.cops = 0; SFX.door();
+  c.driver = pl; c.ai = null; pl.car = c; c.siren = false; c.cops = 0; SFX.door(); Radio.next();
+  if (!G.droveHint) { G.droveHint = 1; showHint('Aponte o analógico para onde quer ir — o carro acelera sozinho. FREIO/RÉ para frear e dar ré, DRIFT para o freio de mão.', 7); }
   if (c.police) c.police = false;
   c.vx = Math.cos(c.a) * (c.spd || 0) * 0.3; c.vy = Math.sin(c.a) * (c.spd || 0) * 0.3;
 }
@@ -434,7 +438,7 @@ function updateWanted(dt) {
   for (const c of G.cars) if (c.police && c.driver && !c.wreck && dist(c, me) < 420) { seen = true; break; }
   if (!seen) for (const p of G.peds) if (p.kind === 'cop' && p.hp > 0 && !p.car && dist(p, me) < 380) { seen = true; break; }
   if (seen) G.unseen = 0; else G.unseen += dt;
-  if (G.unseen > 7 + G.wanted * 2.5) { G.wanted--; G.heat = HEAT_THR[G.wanted]; G.unseen = 0; if (G.wanted === 0) showHint('Você despistou a polícia.', 3); }
+  if (G.unseen > 13 + G.wanted * 3) { G.wanted--; G.heat = HEAT_THR[G.wanted]; G.unseen = 0; if (G.wanted === 0) showHint('Você despistou a polícia.', 3); }
 }
 function darkness() {
   const h = (G.time / 60) % 24;
@@ -489,6 +493,7 @@ function update(dt) {
   for (const s of G.skids) s.life -= dt; G.skids = G.skids.filter(s => s.life > 0);
   for (const d of G.decals) d.life -= dt; G.decals = G.decals.filter(d => d.life > 0);
   for (const f of floats) { f.life -= dt; f.y -= 30 * dt; } for (let i = floats.length - 1; i >= 0; i--) if (floats[i].life <= 0) floats.splice(i, 1);
+  Radio.t -= dt;
   if (bigMsg) { bigMsg.life -= dt; if (bigMsg.life <= 0) bigMsg = null; }
   if (hintMsg) { hintMsg.life -= dt; if (hintMsg.life <= 0) hintMsg = null; }
   starFlash = Math.max(0, starFlash - dt); G.shake = Math.max(0, G.shake - dt * 30); G.hurt = Math.max(0, (G.hurt || 0) - dt);
@@ -497,11 +502,11 @@ function update(dt) {
   const look = pl.car ? 0.45 : 0;
   cam.x = lerp(cam.x, me.x + (me.vx || 0) * look, 1 - Math.pow(0.002, dt));
   cam.y = lerp(cam.y, me.y + (me.vy || 0) * look, 1 - Math.pow(0.002, dt));
-  const viewH = pl.car ? 560 + Math.min(320, pl.car.spd * 0.9) : 470;
+  const viewH = pl.car ? 600 + Math.min(320, pl.car.spd * 0.9) : 530;
   const tz = Math.min(W, H * 1.6) / viewH;
   cam.z = lerp(cam.z, tz, 1 - Math.pow(0.15, dt));
   let sirD = 1e9; for (const c of G.cars) if (c.siren && !c.wreck) sirD = Math.min(sirD, dist(c, me));
-  SFX.update(dt, pl.car ? pl.car.spd : 0, !!pl.car, sirD < 900, sirD);
+  SFX.update(dt, pl.car ? pl.car.spd : 0, !!pl.car, sirD < 900, sirD); Radio.update(!!pl.car && !Game.over);
   updateButtons();
 }
 function carCarCollide(a, b) {
@@ -521,7 +526,7 @@ function carCarCollide(a, b) {
         const pl = G.player, inv = a === pl.car || b === pl.car;
         damageCar(a, -vn * 0.035, b === pl.car ? pl : null); damageCar(b, -vn * 0.035, a === pl.car ? pl : null);
         sparks((ca[0] + cb[0]) / 2, (ca[1] + cb[1]) / 2, 6);
-        if (inv) { SFX.crash(-vn / 400); G.shake = Math.max(G.shake, Math.min(10, -vn / 35)); }
+        if (inv) { buzz(40); SFX.crash(-vn / 400); G.shake = Math.max(G.shake, Math.min(10, -vn / 35)); }
       }
     }
     return;
@@ -538,7 +543,7 @@ function updateButtons() {
   bEnter.textContent = inCar ? 'SAIR' : 'ENTRAR'; bEnter.classList.toggle('glow', near || inCar);
   bRun.textContent = inCar ? 'FREIO/RÉ' : 'CORRER';
   bFire.textContent = inCar ? 'DRIFT' : G.weap === 0 ? 'SOCO' : 'ATIRAR';
-  bWeap.innerHTML = `<small>ARMA</small>${WEAPONS[G.weap].icon}`;
+  bWeap.innerHTML = inCar ? '<small>RÁDIO</small>📻' : `<small>ARMA</small>${WEAPONS[G.weap].icon}`;
 }
 
 // ===== Render =====
@@ -741,6 +746,7 @@ function drawHUD() {
     lines.forEach((l, i) => ctx.fillText(l, bx + 10, by + 8 + i * lh));
     ctx.globalAlpha = 1;
   }
+  if (Radio.t > 0 && pl.car) { ctx.globalAlpha = Math.min(1, Radio.t * 2); txt('♪ ' + Radio.name, W / 2, H - 90 * u, 16 * u, '#7cf', 'center', 4); ctx.globalAlpha = 1; }
   if (bigMsg) {
     const a = Math.min(1, bigMsg.life * 2, (bigMsg.dur - bigMsg.life) * 4);
     ctx.globalAlpha = a;

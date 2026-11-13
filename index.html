@@ -57,8 +57,9 @@
   .shopItem b { color: #5dd35d; }
   .shopItem.no { border-color: #f44; background: #4a1a1a; }
   #rotate { display: none; }
+  @keyframes fade { to { opacity: 0; } }
   @media (orientation: portrait) and (pointer: coarse) {
-    #rotate { display: flex; position: fixed; top: 54px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,.7); padding: 6px 12px; border-radius: 8px; font-size: 11px; z-index: 5; pointer-events: none; white-space: nowrap; }
+    #rotate { display: flex; position: fixed; top: 46%; animation: fade 1s 6s forwards; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,.7); padding: 6px 12px; border-radius: 8px; font-size: 11px; z-index: 5; pointer-events: none; white-space: nowrap; }
     #btns { transform: scale(.85); transform-origin: right bottom; }
   }
 </style>

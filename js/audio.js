@@ -62,3 +62,33 @@ const SFX = {
     this.skG.gain.setTargetAtTime((this.skV || 0) * 0.25 * on, t, 0.05); this.skV = 0;
   },
 };
+
+// ===== Rádio do carro: música procedural simples =====
+const Radio = {
+  st: 0, next16: 0, step: 0, name: '', t: 0,
+  stations: [
+    { name: 'RÁDIO ORLA FM', bpm: 96, bass: [0, 0, 7, 0, 5, 0, 3, 5], root: 43, wave: 'square', hat: 1 },
+    { name: 'BATIDÃO 104', bpm: 128, bass: [0, 12, 0, 12, 3, 15, 5, 17], root: 38, wave: 'sawtooth', hat: 2 },
+    { name: 'NOITE LO-FI', bpm: 78, bass: [0, 3, 7, 10, 7, 3, 5, 2], root: 45, wave: 'triangle', hat: 0 },
+  ],
+  next() { this.st = (this.st + 1) % (this.stations.length + 1); this.name = this.st ? this.stations[this.st - 1].name : 'RÁDIO DESLIGADO'; this.t = 2.5; this.step = 0; this.next16 = 0; },
+  update(on) {
+    const c = SFX.ctx; if (!c || !SFX.on || !on || !this.st) return;
+    const s = this.stations[this.st - 1], dur = 60 / s.bpm / 4;
+    if (this.next16 < c.currentTime) this.next16 = c.currentTime + 0.05;
+    while (this.next16 < c.currentTime + 0.15) {
+      const t = this.next16, i = this.step % 16;
+      if (i % 2 === 0) this.note(440 * Math.pow(2, (s.root + s.bass[(i / 2) | 0] - 69) / 12), t, dur * 1.8, s.wave, 0.06);
+      if (i % 8 === 0 || (s.hat === 2 && i % 4 === 0)) this.kick(t);
+      if (i % 8 === 4) this.snare(t);
+      if (s.hat && i % 2 === 1) this.hat(t);
+      if (i === 0 && (this.step / 16 | 0) % 2 === 1) for (const n of [12, 16, 19]) this.note(440 * Math.pow(2, (s.root + 12 + n - 69) / 12), t, dur * 8, 'triangle', 0.018);
+      this.next16 += dur; this.step++;
+    }
+  },
+  note(f, t, d, w, v) { const c = SFX.ctx, o = c.createOscillator(), g = c.createGain(), fl = c.createBiquadFilter(); fl.type = 'lowpass'; fl.frequency.value = 900; o.type = w; o.frequency.value = f; g.gain.setValueAtTime(v, t); g.gain.exponentialRampToValueAtTime(0.001, t + d); o.connect(fl); fl.connect(g); g.connect(SFX.master); o.start(t); o.stop(t + d + 0.02); },
+  kick(t) { const c = SFX.ctx, o = c.createOscillator(), g = c.createGain(); o.frequency.setValueAtTime(140, t); o.frequency.exponentialRampToValueAtTime(40, t + 0.12); g.gain.setValueAtTime(0.25, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.18); o.connect(g); g.connect(SFX.master); o.start(t); o.stop(t + 0.2); },
+  noiseHit(t, f, v, d, type) { const c = SFX.ctx, s = c.createBufferSource(); s.buffer = SFX.noise; const fl = c.createBiquadFilter(); fl.type = type; fl.frequency.value = f; const g = c.createGain(); g.gain.setValueAtTime(v, t); g.gain.exponentialRampToValueAtTime(0.001, t + d); s.connect(fl); fl.connect(g); g.connect(SFX.master); s.start(t, Math.random()); s.stop(t + d + 0.02); },
+  snare(t) { this.noiseHit(t, 1500, 0.09, 0.12, 'bandpass'); },
+  hat(t) { this.noiseHit(t, 7000, 0.025, 0.04, 'highpass'); },
+};

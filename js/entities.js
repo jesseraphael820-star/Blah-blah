@@ -80,7 +80,7 @@ function spawnPolice(near) {
     const s = randi(0, NB - 1) * PT + RWP + rand(20, PT - RWP - 20);
     const x = hor ? s : laneCross(dir, road), y = hor ? laneCross(dir, road) : s;
     const d = Math.hypot(x - near.x, y - near.y);
-    if (d < 600 || d > 1000) continue;
+    if (d < 480 || d > 850) continue;
     const c = makeCar(x, y, Math.atan2(near.y - y, near.x - x), 'police');
     c.police = true; c.siren = true; c.driver = makePed(x, y, 'cop'); c.driver.car = c;
     c.cops = 1; G.cars.push(c); return c;
@@ -120,7 +120,7 @@ function carWorldCollide(c) {
     const vn = c.vx * n.nx + c.vy * n.ny;
     if (vn < 0) {
       c.vx -= n.nx * vn * 1.35; c.vy -= n.ny * vn * 1.35;
-      if (-vn > 80) { damageCar(c, -vn * 0.05, null); sparks(px - n.nx * r, py - n.ny * r, 6); if (c === G.player.car) { SFX.crash(-vn / 400); G.shake = Math.min(12, -vn / 30); } }
+      if (-vn > 80) { damageCar(c, -vn * 0.05, null); sparks(px - n.nx * r, py - n.ny * r, 6); if (c === G.player.car) { buzz(40); SFX.crash(-vn / 400); G.shake = Math.min(12, -vn / 30); } }
     }
   }
 }
@@ -129,12 +129,16 @@ function aiTraffic(c, dt) {
   const ai = c.ai, hor = ai.dir % 2 === 0, sgn = (ai.dir === 0 || ai.dir === 1) ? 1 : -1;
   const fx = DX[ai.dir], fy = DY[ai.dir];
   let tgt = ai.cruise; const look = 55 + c.spd * 0.5;
-  for (const o of G.cars) {
+  ai.push = (ai.push || 0) - dt;
+  let carBlock = false;
+  if (ai.push <= 0) for (const o of G.cars) {
     if (o === c) continue; const dx = o.x - c.x, dy = o.y - c.y;
     if (Math.abs(dx) > 200 || Math.abs(dy) > 200) continue;
     const al = dx * fx + dy * fy, lt = Math.abs(-dx * fy + dy * fx);
-    if (al > 0 && al < look && lt < 28) tgt = Math.min(tgt, Math.max(0, (al - 48) * 2));
+    if (al > 0 && al < look && lt < 28) { tgt = Math.min(tgt, Math.max(0, (al - 48) * 2)); if (tgt < 10) carBlock = true; }
   }
+  ai.wait = carBlock ? (ai.wait || 0) + dt : 0;
+  if (ai.wait > 3.5) { ai.wait = 0; ai.push = 1.6; }
   const pl = G.player;
   const check = p => { const dx = p.x - c.x, dy = p.y - c.y; const al = dx * fx + dy * fy, lt = Math.abs(-dx * fy + dy * fx); if (al > 0 && al < look && lt < 22) { tgt = Math.min(tgt, Math.max(0, (al - 34) * 2)); return true; } return false; };
   if (!pl.car && pl.hp > 0 && check(pl) && c.spd < 5) { c.horn -= dt; if (c.horn < 0) { c.horn = rand(2, 5); if (dist(c, pl) < 300) SFX.horn(); } }
@@ -200,7 +204,7 @@ function damagePed(p, dmg, src) {
   if (p === G.player) {
     if (G.cheatGod) return;
     const ab = Math.min(G.armor, dmg * 0.7); G.armor -= ab; dmg -= ab;
-    p.hp -= dmg; G.shake = Math.max(G.shake, 4); G.hurt = 0.4;
+    p.hp -= dmg; G.shake = Math.max(G.shake, 4); G.hurt = 0.4; buzz(25);
     if (p.hp <= 0) { p.hp = 0; Game.wasted(); }
     blood(p.x, p.y, 3); return;
   }
