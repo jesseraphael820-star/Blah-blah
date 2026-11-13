@@ -18,3 +18,4 @@ Abra `index.html` no navegador (no celular, de preferência na horizontal e em t
 - 5 missões com história, checkpoints e cronômetro
 - Loja de armas, PINTURA (zera estrelas), ponto de salvar, itens espalhados
 - Sons sintetizados (WebAudio) e progresso salvo no navegador
+- `python3 build.py` gera `dist/porto-sol.html` com tudo em um arquivo só.
