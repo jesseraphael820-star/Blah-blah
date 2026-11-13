@@ -51,12 +51,13 @@ const SFX = {
   win() { if (!this.ok('win', 1)) return; [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => this.tone(f, 0.35, 'triangle', 0.3), i * 140)); },
   fail() { if (!this.ok('fail', 1)) return; [392, 330, 262].forEach((f, i) => setTimeout(() => this.tone(f, 0.45, 'sawtooth', 0.15), i * 200)); },
   cp() { if (this.ok('cp', 0.1)) this.tone(1046, 0.18, 'triangle', 0.3, 1568); },
-  update(dt, carSpd, inCar, siren, sirD) {
+  update(dt, carSpd, inCar, siren, sirD, type) {
     if (!this.ctx) return;
     const t = this.ctx.currentTime, on = this.on ? 1 : 0;
     this.engG.gain.setTargetAtTime(inCar ? 0.09 * on : 0, t, 0.1);
-    this.eng.frequency.setTargetAtTime(38 + carSpd * 0.32, t, 0.08);
-    this.engF.frequency.setTargetAtTime(300 + carSpd * 2.5, t, 0.1);
+    const moto = type === 'moto', heavy = type === 'truck' || type === 'tractor';
+    this.eng.frequency.setTargetAtTime((moto ? 70 : heavy ? 26 : 38) + carSpd * (moto ? 0.6 : heavy ? 0.22 : 0.32), t, 0.08);
+    this.engF.frequency.setTargetAtTime((moto ? 600 : heavy ? 220 : 300) + carSpd * 2.5, t, 0.1);
     this.sirG.gain.setTargetAtTime(siren ? 0.035 * on * clamp(1 - sirD / 900, 0, 1) : 0, t, 0.2);
     this.sir.frequency.setTargetAtTime(Math.sin(t * 5) > 0 ? 960 : 720, t, 0.02);
     this.skG.gain.setTargetAtTime((this.skV || 0) * 0.25 * on, t, 0.05); this.skV = 0;

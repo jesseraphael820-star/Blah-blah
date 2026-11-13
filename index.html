@@ -19,6 +19,7 @@
   #lookZone { position: absolute; inset: 0; pointer-events: auto; touch-action: none; }
   .topBtn { position: absolute; top: 12px; pointer-events: auto; touch-action: none; height: 34px; padding: 0 10px; border-radius: 8px; border: 2px solid rgba(120,200,255,.6); background: rgba(0,0,0,.4); color: #9df; font-family: inherit; font-size: 11px; transition: opacity .2s, transform .2s; }
   #bRadio { left: calc(50% + 30px); }
+  #bHorn { right: calc(50% + 116px); color: #fff; border-color: rgba(255,255,255,.5); }
   #bLights { right: calc(50% + 30px); color: #ffe7a0; border-color: rgba(255,220,120,.6); }
   #bLights.lit { background: rgba(255,210,90,.55); color: #111; box-shadow: 0 0 14px rgba(255,220,120,.7); }
   .btn, .topBtn { transition: opacity .2s, transform .2s; }
@@ -55,7 +56,7 @@
   .menuBtn:active { transform: translateY(3px); box-shadow: 0 2px 0 #b3881a; }
   .menuBtn.alt { background: #fff; box-shadow: 0 5px 0 #999, 0 8px 18px rgba(0,0,0,.5); }
   .help { position: relative; margin-top: 16px; font-family: Arial, sans-serif; font-weight: 700; font-size: 12px; opacity: .85; text-align: center; text-shadow: 1px 1px 0 #000; max-width: 90vw; }
-  #dialog, #pause { background: rgba(0,0,0,.55); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); }
+  #dialog, #pause, #mods { background: rgba(0,0,0,.55); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); }
   .card { width: min(480px, 92vw); max-height: 92vh; overflow: auto; background: linear-gradient(#1c1c28, #12121a); border: 3px solid #ffe25a; border-radius: 14px; padding: 18px 20px; box-shadow: 0 10px 40px #000; text-align: center; }
   .card h2 { margin: 0 0 8px; color: #ffe25a; font-size: 22px; text-shadow: 2px 2px 0 #000; }
   .card p { font-family: Arial, sans-serif; font-weight: 700; line-height: 1.4; font-size: 14px; margin: 6px 0; }
@@ -64,6 +65,9 @@
   #dNo:empty { display: none; }
   .shopItem { display: flex; justify-content: space-between; width: 100%; margin: 5px 0; padding: 10px 14px; border-radius: 8px; border: 2px solid #444; background: #22222e; color: #fff; font-family: inherit; font-size: 13px; }
   .shopItem b { color: #5dd35d; }
+  .shopItem.mod.on { border-color: #f6a; background: #4a2a3a; }
+  .shopItem.mod b { color: #f6a; }
+  #modList { max-height: 50vh; overflow: auto; }
   .shopItem.no { border-color: #f44; background: #4a1a1a; }
   #rotate { display: none; }
   @keyframes fade { to { opacity: 0; } }
@@ -88,6 +92,7 @@
   <button id="bPause">❚❚</button>
   <button id="bRadio" class="topBtn off" data-k="radio">📻 RÁDIO</button>
   <button id="bLights" class="topBtn off" data-k="lights">💡 FARÓIS</button>
+  <button id="bHorn" class="topBtn off">📯</button>
   <div id="rotate">↻ Gire o celular para jogar melhor</div>
 </div>
 <div id="title" class="screen">
@@ -96,7 +101,7 @@
   <h2>CRIME • CARROS • CIDADE • 3D</h2>
   <button class="menuBtn hidden" id="bCont">CONTINUAR</button>
   <button class="menuBtn alt" id="bNew">NOVO JOGO</button>
-  <div class="help">Celular: analógico à esquerda, botões à direita • Arraste o lado direito para girar a câmera • PC: WASD, mouse gira a câmera, Espaço atira/freio de mão, F entra/sai, Shift corre/freia, Q arma, R rádio, H faróis</div>
+  <div class="help">Celular: analógico à esquerda, botões à direita • Arraste o lado direito para girar a câmera • PC: WASD, mouse gira a câmera, Espaço atira/freio de mão, F entra/sai, Shift corre/freia, Q arma, R rádio, H faróis, Esc pausa (com MOD MENU)</div>
 </div>
 <div id="dialog" class="screen hidden">
   <div class="card">
@@ -108,11 +113,20 @@
     <button class="menuBtn alt" id="dNo">AGORA NÃO</button>
   </div>
 </div>
+<div id="mods" class="screen hidden">
+  <div class="card" style="border-color:#f6a">
+    <h2 style="color:#f6a">MOD MENU</h2>
+    <p>Trapaças pra quem quer brincar. O jogo continua salvando normalmente.</p>
+    <div id="modList"></div>
+    <button class="menuBtn alt" id="mClose">FECHAR</button>
+  </div>
+</div>
 <div id="pause" class="screen hidden">
   <div class="card">
     <h2>PAUSADO</h2>
     <button class="menuBtn" id="pResume">CONTINUAR</button><br>
     <button class="menuBtn alt" id="pSound">SOM: LIGADO</button><br>
+    <button class="menuBtn" id="pMods" style="background:#f6a;box-shadow:0 5px 0 #a3466f,0 8px 18px rgba(0,0,0,.5)">MOD MENU</button><br>
     <button class="menuBtn alt" id="pShadow">SOMBRAS: LIGADAS</button><br>
     <button class="menuBtn alt" id="pFull">TELA CHEIA</button><br>
     <button class="menuBtn alt" id="pMenu">SALVAR E SAIR</button>

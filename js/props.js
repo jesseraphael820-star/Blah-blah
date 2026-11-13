@@ -87,12 +87,13 @@ Object.assign(R3, {
     const umb = ['#e83a3a', '#2a8ae8', '#f2c21a'];
     L.umbrella.forEach((lst, i) => instanced(mergeGeo([[gCy(0.4, 0.4, 17, 0, 8.5, 0, 6), '#eeeeee'], [new THREE.ConeGeometry(12, 4, 10).translate(0, 18, 0), umb[i]], [new THREE.ConeGeometry(4, 1.5, 10).translate(0, 20.5, 0), '#ffffff']]), lst, null, true));
     if (L.towel.length) { const tm = new THREE.InstancedMesh(new THREE.BoxGeometry(18, 0.4, 9), new THREE.MeshLambertMaterial(), L.towel.length), d = new THREE.Object3D(), c = new THREE.Color(); L.towel.forEach((o, i) => { d.position.set(o.x, 0.3, o.y); d.rotation.set(0, o.a, 0); d.updateMatrix(); tm.setMatrixAt(i, d.matrix); tm.setColorAt(i, c.set(o.c)); }); tm.receiveShadow = true; this.scene.add(tm); }
-    this.buildBeach(); this.buildCurbs(); this.buildSignals(); this.buildBuildingDetails(); this.buildSky();
+    this.buildBeach(); this.buildCurbs(); this.buildSignals(); this.buildBuildingDetails(); this.buildSky(); this.buildRural(); this.buildHorizon();
   },
   buildCurbs() {
     const P = [];
     for (let by = 0; by < NB; by++) for (let bx = 0; bx < NB; bx++) {
       const x0 = bx * PT + 128, y0 = by * PT + 128, s = 320;
+      if (districtOf(bx, by) === 'rural') continue;
       P.push([gB(s, 2.2, 2, x0 + s / 2, 1.1, y0), '#b8b4aa'], [gB(s, 2.2, 2, x0 + s / 2, 1.1, y0 + s), '#b8b4aa'], [gB(2, 2.2, s, x0, 1.1, y0 + s / 2), '#b8b4aa'], [gB(2, 2.2, s, x0 + s, 1.1, y0 + s / 2), '#b8b4aa']);
     }
     const m = new THREE.Mesh(mergeGeo(P), VC()); m.receiveShadow = true; this.scene.add(m);
@@ -239,7 +240,7 @@ Object.assign(R3, {
     this.sunDisc = disc(0xfff2c0, 70); this.moonDisc = disc(0xe8eef8, 45);
   },
   updateProps(dt, dk) {
-    this.updateSignals(dt);
+    this.updateSignals(dt); this.updateRural(dt);
     const cam = this.camera.position;
     this.stars.position.copy(cam); this.stars.material.opacity = clamp((dk - 0.4) * 2, 0, 1);
     this.clouds.position.x = (G.t * 6) % 3000 - 1500;
@@ -252,5 +253,67 @@ Object.assign(R3, {
     const blink = dk > 0.1 && Math.floor(G.t * 1.2) % 2 === 0;
     for (const a of this.antLights) a.material.color.setHex(blink ? 0xff2020 : 0x441010);
     for (const m of this.adMats) m.emissiveIntensity = dk * 0.6;
+  },
+});
+
+Object.assign(R3, {
+  buildRural() {
+    const L = { silo: [], windmill: [], hay: [], cow: [], fence: [], scarecrow: [], tractor: [], cabin: [], dock: [], reed: [], canopy: [], pump: [], sign: [], rock: [] };
+    for (const p of RURAL_PROPS) L[p.type].push(p);
+    const wood = '#8a6a48', metal = '#9a9ea6';
+    instanced(mergeGeo([[gCy(13, 13, 60, 0, 30, 0, 14), '#c8ccd2'], [new THREE.ConeGeometry(13.5, 12, 14).translate(0, 66, 0), '#8a8e96'], [gCy(13.3, 13.3, 1, 0, 20, 0, 14), '#777'], [gCy(13.3, 13.3, 1, 0, 40, 0, 14), '#777'], [gB(1.2, 60, 1.2, 13.5, 30, 0), '#555']]), L.silo, null, true);
+    // moinho: torre fixa + pás que giram
+    instanced(mergeGeo([[new THREE.CylinderGeometry(1.5, 4, 52, 4).translate(0, 26, 0), metal], [gB(10, 4, 10, 0, 50, 0), '#666'], [gB(3, 2, 18, 0, 52, 6), '#666']]), L.windmill, null, true);
+    const bladeG = mergeGeo((() => { const a = []; for (let i = 0; i < 12; i++) a.push([new THREE.BoxGeometry(14, 2.8, 0.4).translate(9, 0, 0).rotateZ(i * Math.PI / 6), '#e8e8e8']); a.push([new THREE.CylinderGeometry(2, 2, 1.2, 10).rotateX(Math.PI / 2), '#555']); return a; })());
+    this.blades = L.windmill.map(w => { const m = new THREE.Mesh(bladeG, VC()); m.position.set(w.x + Math.cos(w.a) * 7, 52, w.y + Math.sin(w.a) * 7); m.rotation.y = -w.a; m.castShadow = true; this.scene.add(m); return m; });
+    instanced(mergeGeo([[new THREE.CylinderGeometry(7, 7, 11, 12).rotateX(Math.PI / 2).translate(0, 7, 0), '#c8a850'], [new THREE.CylinderGeometry(7.2, 7.2, 1, 12).rotateX(Math.PI / 2).translate(0, 7, 3), '#a88a3a'], [new THREE.CylinderGeometry(7.2, 7.2, 1, 12).rotateX(Math.PI / 2).translate(0, 7, -3), '#a88a3a']]), L.hay, null, true);
+    // vacas: corpo + cabeça (andam devagar)
+    const cowG = mergeGeo([[gB(18, 10, 9, 0, 11, 0), '#f4f4f4'], [gB(6, 5, 9.2, 3, 12, 0), '#222'], [gB(5, 4, 9.2, -6, 9, 0), '#222'], [gB(5, 5, 6, 11, 14, 0), '#f4f4f4'], [gB(3, 3, 3.5, 13.5, 12.5, 0), '#e8a8a8'], [gB(2, 1, 1, 11, 16.5, 2.5), '#ddd'], [gB(2, 1, 1, 11, 16.5, -2.5), '#ddd'], [gB(2, 7, 2, 6, 3.5, 3), '#eee'], [gB(2, 7, 2, 6, 3.5, -3), '#eee'], [gB(2, 7, 2, -6, 3.5, 3), '#eee'], [gB(2, 7, 2, -6, 3.5, -3), '#eee'], [gB(4, 4, 4, -9, 7, 0), '#e8b8c0']]);
+    this.cows = instanced(cowG, L.cow, null, true); this.cowList = L.cow;
+    const fenceP = [];
+    for (const f of L.fence) { const n = Math.floor(f.len / 20); const cx = Math.cos(f.a), sy = Math.sin(f.a); for (let i = 0; i <= n; i++) fenceP.push([gB(1.6, 10, 1.6, f.x + cx * i * 20, 5, f.y + sy * i * 20), wood]); fenceP.push([new THREE.BoxGeometry(f.len, 1.2, 1).rotateY(-f.a).translate(f.x + cx * f.len / 2, 8, f.y + sy * f.len / 2), wood], [new THREE.BoxGeometry(f.len, 1.2, 1).rotateY(-f.a).translate(f.x + cx * f.len / 2, 4, f.y + sy * f.len / 2), wood]); }
+    if (fenceP.length) { const fm = new THREE.Mesh(mergeGeo(fenceP), VC()); fm.castShadow = true; this.scene.add(fm); }
+    instanced(mergeGeo([[gB(1.2, 24, 1.2, 0, 12, 0), wood], [gB(1.2, 1.2, 16, 0, 20, 0), wood], [gB(5, 7, 4, 0, 19, 0), '#8a4a2a'], [gS(2.6, 0, 25, 0, 1, 1, 1, 6, 5), '#e8c890'], [new THREE.ConeGeometry(4, 3, 6).translate(0, 29, 0), '#c8a850']]), L.scarecrow, null, true);
+    instanced(mergeGeo([[gB(30, 12, 16, 0, 11, 0), '#2a8a2a'], [gB(10, 10, 12, -8, 22, 0), '#2a8a2a'], [gB(10, 1.5, 14, -8, 28, 0), '#1a1a1a'], [new THREE.CylinderGeometry(9, 9, 7, 12).rotateX(Math.PI / 2).translate(-9, 9, 10), '#1a1a1a'], [new THREE.CylinderGeometry(9, 9, 7, 12).rotateX(Math.PI / 2).translate(-9, 9, -10), '#1a1a1a'], [new THREE.CylinderGeometry(5, 5, 4, 10).rotateX(Math.PI / 2).translate(10, 5, 9), '#1a1a1a'], [new THREE.CylinderGeometry(5, 5, 4, 10).rotateX(Math.PI / 2).translate(10, 5, -9), '#1a1a1a'], [gCy(1, 1, 12, 8, 22, 4, 6), '#444']]), L.tractor, null, true);
+    instanced(mergeGeo([[gB(50, 26, 40, 0, 13, 0), '#6a4a30'], [new THREE.ConeGeometry(38, 18, 4).rotateY(Math.PI / 4).translate(0, 35, 0), '#3a2a1a'], [gB(10, 16, 1, 0, 8, 20.5), '#3a2416'], [gB(1, 12, 10, 25.5, 14, 0), '#9cc4d6'], [gB(6, 14, 6, 14, 40, -8), '#555']]), L.cabin, null, true);
+    for (const c of L.cabin) addObs({ type: 'r', x: c.x - 25, y: c.y - 20, w: 50, h: 40 });
+    instanced(mergeGeo([[gB(16, 2, 70, 0, 4, 35), wood], [gCy(1.6, 1.6, 10, -6, 0, 10, 6), '#5a4030'], [gCy(1.6, 1.6, 10, 6, 0, 10, 6), '#5a4030'], [gCy(1.6, 1.6, 10, -6, 0, 60, 6), '#5a4030'], [gCy(1.6, 1.6, 10, 6, 0, 60, 6), '#5a4030'], [gB(20, 6, 10, 0, 7, 72), '#8a6a48']]), L.dock, null, true);
+    instanced(mergeGeo((() => { const a = []; for (let i = 0; i < 12; i++) a.push([gCy(0.4, 0.6, 12 + Math.random() * 8, Math.random() * 16 - 8, 6, Math.random() * 16 - 8, 4), '#4a7a30']); return a; })()), L.reed, null, false);
+    instanced(mergeGeo([[gB(120, 3, 60, 0, 34, 0), '#f4f4f4'], [gB(120.4, 4, 60.4, 0, 30.5, 0), '#d23a2a'], [gB(3, 32, 3, -50, 16, -25), '#ccc'], [gB(3, 32, 3, 50, 16, -25), '#ccc'], [gB(3, 32, 3, -50, 16, 25), '#ccc'], [gB(3, 32, 3, 50, 16, 25), '#ccc']]), L.canopy, null, true);
+    instanced(mergeGeo([[gB(8, 16, 6, 0, 8, 0), '#e8e8e8'], [gB(6, 5, 0.5, 0, 11, 3.2), '#222'], [gB(1, 8, 1, 4.5, 8, 0), '#111'], [gB(8.5, 1, 6.5, 0, 16.5, 0), '#d23a2a'], [gB(10, 2, 8, 0, 1, 0), '#999']]), L.pump, null, true);
+    const signTex = textTex('POSTO SOL', '#d23a2a', '#fff', 256, 96);
+    for (const sg of L.sign) { const pole = new THREE.Mesh(mergeGeo([[gCy(1.5, 1.5, 60, 0, 30, 0, 8), '#888']]), VC()); pole.position.set(sg.x, 0, sg.y); this.scene.add(pole); const b = new THREE.Mesh(new THREE.BoxGeometry(40, 15, 2), [mat('#d23a2a'), mat('#d23a2a'), mat('#d23a2a'), mat('#d23a2a'), new THREE.MeshBasicMaterial({ map: signTex }), new THREE.MeshBasicMaterial({ map: signTex })]); b.position.set(sg.x, 62, sg.y); this.scene.add(b); }
+    instanced(new THREE.DodecahedronGeometry(9, 0).translate(0, 4, 0), L.rock, new THREE.MeshLambertMaterial({ color: 0x8a867c, flatShading: true }), true);
+    for (const rk of L.rock) addObs({ type: 'c', x: rk.x, y: rk.y, r: 8 * (rk.s || 1) });
+    // plantações 3D: fileiras de pés em campos (instâncias leves)
+    const crops = []; const r = rng(55);
+    for (let ty = CITY_T; ty < MAP_TH; ty += 2) for (let tx = 0; tx < CITY_T; tx += 2) if (tileAt(tx, ty) === TILE.FIELD && r() < 0.5) crops.push({ x: tx * T + 16, y: ty * T + 16, a: r() * 6, s: 0.8 + r() * 0.5 });
+    instanced(mergeGeo([[gB(2, 14, 2, 0, 7, 0), '#5a8a2a'], [gB(10, 1.2, 1.2, 0, 10, 0).rotateY(0.6), '#6a9a30'], [gB(10, 1.2, 1.2, 0, 7, 0).rotateY(-0.5), '#6a9a30'], [gS(1.8, 0, 14, 0, 1, 1.3, 1, 5, 4), '#d8c030']]), crops.slice(0, 3000), null, false);
+    // dirt tracks around farms (decor plane)
+  },
+  buildHorizon() {
+    // montanhas ao redor da ilha e terra firme embaixo delas
+    const land = new THREE.MeshLambertMaterial({ color: 0x4a7a32 });
+    const add = (x, z, w, d) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d).rotateX(-Math.PI / 2), land); m.position.set(x, -0.6, z); this.scene.add(m); };
+    add(-1600, WH / 2, 3200, WH + 6400); add(CITY_T * T / 2, -1600, CITY_T * T + 6400, 3200); add(CITY_T * T / 2, WH + 1600, CITY_T * T + 6400, 3200);
+    const hillG = new THREE.SphereGeometry(1, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), list = [], r = rng(8);
+    const push = (x, z) => list.push({ x, y: z, h: 0, s: 1, a: r() * 6, sx: 500 + r() * 700, sy: 220 + r() * 420, sz: 500 + r() * 700, c: r() < 0.5 ? 0x3f6a2c : 0x5a7a3a });
+    for (let z = -1200; z < WH + 1400; z += 520) push(-900 - r() * 700, z);
+    for (let x = -800; x < CITY_T * T + 800; x += 520) { push(x, -900 - r() * 700); push(x, WH + 900 + r() * 700); }
+    const hm = new THREE.InstancedMesh(hillG, new THREE.MeshLambertMaterial({ flatShading: true }), list.length), d = new THREE.Object3D(), c = new THREE.Color();
+    list.forEach((h, i) => { d.position.set(h.x, -5, h.y); d.rotation.set(0, h.a, 0); d.scale.set(h.sx, h.sy, h.sz); d.updateMatrix(); hm.setMatrixAt(i, d.matrix); hm.setColorAt(i, c.setHex(h.c)); });
+    this.scene.add(hm);
+  },
+  updateRural(dt) {
+    if (this.blades) for (const b of this.blades) b.rotation.z += dt * 1.2;
+    if (this.cows && this.cowList.length) {
+      const d = this._d || (this._d = new THREE.Object3D());
+      this.cowList.forEach((cw, i) => {
+        cw.t += dt; const ph = cw.t % 14;
+        if (ph < 6) { cw.x += Math.cos(cw.a) * 6 * dt; cw.y += Math.sin(cw.a) * 6 * dt; } else if (ph > 13.9) cw.a += rand(-1, 1);
+        d.position.set(cw.x, ph >= 6 && ph < 10 ? -1.5 : 0, cw.y); d.rotation.set(0, -cw.a, 0); d.scale.setScalar(1); d.updateMatrix(); this.cows.setMatrixAt(i, d.matrix);
+      });
+      this.cows.instanceMatrix.needsUpdate = true;
+    }
   },
 });

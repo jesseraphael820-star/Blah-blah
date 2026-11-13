@@ -5,11 +5,20 @@ const P = 14;              // período do quarteirão em tiles (4 rua + 10 lote)
 const RW = 4;              // largura da rua em tiles
 const NB = 9;              // quarteirões por eixo
 const PT = P * T, RWP = RW * T;
+const RR = 5;              // fileiras de quarteirões da zona rural (ao sul da cidade)
+const NBY = NB + RR;       // total de fileiras
 const CITY_T = NB * P + RW;
-const MAP_TW = CITY_T + 16, MAP_TH = CITY_T;
+const CITY_H = CITY_T * T; // altura (px) da parte urbana
+const MAP_TW = CITY_T + 16, MAP_TH = NBY * P + RW;
 const WW = MAP_TW * T, WH = MAP_TH * T;
 const WATER_X = (CITY_T + 5) * T;
-const TILE = { ROAD: 0, WALK: 1, GRASS: 2, LOT: 3, SAND: 4, WATER: 5, PATH: 6 };
+const TILE = { ROAD: 0, WALK: 1, GRASS: 2, LOT: 3, SAND: 4, WATER: 5, PATH: 6, DIRT: 7, FIELD: 8, MEADOW: 9 };
+// ===== Malha de ruas: na cidade todas existem; na zona rural só algumas =====
+const RURAL_V = new Set([1, 4, 7]);          // ruas verticais que continuam para o sul
+const RURAL_H = new Set([NB + 2, NBY]);      // estradas horizontais rurais
+function hasV(i, j) { if (i < 0 || i > NB || j < 0 || j >= NBY) return false; return j < NB || RURAL_V.has(i); }
+function hasH(j, i) { if (j < 0 || j > NBY || i < 0 || i >= NB) return false; if (j <= NB) return true; return RURAL_H.has(j) && i >= 1 && i < 7; }
+const isRural = y => y >= CITY_H;
 
 // ===== Utilidades =====
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -44,7 +53,12 @@ const SPECIAL = {
 const SPECIAL_BY_BLOCK = {};
 for (const k in SPECIAL) { const s = SPECIAL[k]; s.key = k; SPECIAL_BY_BLOCK[s.bx + ',' + s.by] = s; }
 
+const FARMS = [];   // fazendas: {x, y, w, h, house, barn}
+const RURAL_PROPS = []; // {type, x, y, a, s}
+const GAS = { bx: 4, by: NB + 1 };
+let GAS_SPOT = null;
 function districtOf(bx, by) {
+  if (by >= NB) return 'rural';
   if (PARKS.has(bx + ',' + by)) return 'park';
   if (bx === NB - 1) return 'beach';
   if (bx <= 2 && by >= 6) return 'industrial';
@@ -68,16 +82,82 @@ const BUILDINGS = [];
 const TREES = [];
 const DECOS = [];  // decorações no chão: piscinas, vagas, fontes
 const BLOCK_OBS = []; // obstáculos por quarteirão
-for (let i = 0; i < (NB + 2) * (NB + 2); i++) BLOCK_OBS.push([]);
-const blockIdx = (bx, by) => (bx < 0 || by < 0 || bx > NB || by > NB) ? -1 : bx + by * (NB + 1);
+for (let i = 0; i < (NB + 2) * (NBY + 2); i++) BLOCK_OBS.push([]);
+const blockIdx = (bx, by) => (bx < 0 || by < 0 || bx > NB || by > NBY) ? -1 : bx + by * (NB + 1);
 
+// ----- Zona rural -----
+const RURAL_KIND = {};
+function ruralKind(bx, by) {
+  const k = bx + ',' + by; if (RURAL_KIND[k]) return RURAL_KIND[k];
+  const r = rng(bx * 7 + by * 101 + 5)();
+  let kind;
+  if (bx === GAS.bx && by === GAS.by) kind = 'gas';
+  else if (bx === 0 || bx === NB - 1 || by === NBY - 1) kind = r < 0.5 ? 'forest' : 'meadow';
+  else if (r < 0.34) kind = 'farm'; else if (r < 0.5) kind = 'field'; else if (r < 0.66) kind = 'forest'; else if (r < 0.78) kind = 'pond'; else kind = 'meadow';
+  return (RURAL_KIND[k] = kind);
+}
+function ruralTile(tx, ty) {
+  const bx = Math.floor(tx / P), by = Math.floor(ty / P), mx = tx % P, my = ty % P, k = ruralKind(bx, by);
+  if (tx >= CITY_T - 4) return TILE.SAND;
+  if (k === 'farm') { if (mx >= 5 && mx <= 7 && my >= 4 && my <= 9) return TILE.DIRT; return my >= 10 || mx >= 9 ? TILE.FIELD : TILE.MEADOW; }
+  if (k === 'field') return (mx < 5 && my < 5) ? TILE.MEADOW : TILE.FIELD;
+  if (k === 'pond') { const dx = mx - 9, dy = my - 9; return dx * dx + dy * dy <= 7 ? TILE.WATER : dx * dx + dy * dy <= 13 ? TILE.SAND : TILE.MEADOW; }
+  if (k === 'gas') return (mx >= 4 && mx <= 9 && my >= 4 && my <= 9) ? TILE.LOT : TILE.MEADOW;
+  return k === 'forest' ? TILE.GRASS : TILE.MEADOW;
+}
+function genRural(bx, by) {
+  const r = rng(bx * 977 + by * 31 + 9), k = ruralKind(bx, by);
+  const x0 = bx * PT + RWP, y0 = by * PT + RWP, S = PT - RWP; // interior do quarteirão (320px)
+  const tree = (x, y, rr) => TREES.push({ x, y, r: rr || 14 + r() * 12 });
+  if (k === 'farm') {
+    const hx = x0 + 60, hy = y0 + 60;
+    const b = addB(hx, hy, 90, 70, 32, pick(['#f0e6d2', '#e8d8b8', '#d8c8a8']), pick(['#8a3b2a', '#5a5a6a', '#4a5a3a']), null); b.farm = true;
+    const barn = addB(x0 + 200, y0 + 40, 100, 70, 46, '#a8322a', '#5a2a22', null); barn.barn = true;
+    RURAL_PROPS.push({ type: 'silo', x: x0 + 300, y: y0 + 130, a: 0 }); addObs({ type: 'c', x: x0 + 300, y: y0 + 130, r: 14 });
+    if (r() < 0.6) { RURAL_PROPS.push({ type: 'windmill', x: x0 + 40, y: y0 + 200, a: r() * 6 }); addObs({ type: 'c', x: x0 + 40, y: y0 + 200, r: 6 }); }
+    for (let i = 0; i < 5; i++) RURAL_PROPS.push({ type: 'hay', x: x0 + 180 + r() * 120, y: y0 + 200 + r() * 100, a: r() * 6 });
+    for (let i = 0; i < 4; i++) RURAL_PROPS.push({ type: 'cow', x: x0 + 20 + r() * 120, y: y0 + 240 + r() * 60, a: r() * 6, t: r() * 10 });
+    // cerca com portão (na frente da casa, lado da rua)
+    const fx = x0 + 10, fy = y0 + 10, fw = S - 20, fh = S - 20;
+    RURAL_PROPS.push({ type: 'fence', x: fx, y: fy, len: fw, a: 0 }, { type: 'fence', x: fx + fw, y: fy, len: fh, a: Math.PI / 2 }, { type: 'fence', x: fx, y: fy + fh, len: fw, a: 0 });
+    RURAL_PROPS.push({ type: 'fence', x: fx, y: fy, len: 110, a: Math.PI / 2 }, { type: 'fence', x: fx, y: fy + 200, len: fh - 200, a: Math.PI / 2 });
+    FARMS.push({ x: x0, y: y0, w: S, h: S, house: b, barn, gate: { x: fx, y: fy + 155 } });
+    tree(x0 + 150, y0 + 300, 20); tree(x0 + 300, y0 + 290, 18);
+  } else if (k === 'field') {
+    for (let i = 0; i < 2; i++) RURAL_PROPS.push({ type: 'hay', x: x0 + 30 + r() * 100, y: y0 + 30 + r() * 100, a: r() * 6 });
+    if (r() < 0.5) RURAL_PROPS.push({ type: 'scarecrow', x: x0 + 160 + r() * 120, y: y0 + 160 + r() * 120, a: r() * 6 });
+    RURAL_PROPS.push({ type: 'tractor', x: x0 + 60, y: y0 + 60, a: r() * 6 });
+  } else if (k === 'forest') {
+    for (let i = 0; i < 24; i++) tree(x0 + 12 + r() * (S - 24), y0 + 12 + r() * (S - 24), 16 + r() * 14);
+    if (r() < 0.5) RURAL_PROPS.push({ type: 'cabin', x: x0 + 160, y: y0 + 160, a: r() * 6 });
+  } else if (k === 'meadow') {
+    for (let i = 0; i < 5; i++) tree(x0 + 20 + r() * (S - 40), y0 + 20 + r() * (S - 40));
+    for (let i = 0; i < 6; i++) RURAL_PROPS.push({ type: 'cow', x: x0 + 40 + r() * (S - 80), y: y0 + 40 + r() * (S - 80), a: r() * 6, t: r() * 10 });
+    for (let i = 0; i < 3; i++) RURAL_PROPS.push({ type: 'rock', x: x0 + 20 + r() * (S - 40), y: y0 + 20 + r() * (S - 40), a: r() * 6, s: 0.6 + r() });
+    RURAL_PROPS.push({ type: 'fence', x: x0 + 10, y: y0 + 10, len: S - 20, a: 0 });
+  } else if (k === 'pond') {
+    for (let i = 0; i < 8; i++) { const a = r() * 6.28, d = 120 + r() * 30; tree(x0 + 160 + Math.cos(a) * d, y0 + 160 + Math.sin(a) * d); }
+    RURAL_PROPS.push({ type: 'dock', x: x0 + 160, y: y0 + 60, a: 0 });
+    for (let i = 0; i < 4; i++) RURAL_PROPS.push({ type: 'reed', x: x0 + 160 + Math.cos(i * 1.6) * 95, y: y0 + 160 + Math.sin(i * 1.6) * 95, a: 0 });
+  } else if (k === 'gas') {
+    const shop = addB(x0 + 150, y0 + 20, 120, 60, 30, '#f4f4f4', '#d23a2a', null); shop.shop = 'POSTO SOL';
+    RURAL_PROPS.push({ type: 'canopy', x: x0 + 70, y: y0 + 90, a: 0 }); 
+    for (let i = 0; i < 3; i++) { RURAL_PROPS.push({ type: 'pump', x: x0 + 40 + i * 30, y: y0 + 90, a: 0 }); addObs({ type: 'r', x: x0 + 36 + i * 30, y: y0 + 86, w: 8, h: 8 }); }
+    for (let i = 0; i < 4; i++) addObs({ type: 'c', x: x0 + 20 + i * 100 / 3 * 3 / 3 * (i ? 1 : 0) + (i === 0 ? 20 : 20 + (i - 1) * 50 + 50), y: y0 + 70 + (i % 2) * 40, r: 2 });
+    GAS_SPOT = { x: x0 + 70, y: y0 + 110 };
+    RURAL_PROPS.push({ type: 'sign', x: x0 + 12, y: y0 + 12, a: 0 });
+    for (let i = 0; i < 4; i++) tree(x0 + 200 + r() * 100, y0 + 200 + r() * 100);
+  }
+}
 function genWorld() {
   for (let ty = 0; ty < MAP_TH; ty++) for (let tx = 0; tx < MAP_TW; tx++) {
     let t;
+    const mx = tx % P, my = ty % P, bi = Math.floor(tx / P), bj = Math.floor(ty / P);
+    const road = (mx < 4 && my >= 4 && hasV(bi, bj)) || (my < 4 && mx >= 4 && hasH(bj, bi)) || (mx < 4 && my < 4 && (hasV(bi, bj) || hasV(bi, bj - 1) || hasH(bj, bi) || hasH(bj, bi - 1)));
     if (tx >= CITY_T) t = tx < CITY_T + 5 ? TILE.SAND : TILE.WATER;
+    else if (ty >= CITY_T) t = road ? TILE.ROAD : ruralTile(tx, ty);
     else {
-      const mx = tx % P, my = ty % P;
-      if (mx < 4 || my < 4) t = TILE.ROAD;
+      if (road) t = TILE.ROAD;
       else if (mx === 4 || mx === 13 || my === 4 || my === 13) t = TILE.WALK;
       else {
         const bx = Math.floor(tx / P), by = Math.floor(ty / P);
@@ -93,6 +173,7 @@ function genWorld() {
     tiles[ty * MAP_TW + tx] = t;
   }
   for (let by = 0; by < NB; by++) for (let bx = 0; bx < NB; bx++) genBlock(bx, by);
+  for (let by = NB; by < NBY; by++) for (let bx = 0; bx < NB; bx++) genRural(bx, by);
   // palmeiras na praia
   const r = rng(999);
   for (let y = 40; y < WH - 40; y += 90 + r() * 120) {
@@ -235,7 +316,7 @@ const isRoad = (x, y) => tileAt(Math.floor(x / T), Math.floor(y / T)) === TILE.R
 // ===== Chão em pedaços (cache) =====
 const CH = 512, CHT = CH / T;
 const chunkCache = new Map();
-const TCOL = ['#3b3d42', '#a3a198', '#4f8a3a', '#77766f', '#e3d09a', '#2a7fb8', '#b9a57a'];
+const TCOL = ['#3b3d42', '#a3a198', '#4f8a3a', '#77766f', '#e3d09a', '#2a7fb8', '#b9a57a', '#8a7250', '#a08a3c', '#6f9a3c'];
 function renderChunk(cx, cy) {
   const c = document.createElement('canvas'); c.width = c.height = CH;
   const g = c.getContext('2d');
@@ -251,10 +332,34 @@ function renderChunk(cx, cy) {
       g.fillRect(x + r() * T, y + r() * T, 2 + r() * 5, 2 + r() * 5);
     }
     if (t === TILE.WALK) { g.strokeStyle = 'rgba(0,0,0,.12)'; g.strokeRect(x + .5, y + .5, T - 1, T - 1); }
-    if (t === TILE.GRASS) for (let k = 0; k < 5; k++) { g.fillStyle = 'rgba(30,70,20,.35)'; g.fillRect(x + r() * T, y + r() * T, 2, 3); }
+    if (t === TILE.GRASS || t === TILE.MEADOW) for (let k = 0; k < 5; k++) { g.fillStyle = t === TILE.GRASS ? 'rgba(30,70,20,.35)' : 'rgba(120,110,30,.35)'; g.fillRect(x + r() * T, y + r() * T, 2, 3); }
+    if (t === TILE.FIELD) { const hor = Math.floor(tx / P) % 2 === 0; g.fillStyle = 'rgba(60,45,15,.45)'; for (let k = 0; k < T; k += 8) { if (hor) g.fillRect(x, y + k, T, 3); else g.fillRect(x + k, y, 3, T); } g.fillStyle = 'rgba(90,140,40,.5)'; for (let k = 0; k < 6; k++) g.fillRect(x + r() * T, y + r() * T, 3, 3); }
+    if (t === TILE.DIRT) { g.fillStyle = 'rgba(60,40,20,.25)'; g.fillRect(x + 6, y, 5, T); g.fillRect(x + 21, y, 5, T); }
     if (t === TILE.WATER) { g.strokeStyle = 'rgba(255,255,255,.18)'; g.beginPath(); const wy = y + r() * T; g.moveTo(x + 4, wy); g.quadraticCurveTo(x + 16, wy - 4, x + 28, wy); g.stroke(); }
-    if (t === TILE.ROAD && tx < CITY_T) {
+    if (t === TILE.ROAD && ty >= CITY_T) {
+      const mx = tx % P, my = ty % P, inter = mx < 4 && my < 4;
+      g.fillStyle = '#5a5248'; g.fillRect(x, y, T, T);
+      for (let k = 0; k < 3; k++) { g.fillStyle = `rgba(0,0,0,${0.05 + r() * 0.08})`; g.fillRect(x + r() * T, y + r() * T, 3 + r() * 8, 2 + r() * 4); }
+      g.fillStyle = '#e8c547';
+      if (!inter && my === 1 && mx >= 4) g.fillRect(x + 6, y + T - 2, 14, 3);
+      if (!inter && mx === 1 && my >= 4) g.fillRect(x + T - 2, y + 6, 3, 14);
+      g.fillStyle = 'rgba(255,255,255,.55)';
+      if (!inter && (my === 0 || my === 3) && mx >= 4) g.fillRect(x, my === 0 ? y + 1 : y + T - 3, T, 2);
+      if (!inter && (mx === 0 || mx === 3) && my >= 4) g.fillRect(mx === 0 ? x + 1 : x + T - 3, y, 2, T);
+      if (tileAt(tx, ty - 1) !== TILE.ROAD || tileAt(tx, ty + 1) !== TILE.ROAD || tileAt(tx - 1, ty) !== TILE.ROAD || tileAt(tx + 1, ty) !== TILE.ROAD) { g.fillStyle = 'rgba(138,114,80,.5)'; if (tileAt(tx, ty - 1) !== TILE.ROAD) g.fillRect(x, y, T, 4); if (tileAt(tx, ty + 1) !== TILE.ROAD) g.fillRect(x, y + T - 4, T, 4); if (tileAt(tx - 1, ty) !== TILE.ROAD) g.fillRect(x, y, 4, T); if (tileAt(tx + 1, ty) !== TILE.ROAD) g.fillRect(x + T - 4, y, 4, T); }
+    }
+    if (t === TILE.ROAD && tx < CITY_T && ty < CITY_T) {
       const mx = tx % P, my = ty % P;
+      // desgaste: rachaduras, manchas de óleo, bueiros
+      if (r() < 0.06) { g.strokeStyle = 'rgba(0,0,0,.35)'; g.lineWidth = 1; g.beginPath(); let px = x + r() * T, py = y + r() * T; g.moveTo(px, py); for (let k = 0; k < 4; k++) { px += r() * 14 - 7; py += r() * 14 - 7; g.lineTo(px, py); } g.stroke(); }
+      if (r() < 0.04) { g.fillStyle = 'rgba(0,0,0,.28)'; g.beginPath(); g.ellipse(x + 16, y + 16, 8 + r() * 8, 5 + r() * 6, r() * 3, 0, 7); g.fill(); }
+      if (r() < 0.025 && mx >= 4 && my >= 4) { g.fillStyle = '#2a2c30'; g.beginPath(); g.arc(x + 16, y + 16, 7, 0, 7); g.fill(); g.strokeStyle = '#55585e'; g.lineWidth = 1.5; g.stroke(); g.beginPath(); g.arc(x + 16, y + 16, 4, 0, 7); g.stroke(); }
+      // faixas de parada (mão inglesa invertida: pista da direita)
+      g.fillStyle = 'rgba(255,255,255,.8)';
+      if (my === 13 && mx <= 1) g.fillRect(x, y + T - 7, T, 5);     // quem vem do norte (dir 1, mx 0-1)
+      if (my === 4 && mx >= 2 && mx < 4) g.fillRect(x, y + 2, T, 5); // quem vem do sul (dir 3)
+      if (mx === 13 && my >= 2 && my < 4) g.fillRect(x + T - 7, y, 5, T); // leste (dir 0, my 2-3)
+      if (mx === 4 && my <= 1) g.fillRect(x + 2, y, 5, T);           // oeste (dir 2)
       g.fillStyle = 'rgba(255,255,255,.75)';
       const inter = mx < 4 && my < 4;
       if (!inter && my === 1 && mx >= 5 && mx <= 12) { g.fillStyle = '#e8c547'; g.fillRect(x + 4, y + T - 2, 18, 4); }
@@ -307,7 +412,7 @@ let MINIMAP;
 function buildMinimap() {
   MINIMAP = document.createElement('canvas'); MINIMAP.width = MAP_TW; MINIMAP.height = MAP_TH;
   const g = MINIMAP.getContext('2d'); const id = g.createImageData(MAP_TW, MAP_TH);
-  const C = [[70, 70, 78], [120, 120, 112], [70, 120, 55], [95, 95, 90], [215, 195, 140], [40, 110, 170], [150, 135, 100]];
+  const C = [[70, 70, 78], [120, 120, 112], [70, 120, 55], [95, 95, 90], [215, 195, 140], [40, 110, 170], [150, 135, 100], [138, 114, 80], [160, 138, 60], [111, 154, 60]];
   for (let i = 0; i < tiles.length; i++) { const c = C[tiles[i]]; id.data[i * 4] = c[0]; id.data[i * 4 + 1] = c[1]; id.data[i * 4 + 2] = c[2]; id.data[i * 4 + 3] = 255; }
   g.putImageData(id, 0, 0);
   g.fillStyle = '#2b2b30';

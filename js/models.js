@@ -100,8 +100,9 @@ function makePedModel(p) {
     const elbow = new THREE.Group(); elbow.position.y = -6.4; shoulder.add(elbow);
     elbow.add(new THREE.Mesh(mergeGeo([[gC(1.4, 3.4, 0, -2.9, 0), longSleeve ? top : skin], [gS(1.55, 0.2, -6.4, 0, 1, 1.25, 0.85, 8, 6), skin]]), PED_MAT()));
     if (s > 0) {
-      u.gun = new THREE.Mesh(mergeGeo([[gB(1.7, 8, 1.4, 0.8, -10, 0), '#1c1c1c'], [gB(1.6, 3, 1.3, -0.4, -6.8, 0), '#2a2a2a']]), PED_MAT());
-      elbow.add(u.gun); u.phone = new THREE.Mesh(mergeGeo([[gB(1.8, 3.2, 0.6, 1.1, -7, 0.6), '#111111']]), PED_MAT()); elbow.add(u.phone);
+      u.guns = [null, 1, 2, 3].map(wi => { if (!wi) return null; const g2 = new THREE.Mesh(gunGeo(wi), PED_MAT()); g2.position.set(0.8, -10, 0); g2.rotation.z = -Math.PI / 2; g2.visible = false; elbow.add(g2); return g2; });
+      u.gun = { set visible(v) { } };
+      u.phone = new THREE.Mesh(mergeGeo([[gB(1.8, 3.2, 0.6, 1.1, -7, 0.6), '#111111']]), PED_MAT()); elbow.add(u.phone);
     }
     u[s < 0 ? 'hipL' : 'hipR'] = hip; u[s < 0 ? 'kneeL' : 'kneeR'] = knee; u[s < 0 ? 'shL' : 'shR'] = shoulder; u[s < 0 ? 'elL' : 'elR'] = elbow;
   }
@@ -113,12 +114,30 @@ function disposeModel(m) { m.traverse(o => { if (o.geometry && !o.geometry.share
 function animPed(p, m, dt) {
   const u = m.userData, t = G.t + p.id;
   m.position.set(p.x, 0, p.y); m.rotation.y = -p.a;
-  const inst = Math.hypot(p.x - u.px, p.y - u.py) / Math.max(dt, 1e-3); u.px = p.x; u.py = p.y;
+  const inst = Math.hypot(p.x - u.px, p.y - u.py) / Math.max(dt, 1e-3); u.px = p.x; u.py = p.y; m.position.y = 0;
   u.mv = lerp(u.mv, Math.min(inst, 260), 1 - Math.exp(-10 * dt));
   const B = u.body;
   B.rotation.set(0, 0, 0); B.position.set(0, 0, 0);
   u.shL.rotation.set(0.1, 0, 0); u.shR.rotation.set(-0.1, 0, 0); u.hipL.rotation.set(0, 0, 0); u.hipR.rotation.set(0, 0, 0);
-  u.gun.visible = p.weapon > 0; u.phone.visible = false;
+  for (let i = 1; i <= 3; i++) u.guns[i].visible = p.weapon === i && !p.rag; u.phone.visible = false;
+  if (p.rag || p.getup > 0) {
+    const r = p.rag;
+    m.position.y = p.h || 0;
+    if (r) { B.rotation.set(r.t * 4 + p.id, 0, r.t * 3); B.position.set(0, 4, 0); u.shL.rotation.set(1.2, 0, 1.5); u.shR.rotation.set(-1.2, 0, 1.5); u.elL.rotation.z = u.elR.rotation.z = 0.8; u.hipL.rotation.z = 0.6; u.hipR.rotation.z = -0.3; u.kneeL.rotation.z = -0.9; u.kneeR.rotation.z = -0.4; }
+    else { const k = 1 - clamp(p.getup / 1.1, 0, 1); B.rotation.z = Math.PI / 2 * (1 - k); B.position.set(-1 * (1 - k), 3 * (1 - k), 0); u.hipL.rotation.z = u.hipR.rotation.z = 1.2 * (1 - k); u.kneeL.rotation.z = u.kneeR.rotation.z = -1.4 * (1 - k); u.shL.rotation.set(0, 0, 1.0 * (1 - k)); u.shR.rotation.set(0, 0, 1.0 * (1 - k)); }
+    return;
+  }
+  if (p.car && p.car.two) { // pilotando
+    const c = p.car, bike = c.bike;
+    m.position.set(c.x, 0, c.y); m.rotation.set(0, -c.a, 0); m.rotation.z = c.lean || 0;
+    B.position.set(bike ? -4 : -2, bike ? 10 : 6, 0); B.rotation.z = bike ? -0.25 : -0.45;
+    u.hipL.rotation.z = u.hipR.rotation.z = bike ? 0.9 : 1.35; u.kneeL.rotation.z = u.kneeR.rotation.z = bike ? -1.1 : -1.6;
+    if (bike) { const ped = p.walk; u.hipL.rotation.z = 0.9 + Math.sin(ped) * 0.5; u.hipR.rotation.z = 0.9 - Math.sin(ped) * 0.5; u.kneeL.rotation.z = -1.1 - Math.cos(ped) * 0.4; u.kneeR.rotation.z = -1.1 + Math.cos(ped) * 0.4; }
+    u.shL.rotation.set(0.25, 0, bike ? 1.2 : 1.1); u.shR.rotation.set(-0.25, 0, bike ? 1.2 : 1.1); u.elL.rotation.z = u.elR.rotation.z = 0.5;
+    u.hipL.rotation.x = 0.35; u.hipR.rotation.x = -0.35;
+    for (let i = 1; i <= 3; i++) u.guns[i].visible = false;
+    return;
+  }
   if (p.hp <= 0) {
     B.rotation.z = Math.PI / 2; B.position.set(-1, 3, 0);
     u.shL.rotation.set(1.3, 0, 0.3); u.shR.rotation.set(-1.3, 0, 0.3); u.elL.rotation.z = u.elR.rotation.z = 0.3;
@@ -260,6 +279,7 @@ function makeCarModel(c) {
 }
 function updCarModel(c, m, dt, dk) {
   const u = m.userData, pl = G.player;
+  if (u.two) return updTwoWheeler(c, m, dt, dk);
   m.position.set(c.x, 0, c.y); m.rotation.y = -c.a;
   const spd = c.ai ? c.spd : (c.fwd || 0);
   const yawRate = angN(c.a - u.pa) / Math.max(dt, 1e-3); u.pa = c.a;
@@ -271,6 +291,8 @@ function updCarModel(c, m, dt, dk) {
   for (const w of u.wheels) { w.spin.rotation.z -= spd * dt / 4.6; if (w.front) w.piv.rotation.y = -steerVis * 0.42; }
   if (c.wreck && !u.wreck) { u.wreck = true; u.paint.material = paintMat('#2b2724'); u.glass.visible = false; u.drv.visible = false; }
   if (u.col !== c.col && !c.wreck) { u.col = c.col; u.paint.material = paintMat(c.col); }
+  if (c.dentsV && u.dentsV !== c.dentsV) { u.dentsV = c.dentsV; applyDents(c, u); }
+  if (c.glassHit && !u.cracked && u.glass && u.glass.material) { u.cracked = true; u.glass.material = crackedGlass(); }
   const on = c.lights && !c.wreck, M = u.M;
   M.head.color.setHex(on ? 0xfff6d2 : 0xbdb9a8);
   M.tail.color.setHex(c.wreck ? 0x200404 : c.braking ? 0xff2020 : on ? 0xc01414 : 0x6a0c0c);
@@ -286,4 +308,116 @@ function updCarModel(c, m, dt, dk) {
     u.drvId = d.id; const L = d.look || (d.look = makeLook(d));
     u.drvBody.material = mat(L.topCol); u.drvHead.material = mat(L.skin);
   }
+}
+
+// ---------- Armas ----------
+const GUN_GEO = {};
+function gunGeo(wi) {
+  if (GUN_GEO[wi]) return GUN_GEO[wi];
+  let g;
+  if (wi === 1) g = mergeGeo([[gB(8, 1.9, 1.5, 2, 0.6, 0), '#1c1c1c'], [gB(2.2, 4.2, 1.4, -1.2, -1.8, 0), '#2a2a2a'], [gB(1.6, 1.4, 0.5, 1, -1.2, 0), '#3a3a3a'], [gB(5, 0.6, 0.6, 2.5, 1.9, 0), '#2a2a2a']]);
+  else if (wi === 2) g = mergeGeo([[gB(13, 2.2, 1.8, 3, 0.8, 0), '#1a1a1a'], [gB(2.2, 5.6, 1.6, -1.5, -2.4, 0), '#2a2a2a'], [gB(1.8, 7, 1.4, 3, -3, 0), '#111111'], [gB(5, 1.6, 1.2, -4.5, 0.5, 0), '#2a2a2a'], [gB(4, 1.6, 0.8, 7.5, 0.2, 0), '#333333'], [gB(6, 0.5, 0.5, 2, 2.2, 0), '#333333']]);
+  else g = mergeGeo([[gB(20, 1.6, 1.6, 6, 0.9, 0), '#222222'], [gB(14, 1.5, 1.2, 4, -0.6, 0), '#3a3a3a'], [gB(7, 2.8, 1.6, -5.5, -1.4, 0), '#6a4020'], [gB(4, 1.8, 1.6, -1, -1.8, 0), '#2a2a2a'], [gB(5, 1.4, 2, 7, -0.9, 0), '#5a3a1a']]);
+  return (GUN_GEO[wi] = g);
+}
+// ---------- Motos, bicicletas, caminhonete, trator ----------
+function makeTwoWheeler(c) {
+  const g = new THREE.Group(), ch = new THREE.Group(); g.add(ch);
+  const col = c.col, bike = c.bike, M = { head: new THREE.MeshBasicMaterial({ color: 0xbdb9a8 }), tail: new THREE.MeshBasicMaterial({ color: 0x6a0c0c }) };
+  const P = [];
+  if (bike) {
+    const fr = '#' + col.slice(1);
+    P.push([new THREE.CylinderGeometry(0.5, 0.5, 15, 6).rotateZ(Math.PI / 2 - 0.5).translate(0, 11, 0), fr], [new THREE.CylinderGeometry(0.5, 0.5, 13, 6).rotateZ(0.35).translate(-8, 9, 0), fr], [new THREE.CylinderGeometry(0.5, 0.5, 12, 6).rotateZ(-0.6).translate(-4, 8, 0), fr],
+      [new THREE.CylinderGeometry(0.5, 0.5, 11, 6).rotateZ(-0.3).translate(9, 10, 0), fr], [new THREE.CylinderGeometry(0.4, 0.4, 12, 6).rotateZ(Math.PI / 2 - 0.25).translate(-7, 5, 0), fr],
+      [new THREE.CylinderGeometry(0.4, 0.4, 14, 6).rotateX(Math.PI / 2).translate(10, 15.5, 0), '#222'], [gB(5, 1.2, 3, -8, 15, 0), '#222'], [new THREE.CylinderGeometry(0.4, 0.4, 2.5, 6).rotateX(Math.PI / 2).translate(-1, 4.6, 0), '#333']);
+    M.head.visible = false;
+  } else {
+    P.push([gB(20, 6, 8, -2, 10, 0), col], [gB(14, 4, 9, -8, 14.5, 0), '#1a1a1a'], [gB(8, 5, 6, 4, 12, 0), '#444'], [gB(10, 6, 7, -3, 6, 0), '#333'], [new THREE.CylinderGeometry(2.2, 2.2, 8, 8).rotateX(Math.PI / 2).translate(2, 9, 0), '#555'],
+      [new THREE.CylinderGeometry(0.8, 0.8, 16, 6).rotateX(Math.PI / 2).translate(11, 17, 0), '#222'], [new THREE.CylinderGeometry(0.9, 0.9, 10, 6).rotateZ(-0.5).translate(12, 11, -2), '#777'], [new THREE.CylinderGeometry(0.9, 0.9, 10, 6).rotateZ(-0.5).translate(12, 11, 2), '#777'],
+      [gB(8, 5, 6, 14, 14, 0), col], [new THREE.CylinderGeometry(1.1, 1.1, 14, 6).rotateZ(Math.PI / 2).translate(-9, 5, 5), '#999'], [gB(5, 2.5, 3, -18, 9, 0), col]);
+  }
+  const mesh = new THREE.Mesh(mergeGeo(P), carTrim()); mesh.castShadow = true; ch.add(mesh);
+  if (!bike) { const h = new THREE.Mesh(gB(1, 3, 3.5, 18, 14, 0), M.head); ch.add(h); const t = new THREE.Mesh(gB(1, 2, 3, -20.5, 9.5, 0), M.tail); ch.add(t); }
+  const wheelG = bike ? mergeGeo([[new THREE.TorusGeometry(5.6, 0.7, 6, 16), '#1a1a1a'], [new THREE.TorusGeometry(4.6, 0.25, 4, 16), '#bbb'], [gB(9, 0.3, 0.3, 0, 0, 0), '#bbb'], [gB(0.3, 9, 0.3, 0, 0, 0), '#bbb'], [gB(6.4, 0.3, 0.3, 0, 0, 0).rotateZ(0.8), '#bbb'], [gB(6.4, 0.3, 0.3, 0, 0, 0).rotateZ(-0.8), '#bbb']])
+    : mergeGeo([[new THREE.CylinderGeometry(5.6, 5.6, 2.8, 14).rotateX(Math.PI / 2), '#141414'], [new THREE.CylinderGeometry(3.4, 3.4, 3, 10).rotateX(Math.PI / 2), '#9a9ea6'], [gB(6, 0.8, 3.2, 0, 0, 0), '#777'], [gB(0.8, 6, 3.2, 0, 0, 0), '#777']]);
+  const wheels = [];
+  for (const sx of [1, -1]) { const piv = new THREE.Group(), spin = new THREE.Mesh(wheelG, carTrim()); spin.castShadow = true; piv.position.set(sx * (bike ? 11 : 13), 5.6, 0); piv.add(spin); ch.add(piv); wheels.push({ piv, spin, front: sx > 0 }); }
+  const pool = new THREE.Mesh(R3.poolGeo, R3.poolMat); pool.position.set(60, 0.45, 0); pool.visible = false; g.add(pool);
+  g.userData = { ch, M, wheels, pool, two: true, col, wreck: false, pa: c.a, ps: 0 };
+  return g;
+}
+function makeHeavy(c) {
+  const L = c.L, W = c.W, h = L / 2, g = new THREE.Group(), ch = new THREE.Group(), tractor = c.type === 'tractor'; g.add(ch); g.userData = {};
+  const P = [], T = [];
+  if (tractor) {
+    P.push([gB(L * 0.55, 14, W * 0.55, 4, 12, 0), c.col], [gB(L * 0.2, 6, W * 0.4, -L * 0.2, 20, 0), c.col], [gB(2, 14, 2, -L * 0.1, 30, -W * 0.3), '#333'], [gB(2, 14, 2, -L * 0.1, 30, W * 0.3), '#333'], [gB(2, 14, 2, -L * 0.4, 30, -W * 0.3), '#333'], [gB(2, 14, 2, -L * 0.4, 30, W * 0.3), '#333'], [gB(L * 0.36, 1.5, W * 0.75, -L * 0.25, 37.5, 0), c.col]);
+    T.push([new THREE.CylinderGeometry(1.2, 1.2, 14, 8).translate(L * 0.3, 26, W * 0.25), '#222'], [gB(6, 5, 8, -L * 0.28, 22, 0), '#222'], [gB(10, 2.5, 1, -L * 0.3, 11, 0), '#555']);
+    g.userData.M = {};
+  } else {
+    P.push([gB(L * 0.42, 12, W, -h + L * 0.21 + 2, 10, 0), c.col], [gB(L * 0.42, 1.2, W, -h + L * 0.21 + 2, 16.5, 0), '#3a3a3a']);
+    for (const zs of [-1, 1]) P.push([gB(L * 0.42, 6, 1.4, -h + L * 0.21 + 2, 19, zs * (W / 2 - 0.7)), c.col]);
+    P.push([gB(1.4, 6, W, -h + 1, 19, 0), c.col], [gB(1.4, 6, W, -h + L * 0.42 + 2, 19, 0), c.col]);
+    P.push([gB(L * 0.5, 10, W, h - L * 0.25, 9.5, 0), c.col], [gB(L * 0.27, 10, W - 2, h - L * 0.36, 19, 0), c.col], [gB(L * 0.3, 1.5, W - 1, h - L * 0.37, 24.5, 0), c.col], [gB(2.2, 1.6, 2.2, h - L * 0.3, 20, -W / 2 - 1.2), c.col], [gB(2.2, 1.6, 2.2, h - L * 0.3, 20, W / 2 + 1.2), c.col]);
+    T.push([gB(2.4, 4, W + 1, h + 0.5, 6, 0), '#2a2d33'], [gB(2.4, 4, W + 1, -h - 0.5, 6, 0), '#2a2d33'], [gB(1, 4.5, W * 0.6, h + 0.9, 10, 0), '#111'], [gB(L * 0.6, 1.4, W + 0.4, 0, 4.4, 0), '#1c1d20'], [new THREE.CylinderGeometry(1.5, 1.5, 4, 8).rotateZ(Math.PI / 2).translate(-h - 1, 3.5, W / 2 - 6), '#777']);
+  }
+  const paint = new THREE.Mesh(mergeGeo(P), paintMat(c.col)); paint.castShadow = paint.receiveShadow = true; ch.add(paint);
+  ch.add(new THREE.Mesh(mergeGeo(T), carTrim()));
+  const M = { head: new THREE.MeshBasicMaterial({ color: 0xbdb9a8 }), tail: new THREE.MeshBasicMaterial({ color: 0x6a0c0c }), rev: new THREE.MeshBasicMaterial({ color: 0x8a8a8a }), bl: new THREE.MeshBasicMaterial({ color: 0x6a4208 }), br: new THREE.MeshBasicMaterial({ color: 0x6a4208 }) };
+  if (!tractor) {
+    ch.add(new THREE.Mesh(carGlass() && mergeGeo([[gB(1.4, 7, W - 4, h - L * 0.23, 19.5, 0), '#fff'], [gB(L * 0.2, 6, 0.8, h - L * 0.36, 19, -(W / 2 - 1.2)), '#fff'], [gB(L * 0.2, 6, 0.8, h - L * 0.36, 19, (W / 2 - 1.2)), '#fff']]), carGlass()));
+    ch.add(new THREE.Mesh(mergeGeo([-1, 1].map(zs => [gB(0.8, 2.6, 5, h + 0.3, 11, zs * (W / 2 - 4)), '#fff'])), M.head));
+    ch.add(new THREE.Mesh(mergeGeo([-1, 1].map(zs => [gB(0.8, 3, 4, -h - 0.3, 11, zs * (W / 2 - 3.5)), '#fff'])), M.tail));
+    ch.add(new THREE.Mesh(mergeGeo([[gB(1, 1.4, 1.6, h, 8.5, -(W / 2 - 0.9)), '#fff']]), M.bl), new THREE.Mesh(mergeGeo([[gB(1, 1.4, 1.6, h, 8.5, (W / 2 - 0.9)), '#fff']]), M.br));
+    if (Math.random() < 0.5) { const cargo = new THREE.Mesh(mergeGeo([[gB(L * 0.3, 8, W * 0.6, -h + L * 0.2, 20, 0), pick(['#8a6a48', '#a08a3c', '#444'])], [gB(L * 0.15, 6, W * 0.5, -h + L * 0.3, 27, 0), '#8a6a48']]), carTrim()); ch.add(cargo); }
+  } else M.head.visible = false;
+  const wheels = [];
+  const wg = (r, w) => mergeGeo([[new THREE.CylinderGeometry(r, r, w, 14).rotateX(Math.PI / 2), '#141414'], [new THREE.CylinderGeometry(r * 0.55, r * 0.55, w + 0.3, 10).rotateX(Math.PI / 2), tractor ? '#d8c020' : '#9a9ea6']]);
+  if (tractor) {
+    for (const sz of [-1, 1]) { const p1 = new THREE.Group(), s1 = new THREE.Mesh(wg(10, 7), carTrim()); s1.castShadow = true; p1.position.set(-L * 0.28, 10, sz * (W / 2 - 2)); p1.add(s1); ch.add(p1); wheels.push({ piv: p1, spin: s1, front: false, r: 10 }); const p2 = new THREE.Group(), s2 = new THREE.Mesh(wg(5.5, 4), carTrim()); s2.castShadow = true; p2.position.set(L * 0.33, 5.5, sz * (W / 2 - 4)); p2.add(s2); ch.add(p2); wheels.push({ piv: p2, spin: s2, front: true, r: 5.5 }); }
+  } else for (const sx of [1, -1]) for (const sz of [1, -1]) { const piv = new THREE.Group(), spin = new THREE.Mesh(wg(6, 4.6), carTrim()); spin.castShadow = true; piv.position.set(sx * L * 0.33, 6, sz * (W / 2 - 2.2)); piv.add(spin); ch.add(piv); wheels.push({ piv, spin, front: sx > 0, r: 6 }); }
+  const drv = new THREE.Group(); drv.add(new THREE.Mesh(mergeGeo([[gB(4.2, 6.5, 6.4, 0, 0, 0), '#fff']]), mat('#888888')));
+  const head = new THREE.Mesh(mergeGeo([[gS(2.4, 0.3, 5.4, 0, 1, 1.12, 0.95, 10, 8), '#fff']]), mat('#c08a62')); drv.add(head);
+  drv.position.set(tractor ? -L * 0.22 : h - L * 0.36, tractor ? 24 : 16, -W * 0.2); ch.add(drv);
+  const pool = new THREE.Mesh(R3.poolGeo, R3.poolMat); pool.position.set(h + 62, 0.45, 0); pool.visible = false; g.add(pool);
+  g.userData = { ch, paint, M, wheels, pool, drv, drvBody: drv.children[0], drvHead: head, col: c.col, wreck: false, pa: c.a, ps: 0, roll: 0, pitch: 0, drvId: -1, glass: { visible: true } };
+  return g;
+}
+function makeVehicle(c) { return c.two ? makeTwoWheeler(c) : (c.type === 'truck' || c.type === 'tractor') ? makeHeavy(c) : makeCarModel(c); }
+// amassados: desloca os vértices da lataria perto do impacto
+function applyDents(c, u) {
+  if (!u.paint) return;
+  if (!u.paint.geometry.userData.own) { u.paint.geometry = u.paint.geometry.clone(); u.paint.geometry.userData.own = true; u.paint.geometry.userData.base = u.paint.geometry.attributes.position.array.slice(); }
+  const pos = u.paint.geometry.attributes.position, base = u.paint.geometry.userData.base, arr = pos.array;
+  for (let i = 0; i < arr.length; i += 3) {
+    let x = base[i], y = base[i + 1], z = base[i + 2], dx = 0, dy = 0, dz = 0;
+    for (const d of c.dents) {
+      const ddx = x - d.x, ddz = z - d.z, dd = Math.hypot(ddx, ddz, (y - 10) * 0.6), R = 9 + d.s * 1.6;
+      if (dd < R) { const k = (1 - dd / R) * d.s; const l = Math.hypot(d.x, d.z) || 1; dx -= d.x / l * k; dz -= d.z / l * k; dy -= k * 0.3; }
+    }
+    arr[i] = x + dx; arr[i + 1] = y + dy; arr[i + 2] = z + dz;
+  }
+  pos.needsUpdate = true; u.paint.geometry.computeVertexNormals();
+}
+function crackedGlass() {
+  if (CARM._cg) return CARM._cg;
+  const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d');
+  g.fillStyle = '#18222e'; g.fillRect(0, 0, 128, 128); g.strokeStyle = 'rgba(230,240,255,.8)'; g.lineWidth = 1.2;
+  for (let n = 0; n < 3; n++) { const cx = 30 + Math.random() * 70, cy = 30 + Math.random() * 70; for (let i = 0; i < 9; i++) { const a = i * 0.7 + Math.random(); g.beginPath(); g.moveTo(cx, cy); let x = cx, y = cy; for (let k = 0; k < 4; k++) { x += Math.cos(a + Math.random() * 0.5 - 0.25) * 12; y += Math.sin(a + Math.random() * 0.5 - 0.25) * 12; g.lineTo(x, y); } g.stroke(); } g.beginPath(); g.arc(cx, cy, 8, 0, 7); g.stroke(); }
+  const t = new THREE.CanvasTexture(c);
+  return (CARM._cg = new THREE.MeshPhongMaterial({ map: t, shininess: 60, specular: 0x999999 }));
+}
+
+function updTwoWheeler(c, m, dt, dk) {
+  const u = m.userData;
+  m.position.set(c.x, 0, c.y); m.rotation.set(0, -c.a, 0);
+  u.ch.rotation.x = c.lean || 0;
+  if (c.fallen) { u.ch.rotation.x = 1.35; u.ch.position.y = -2; } else u.ch.position.y = 0;
+  const spd = c.ai ? c.spd : (c.fwd || 0);
+  const yawRate = angN(c.a - u.pa) / Math.max(dt, 1e-3); u.pa = c.a;
+  const steerVis = c === G.player.car ? (c.steerVis || 0) : clamp(yawRate * 0.35, -1, 1);
+  for (const w of u.wheels) { w.spin.rotation.z -= spd * dt / 5.6; if (w.front) w.piv.rotation.y = -steerVis * 0.4; }
+  if (c.driver) c.driver.walk = (c.driver.walk || 0) + spd * dt / 12;
+  const on = c.lights && !c.wreck && !c.fallen;
+  u.M.head.color.setHex(on ? 0xfff6d2 : 0xbdb9a8); u.M.tail.color.setHex(c.braking ? 0xff2020 : on ? 0xc01414 : 0x6a0c0c);
+  u.pool.visible = on && dk > 0.15 && !c.bike; if (u.pool.visible) u.pool.material.opacity = 0.55 * dk;
 }

@@ -2,7 +2,7 @@
 // ===== Estado global =====
 const G = {
   player: null, peds: [], cars: [], pickups: [], parts: [], tracers: [], skids: [], decals: [],
-  heat: 0, wanted: 0, unseen: 0, money: 0, time: 8 * 60, t: 0, msgs: [], shake: 0,
+  heat: 0, wanted: 0, unseen: 0, money: 0, time: 8 * 60, t: 0, msgs: [], shake: 0, debris: [], flashes: [], cheat: {}, hitMark: 0,
 };
 const DX = [1, 0, -1, 0], DY = [0, 1, 0, -1], DA = [0, Math.PI / 2, Math.PI, -Math.PI / 2];
 const HEAT_THR = [0, 1, 4, 9, 16, 25];
@@ -20,7 +20,21 @@ const CARTYPES = {
   van: { L: 62, W: 28, max: 250, accel: 170, brakeF: 420, grip: 6, turn: 2.0, cols: ['#e8e8e8', '#8a8a7a', '#3a6a9a', '#c8a050'] },
   taxi: { L: 50, W: 24, max: 320, accel: 260, brakeF: 520, grip: 7, turn: 2.6, cols: ['#f2c21a'] },
   police: { L: 52, W: 25, max: 390, accel: 340, brakeF: 600, grip: 8, turn: 2.8, cols: ['#f4f4f4'] },
+  truck: { L: 72, W: 30, max: 270, accel: 190, brakeF: 450, grip: 6.5, turn: 2.0, mass: 2.2, cols: ['#3a5a8a', '#8a2a2a', '#d8d8d0', '#4a6a3a', '#2e2e33'] },
+  tractor: { L: 54, W: 30, max: 120, accel: 110, brakeF: 300, grip: 9, turn: 2.2, mass: 2.4, cols: ['#2a8a2a', '#d23a2a', '#2a6ad2'] },
+  moto: { L: 40, W: 12, max: 470, accel: 460, brakeF: 600, grip: 9, turn: 3.4, mass: 0.35, two: true, cols: ['#e0281e', '#111111', '#2a6ad2', '#f2c21a', '#ffffff'] },
+  bike: { L: 32, W: 10, max: 150, accel: 95, brakeF: 260, grip: 10, turn: 3.6, mass: 0.2, two: true, bike: true, cols: ['#2a6ad2', '#e04a2a', '#2aa25a', '#ffffff', '#111111', '#e86ab0'] },
 };
+const MASS = t => CARTYPES[t].mass || (t === 'van' ? 1.5 : 1);
+// terreno: aderência e velocidade máxima
+function surfaceAt(x, y) {
+  const t = tileAt(Math.floor(x / T), Math.floor(y / T));
+  if (t === TILE.ROAD || t === TILE.WALK || t === TILE.LOT || t === TILE.PATH) return { grip: 1, max: 1, dust: false, t };
+  if (t === TILE.DIRT) return { grip: 0.75, max: 0.9, dust: true, t };
+  if (t === TILE.SAND) return { grip: 0.55, max: 0.65, dust: true, t };
+  if (t === TILE.WATER) return { grip: 0.3, max: 0.3, dust: false, t };
+  return { grip: 0.65, max: 0.75, dust: true, t }; // grama, campo
+}
 const SHIRTS = ['#d94a4a', '#4a7ad9', '#e8e8e8', '#e8b84a', '#5aa85a', '#9a5ad9', '#e87a3a', '#3ac8c8', '#333', '#d96aa8'];
 const SKINS = ['#f1c9a5', '#d9a77a', '#a86e4a', '#7a4a2e', '#5a3620', '#e8b896'];
 
@@ -28,7 +42,8 @@ let NEXT_ID = 1;
 function makeCar(x, y, a, type) {
   const s = CARTYPES[type];
   return { id: NEXT_ID++, x, y, a, vx: 0, vy: 0, spd: 0, type, L: s.L, W: s.W, max: s.max, accel: s.accel, brakeF: s.brakeF, grip: s.grip, turn: s.turn,
-    col: pick(s.cols), hp: 100, driver: null, ai: null, fire: 0, wreck: false, siren: false, cops: type === 'police' ? 1 : 0, stuck: 0, rev: 0, horn: 0 };
+    col: pick(s.cols), hp: 100, driver: null, ai: null, fire: 0, wreck: false, siren: false, cops: type === 'police' ? 1 : 0, stuck: 0, rev: 0, horn: 0,
+    av: 0, two: !!s.two, bike: !!s.bike, mass: MASS(type), dents: [], glassHit: 0, lean: 0, fallen: false };
 }
 function makePed(x, y, kind) {
   return { id: NEXT_ID++, x, y, a: rand(-3, 3), hp: 100, maxHp: 100, kind, shirt: kind === 'cop' ? '#2b4a8a' : kind === 'gang' ? '#6a1a1a' : pick(SHIRTS),
@@ -37,21 +52,31 @@ function makePed(x, y, kind) {
 }
 // ===== Faixas =====
 function laneCross(dir, road) { const b = road * PT; return dir === 0 ? b + 96 : dir === 2 ? b + 32 : dir === 1 ? b + 32 : b + 96; }
+function randomSeg() {
+  for (let t = 0; t < 40; t++) {
+    const dir = randi(0, 3), hor = dir % 2 === 0;
+    if (hor) { const road = randi(0, NBY), k = randi(0, NB - 1); if (!hasH(road, k)) continue; return { dir, road, x: k * PT + RWP + rand(20, PT - RWP - 20), y: laneCross(dir, road) }; }
+    const road = randi(0, NB), k = randi(0, NBY - 1); if (!hasV(road, k)) continue;
+    return { dir, road, x: laneCross(dir, road), y: k * PT + RWP + rand(20, PT - RWP - 20) };
+  }
+  return null;
+}
 function spawnTraffic(near) {
-  for (let tries = 0; tries < 12; tries++) {
-    const dir = randi(0, 3), road = randi(0, NB), hor = dir % 2 === 0;
-    const k = randi(0, NB - 1), s = k * PT + RWP + rand(20, PT - RWP - 20);
-    const x = hor ? s : laneCross(dir, road), y = hor ? laneCross(dir, road) : s;
+  for (let tries = 0; tries < 14; tries++) {
+    const sg = randomSeg(); if (!sg) continue;
+    const { dir, road, x, y } = sg;
     const d = Math.hypot(x - near.x, y - near.y);
     if (d < 560 || d > 1100) continue;
     if (G.cars.some(c => Math.abs(c.x - x) < 70 && Math.abs(c.y - y) < 70)) continue;
     const patrol = G.wanted === 0 && Math.random() < 0.07;
-    const type = patrol ? 'police' : pick(['sedan', 'sedan', 'sedan', 'sport', 'van', 'taxi', 'sedan']);
+    const rural = isRural(y) || isRural(near.y);
+    let type = patrol ? 'police' : rural ? pick(['truck', 'truck', 'sedan', 'tractor', 'moto', 'van', 'sedan']) : pick(['sedan', 'sedan', 'sedan', 'sport', 'van', 'taxi', 'sedan', 'moto', 'truck', 'bike']);
     const c = makeCar(x, y, DA[dir], type);
-    c.ai = { dir, road, pend: null, cruise: rand(95, 140) };
+    c.ai = { dir, road, pend: null, cruise: type === 'bike' ? rand(55, 75) : type === 'tractor' ? rand(45, 60) : rand(95, 140) };
     if (patrol) { c.police = true; c.patrol = true; c.cops = 1; } else c.cops = 0;
     c.lights = darkness() > 0.22;
     c.driver = makePed(x, y, patrol ? 'cop' : 'civ'); c.driver.car = c; c.spd = c.ai.cruise * 0.6;
+    if (c.two) c.driver.look = makeLook(c.driver);
     G.cars.push(c); return c;
   }
   return null;
@@ -119,23 +144,75 @@ function spawnPolice(near) {
 function driveCar(c, thr, steer, brake, hand, dt) {
   const fx = Math.cos(c.a), fy = Math.sin(c.a);
   let fwd = c.vx * fx + c.vy * fy, lat = -c.vx * fy + c.vy * fx;
-  const hpF = c.hp < 30 ? 0.6 : 1;
-  if (brake) { if (fwd > 15) fwd -= c.brakeF * dt; else fwd -= c.accel * 0.6 * dt; }
-  else if (thr > 0) fwd += thr * c.accel * hpF * dt * (fwd < 0 ? 2.5 : 1) * (1 - Math.max(0, fwd) / c.max * 0.5);
-  fwd = clamp(fwd, -c.max * 0.35, c.max * hpF);
-  fwd -= fwd * (thr === 0 && !brake ? 0.8 : 0.15) * dt;
-  lat *= Math.max(0, 1 - (hand ? 1.6 : c.grip) * dt);
+  const sf = surfaceAt(c.x, c.y), hpF = (c.hp < 30 ? 0.6 : 1) * sf.max * (c === G.player.car && G.cheat.turbo ? 1.6 : 1);
+  const maxS = c.max * hpF;
+  if (c.fallen) { thr = 0; brake = true; steer = 0; }
+  if (brake) { if (fwd > 15) fwd -= c.brakeF * sf.grip * dt; else fwd -= c.accel * 0.6 * dt; }
+  else if (thr > 0) fwd += thr * c.accel * hpF * dt * (fwd < 0 ? 2.5 : 1) * (1 - Math.max(0, fwd) / Math.max(1, maxS) * 0.5) * (G.cheat.turbo && c === G.player.car ? 1.5 : 1);
+  fwd = clamp(fwd, -c.max * 0.35, Math.max(maxS, Math.min(fwd, c.max))); // em terreno ruim perde velocidade aos poucos
+  if (fwd > maxS) fwd -= (fwd - maxS) * 2 * dt;
+  fwd -= fwd * (thr === 0 && !brake ? (c.bike ? 0.35 : 0.8) : 0.15) * dt;
+  const grip = (hand ? 1.6 : c.grip) * sf.grip;
+  lat *= Math.max(0, 1 - grip * dt);
   const tf = clamp(Math.abs(fwd) / 110, 0, 1) * (fwd >= 0 ? 1 : -1) * (1 - Math.abs(fwd) / c.max * 0.25);
-  c.a = angN(c.a + steer * c.turn * (hand ? 1.35 : 1) * tf * dt);
+  // rotação: direção + giro residual de impactos
+  c.av *= Math.exp(-(c.spd > 40 ? 2.2 : 4) * dt);
+  c.a = angN(c.a + steer * c.turn * (hand ? 1.35 : 1) * tf * dt + c.av * dt);
   c.vx = fx * fwd - fy * lat; c.vy = fy * fwd + fx * lat;
   c.x += c.vx * dt; c.y += c.vy * dt;
   c.spd = Math.hypot(c.vx, c.vy); c.fwd = fwd; c.braking = brake && fwd > 5; c.reversing = fwd < -5;
-  if (Math.abs(lat) > 70 && c.spd > 90) {
+  if (c.two) { const tgt = clamp(-steer * Math.min(1, Math.abs(fwd) / 160) * 0.55 - lat * 0.004, -0.7, 0.7); c.lean = lerp(c.lean, c.fallen ? 1.35 : tgt, 1 - Math.exp(-6 * dt)); }
+  if (Math.abs(lat) > 70 && c.spd > 90 && !sf.dust) {
     for (const s of [-1, 1]) G.skids.push({ x: c.x - fx * c.L * 0.32 - fy * s * c.W * 0.38, y: c.y - fy * c.L * 0.32 + fx * s * c.W * 0.38, a: c.a, life: 8 });
     if (G.skids.length > 500) G.skids.splice(0, G.skids.length - 500);
     if (c === G.player.car) SFX.skid(clamp(Math.abs(lat) / 300, 0, 1));
   }
+  if (sf.dust && c.spd > 60 && Math.random() < dt * 25) G.parts.push({ x: c.x - fx * c.L * 0.4 + rand(-8, 8), y: c.y - fy * c.L * 0.4 + rand(-8, 8), vx: rand(-15, 15), vy: rand(-15, 15), life: rand(.5, 1), max: 1, size: 10, type: 'dust' });
 }
+// impulso num ponto do carro → empurra e gira
+function impulseAt(c, px, py, ix, iy) {
+  const inv = 1 / c.mass;
+  c.vx += ix * inv; c.vy += iy * inv;
+  const rx = px - c.x, ry = py - c.y, I = c.mass * (c.L * c.L + c.W * c.W) / 12;
+  c.av += (rx * iy - ry * ix) / I * 0.9;
+  c.av = clamp(c.av, -6, 6);
+}
+function dentCar(c, px, py, str) {
+  if (c.two) return;
+  const fx = Math.cos(c.a), fy = Math.sin(c.a), dx = px - c.x, dy = py - c.y;
+  const lx = dx * fx + dy * fy, lz = -dx * fy + dy * fx;
+  c.dents.push({ x: lx, z: lz, s: clamp(str, 1.5, 7) });
+  if (c.dents.length > 10) c.dents.shift();
+  c.dentsV = (c.dentsV || 0) + 1;
+  if (str > 3 && Math.random() < 0.5) c.glassHit = Math.min(3, c.glassHit + 1);
+  debris(px, py, Math.min(8, 2 + str | 0), c.col, 0.9);
+}
+function debris(x, y, n, col, size) {
+  for (let i = 0; i < n; i++) { const a = rand(0, 7), sp = rand(40, 160); G.debris.push({ x, y, h: 10 + rand(0, 8), vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, vh: rand(60, 200), rx: rand(0, 6), ry: rand(0, 6), wx: rand(-8, 8), wy: rand(-8, 8), life: rand(2, 4), col: Math.random() < 0.4 ? '#444' : col, s: (size || 1) * rand(2, 4.5) }); }
+  if (G.debris.length > 220) G.debris.splice(0, G.debris.length - 220);
+}
+function shell(x, y, a) {
+  G.debris.push({ x, y, h: 20, vx: -Math.sin(a) * rand(30, 60) + Math.cos(a) * rand(-10, 10), vy: Math.cos(a) * rand(30, 60) + Math.sin(a) * rand(-10, 10), vh: rand(60, 120), rx: rand(0, 6), ry: rand(0, 6), wx: rand(-20, 20), wy: rand(-20, 20), life: 1.4, col: '#d8b24a', s: 0.9, shell: true });
+}
+function updateDebris(dt) {
+  for (const d of G.debris) {
+    d.life -= dt; d.vh -= 420 * dt; d.h += d.vh * dt; d.x += d.vx * dt; d.y += d.vy * dt; d.rx += d.wx * dt; d.ry += d.wy * dt;
+    if (d.h < 0) { d.h = 0; d.vh = -d.vh * 0.35; d.vx *= 0.6; d.vy *= 0.6; d.wx *= 0.4; d.wy *= 0.4; if (Math.abs(d.vh) < 20) { d.vh = 0; d.wx = d.wy = 0; } }
+  }
+  G.debris = G.debris.filter(d => d.life > 0);
+}
+// piloto de moto/bicicleta cai
+function throwRider(c, str) {
+  const d = c.driver; if (!d) return;
+  const fx = Math.cos(c.a), fy = Math.sin(c.a);
+  c.driver = null; c.ai = null; c.fallen = true; d.car = null; d.x = c.x + fx * 10; d.y = c.y + fy * 10;
+  if (d === G.player) { G.player.car = null; }
+  d.rag = { vx: fx * str * 1.2 + rand(-30, 30), vy: fy * str * 1.2 + rand(-30, 30), vh: 60 + str * 0.4, t: 0 }; d.h = 8;
+  damagePed(d, str * 0.22, null);
+  if (d !== G.player && d.hp > 0) { d.state = 'flee'; d.t = 6; d.from = { x: c.x, y: c.y }; d.ring = null; G.peds.push(d); }
+  if (d === G.player) { SFX.thud(); G.shake = Math.max(G.shake, 8); }
+}
+function ragdollPed(p, vx, vy, vh) { p.rag = { vx, vy, vh, t: 0 }; p.h = 2; if (p.seat) { p.seat.busy = false; p.seat = null; } p.anim = null; p.ring = null; p.cross = null; }
 function carCircles(c) {
   const fx = Math.cos(c.a), fy = Math.sin(c.a), o = c.L * 0.27;
   return [[c.x + fx * o, c.y + fy * o], [c.x - fx * o, c.y - fy * o]];
@@ -148,8 +225,14 @@ function carWorldCollide(c) {
     c.x += o.x - px; c.y += o.y - py;
     const vn = c.vx * n.nx + c.vy * n.ny;
     if (vn < 0) {
-      c.vx -= n.nx * vn * 1.35; c.vy -= n.ny * vn * 1.35;
-      if (-vn > 80) { damageCar(c, -vn * 0.05, null); sparks(px - n.nx * r, py - n.ny * r, 6); if (c === G.player.car) { buzz(40); SFX.crash(-vn / 400); G.shake = Math.min(12, -vn / 30); } }
+      const j = -vn * 1.3 * c.mass;
+      c.vx -= n.nx * vn * 0.2; c.vy -= n.ny * vn * 0.2;
+      impulseAt(c, px, py, n.nx * j, n.ny * j);
+      if (-vn > 80) {
+        damageCar(c, -vn * 0.05, null); sparks(px - n.nx * r, py - n.ny * r, 6); dentCar(c, px - n.nx * r, py - n.ny * r, -vn / 40);
+        if (c === G.player.car) { buzz(40); SFX.crash(-vn / 400); G.shake = Math.min(12, -vn / 30); }
+        if (c.two && -vn > 130) throwRider(c, -vn);
+      }
     }
   }
 }
@@ -176,7 +259,7 @@ function aiTraffic(c, dt) {
   if (ai.pend) {
     const k2 = ai.pend.k, front = s + sgn * c.L / 2;
     const gap = sgn > 0 ? k2 * PT - 34 - front : front - (k2 * PT + RWP + 34);
-    if (gap > -4 && gap < 260) {
+    if (gap > -4 && gap < 260 && (hor ? ai.road : k2) <= NB) {
       const st = lightState(hor ? k2 : ai.road, hor ? ai.road : k2), mine = hor ? st.ew : st.ns;
       if (mine === 'R' || (mine === 'Y' && gap > 30)) tgt = Math.min(tgt, Math.max(0, gap * 2.2));
     }
@@ -189,14 +272,21 @@ function aiTraffic(c, dt) {
   if (!ai.pend) {
     const k = sgn > 0 ? Math.floor(s / PT) + 1 : Math.floor((s - RWP) / PT);
     const opts = [];
-    if (sgn > 0 ? k < NB : k > 0) opts.push(ai.dir, ai.dir, ai.dir);
-    for (const nd of [(ai.dir + 1) % 4, (ai.dir + 3) % 4]) { const ps = (nd === 0 || nd === 1) ? 1 : -1; if (ps > 0 ? ai.road < NB : ai.road > 0) opts.push(nd); }
+    const cont = hor ? (sgn > 0 ? hasH(ai.road, k) : hasH(ai.road, k - 1)) : (sgn > 0 ? hasV(ai.road, k) : hasV(ai.road, k - 1));
+    if (cont) opts.push(ai.dir, ai.dir, ai.dir);
+    for (const nd of [(ai.dir + 1) % 4, (ai.dir + 3) % 4]) {
+      const ps = (nd === 0 || nd === 1) ? 1 : -1;
+      const ok = hor ? (ps > 0 ? hasV(k, ai.road) : hasV(k, ai.road - 1)) : (ps > 0 ? hasH(k, ai.road) : hasH(k, ai.road - 1));
+      if (ok) opts.push(nd);
+    }
+    const u = !opts.length; if (u) opts.push((ai.dir + 2) % 4);
     const nd = pick(opts);
-    ai.pend = { k, nd, target: nd === ai.dir ? k * PT + 64 : laneCross(nd, k) };
+    ai.pend = { k, nd, u, target: u ? (sgn > 0 ? k * PT + 24 : k * PT + 104) : nd === ai.dir ? k * PT + 64 : laneCross(nd, k) };
   }
   const p = ai.pend, ns = s + sgn * c.spd * dt;
   if ((sgn > 0 && ns >= p.target) || (sgn < 0 && ns <= p.target)) {
-    if (p.nd !== ai.dir) { if (hor) c.x = p.target; else c.y = p.target; ai.dir = p.nd; ai.road = p.k; }
+    if (p.u) { if (hor) c.x = p.target; else c.y = p.target; ai.dir = p.nd; }
+    else if (p.nd !== ai.dir) { if (hor) c.x = p.target; else c.y = p.target; ai.dir = p.nd; ai.road = p.k; }
     else { if (hor) c.x = ns; else c.y = ns; }
     ai.pend = null;
   } else { if (hor) c.x = ns; else c.y = ns; }
@@ -234,6 +324,7 @@ function aiPolice(c, dt) {
 }
 // ===== Combate =====
 function crime(pts) {
+  if (G.cheat.nowanted) return;
   G.heat = Math.min(40, G.heat + pts); G.unseen = 0;
   let w = 0; for (let i = 1; i <= 5; i++) if (G.heat >= HEAT_THR[i]) w = i;
   if (w > G.wanted) { G.wanted = w; flashStars(); }
@@ -243,7 +334,7 @@ let starFlash = 0; function flashStars() { starFlash = 2; }
 function damagePed(p, dmg, src) {
   if (p.hp <= 0) return;
   if (p === G.player) {
-    if (G.cheatGod) return;
+    if (G.cheat.god) return;
     const ab = Math.min(G.armor, dmg * 0.7); G.armor -= ab; dmg -= ab;
     p.hp -= dmg; G.shake = Math.max(G.shake, 4); G.hurt = 0.4; buzz(25);
     if (p.hp <= 0) { p.hp = 0; Game.wasted(); }
@@ -262,7 +353,8 @@ function killPed(p, src) {
   p.hp = 0; p.state = 'dead'; p.deadT = 0; SFX.thud();
   G.decals.push({ x: p.x + rand(-4, 4), y: p.y + rand(-4, 4), r: rand(10, 16), life: 30, c: 'rgba(120,10,10,.75)' });
   if (p.kind === 'gang' || Math.random() < 0.35) G.pickups.push({ x: p.x + 8, y: p.y, type: 'cash', val: p.kind === 'gang' ? randi(80, 200) : randi(10, 60), temp: 30 });
-  if (p.kind === 'cop' && Math.random() < 0.5) G.pickups.push({ x: p.x - 8, y: p.y, type: 'pistol', val: 17, temp: 30 });
+  if (p.weapon > 0) G.pickups.push({ x: p.x + rand(-10, 10), y: p.y + rand(-10, 10), type: ['', 'pistol', 'smg', 'shotgun'][p.weapon], val: [0, 12, 30, 6][p.weapon], temp: 45, drop: true, a: rand(0, 6) });
+  if (p.car && p.car.two) { const c = p.car; c.driver = null; c.ai = null; c.fallen = true; p.car = null; }
   if (p.onDie) p.onDie();
 }
 function damageCar(c, dmg, src) {
@@ -285,6 +377,7 @@ function explode(c) {
   if (c.onDie) c.onDie();
 }
 function sparks(x, y, n) { for (let i = 0; i < n; i++) { const a = rand(0, 7), s = rand(60, 220); G.parts.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: rand(.1, .35), max: .35, size: 2, type: 'spark' }); } }
+function puff(x, y, kind) { for (let i = 0; i < 4; i++) G.parts.push({ x: x + rand(-3, 3), y: y + rand(-3, 3), vx: rand(-25, 25), vy: rand(-25, 25), life: rand(.3, .6), max: .6, size: 6, type: kind === 'blood' ? 'bloodpuff' : 'dust' }); }
 function blood(x, y, n) { for (let i = 0; i < n; i++) { const a = rand(0, 7), s = rand(20, 90); G.parts.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: rand(.2, .5), max: .5, size: 3, type: 'blood' }); } }
 
 function shoot(sh, ang, wi) {
@@ -303,7 +396,12 @@ function shoot(sh, ang, wi) {
   SFX.shot(wi, sh === G.player ? 1 : clamp(1 - dist(sh, G.player) / 700, 0, 1));
   const n = w.pellets || 1;
   for (let i = 0; i < n; i++) hitscan(sh, ang + rand(-w.spread, w.spread) * (sh === G.player ? 1 : 2.2), w.range, w.dmg * (sh === G.player ? 1 : 0.3));
-  G.parts.push({ x: sh.x + Math.cos(ang) * 16, y: sh.y + Math.sin(ang) * 16, vx: 0, vy: 0, life: .06, max: .06, size: 9, type: 'flash' });
+  const mx = sh.x + Math.cos(ang) * 17, my = sh.y + Math.sin(ang) * 17;
+  G.parts.push({ x: mx, y: my, vx: 0, vy: 0, life: .06, max: .06, size: 9, type: 'flash' });
+  G.flashes.push({ x: mx, y: my, a: ang, life: 0.07, big: wi === 3 });
+  shell(sh.x + Math.cos(ang) * 8, sh.y + Math.sin(ang) * 8, ang);
+  for (let i = 0; i < 2; i++) G.parts.push({ x: mx, y: my, vx: Math.cos(ang) * 40 + rand(-10, 10), vy: Math.sin(ang) * 40 + rand(-10, 10), life: .35, max: .35, size: 5, type: 'smoke' });
+  if (sh === G.player) { CAM.kick = (CAM.kick || 0) + (wi === 3 ? 0.035 : wi === 2 ? 0.012 : 0.02); G.shake = Math.max(G.shake, wi === 3 ? 3 : 1); }
   if (sh === G.player) {
     for (const p of G.peds) {
       if (p.hp <= 0 || p.car) continue; const d = dist(p, sh);
@@ -317,10 +415,10 @@ function hitscan(sh, a, range, dmg) {
   const myCar = sh.car;
   outer: for (let d = 12; d < range; d += 6) {
     const x = sh.x + dx * d, y = sh.y + dy * d;
-    if (solidAt(x, y)) { sparks(x, y, 3); ex = x; ey = y; break; }
+    if (solidAt(x, y)) { sparks(x, y, 3); puff(x, y, 'dust'); ex = x; ey = y; break; }
     for (const p of G.peds) {
       if (p === sh || p.hp <= 0 || p.car) continue;
-      if ((p.x - x) ** 2 + (p.y - y) ** 2 < 120) { damagePed(p, dmg, sh); ex = x; ey = y; break outer; }
+      if ((p.x - x) ** 2 + (p.y - y) ** 2 < 120) { damagePed(p, dmg, sh); puff(x, y, 'blood'); if (sh === G.player) G.hitMark = 0.25; ex = x; ey = y; break outer; }
     }
     const pl = G.player;
     if (sh !== pl && !pl.car && pl.hp > 0 && (pl.x - x) ** 2 + (pl.y - y) ** 2 < 110) { damagePed(pl, dmg, sh); ex = x; ey = y; break; }
@@ -328,14 +426,14 @@ function hitscan(sh, a, range, dmg) {
       if (c === myCar || c.wreck) continue;
       if (Math.abs(c.x - x) > 40 || Math.abs(c.y - y) > 40) continue;
       for (const [cx, cy] of carCircles(c)) if ((cx - x) ** 2 + (cy - y) ** 2 < 196) {
-        c.lastHit = sh; damageCar(c, dmg * 0.45, sh); sparks(x, y, 4); ex = x; ey = y;
+        c.lastHit = sh; damageCar(c, dmg * 0.45, sh); sparks(x, y, 4); ex = x; ey = y; if (Math.random() < 0.3) c.glassHit = Math.min(3, c.glassHit + 1); if (Math.random() < 0.25) dentCar(c, x, y, 1.5);
         if (c === pl.car && sh !== pl) G.hurt = 0.2;
         if (c.driver && c.driver.kind === 'civ' && c.ai && sh === pl) { c.ai.cruise = 260; }
         break outer;
       }
     }
   }
-  G.tracers.push({ x1: sh.x + dx * 14, y1: sh.y + dy * 14, x2: ex, y2: ey, life: .07 });
+  G.tracers.push({ x1: sh.x + dx * 14, y1: sh.y + dy * 14, x2: ex, y2: ey, life: .09, max: .09 });
 }
 // ===== IA de pedestres =====
 const RING_S = 288;
@@ -372,7 +470,15 @@ function pedResume(p) {
   if (p.ring) { const [x, y] = ringPos(p.ring); if (Math.hypot(x - p.x, y - p.y) > 6) { p.state = 'return'; p.t = 10; return; } p.state = 'walk'; }
   else { p.state = 'wander'; p.t = rand(2, 5); p.wa = rand(-3, 3); }
 }
+function updateRag(p, dt) {
+  const r = p.rag; r.t += dt; r.vh -= 500 * dt; p.h = (p.h || 0) + r.vh * dt; p.x += r.vx * dt; p.y += r.vy * dt;
+  if (p.h <= 0) { p.h = 0; if (r.vh < -60) { r.vh = -r.vh * 0.3; r.vx *= 0.5; r.vy *= 0.5; if (p.hp > 0) damagePed(p, 6, null); } else { r.vh = 0; r.vx *= Math.max(0, 1 - 6 * dt); r.vy *= Math.max(0, 1 - 6 * dt); } }
+  resolveCircle(p, 8);
+  if (p.h <= 0 && Math.hypot(r.vx, r.vy) < 8 && r.t > 0.6) { p.rag = null; p.h = 0; if (p.hp > 0) { p.getup = 1.1; } }
+}
 function updatePed(p, dt) {
+  if (p.rag) { updateRag(p, dt); if (p.hp <= 0) { p.deadT = (p.deadT || 0) + dt; } return; }
+  if (p.getup > 0) { p.getup -= dt; if (p.getup <= 0 && p !== G.player && p.kind === 'civ') { p.state = 'flee'; p.t = 6; p.from = { x: p.x + rand(-5, 5), y: p.y + rand(-5, 5) }; } return; }
   if (p.hp <= 0) { p.deadT += dt; if (p.seat) { p.seat.busy = false; p.seat = null; } return; }
   const pl = G.player;
   let mvx = 0, mvy = 0, sp = 0;
@@ -431,6 +537,8 @@ function updatePed(p, dt) {
       const d = dist(p, pl); if (d < 120) p.a = Math.atan2(pl.y - p.y, pl.x - p.x); p.anim = d < 80 && Math.floor(G.t / 3) % 3 === 0 ? 'wave' : 'sell'; return;
     }
     case 'dance': return;
+    case 'waitride': { const d = dist(p, pl); if (d < 200) p.a = Math.atan2(pl.y - p.y, pl.x - p.x); if (!p.anim) p.anim = 'wave'; return; }
+    case 'passenger': { const c = p.car; if (c) { p.x = c.x; p.y = c.y; } return; }
   }
   p.anim = null;
   if (p.state === 'flee') {

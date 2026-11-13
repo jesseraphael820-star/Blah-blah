@@ -20,17 +20,18 @@ const CAM = {
   snap() { const pl = G.player; this.yaw = pl.car ? pl.car.a : pl.a; this.curDist = this.dist; },
   update(dt, camera) {
     const pl = G.player, c = pl.car, me = c || pl;
-    const th = c ? 17 : 19;
-    if (c) {
-      this.dist = 98 + Math.min(70, c.spd * 0.16) + (c.type === 'van' ? 16 : 0);
+    const th = c && !c.two ? 17 : 19;
+    if (c && !c.two) {
+      this.dist = 98 + Math.min(70, c.spd * 0.16) + (c.type === 'van' || c.type === 'truck' ? 16 : 0);
       if (this.manualT <= 0) {
         const tgt = (c.fwd || 0) < -40 ? c.a : c.a; // GTA: a câmera fica atrás do carro, mesmo na ré
         this.yaw = angN(this.yaw + angN(tgt - this.yaw) * (1 - Math.exp(-(1.2 + c.spd / 120) * dt)));
         this.pitch = lerp(this.pitch, 0.27, 1 - Math.exp(-1.5 * dt));
       }
     } else {
-      this.dist = 82;
-      if (this.manualT <= 0 && pl.moving && Math.abs(angN(pl.a - this.yaw)) < 2.0) this.yaw = angN(this.yaw + angN(pl.a - this.yaw) * (1 - Math.exp(-0.9 * dt)));
+      this.dist = c ? 88 + Math.min(40, c.spd * 0.1) : 82;
+      if (pl.car && pl.car.two) { if (this.manualT <= 0) this.yaw = angN(this.yaw + angN(pl.car.a - this.yaw) * (1 - Math.exp(-1.5 * dt))); }
+      else if (this.manualT <= 0 && pl.moving && Math.abs(angN(pl.a - this.yaw)) < 2.0) this.yaw = angN(this.yaw + angN(pl.a - this.yaw) * (1 - Math.exp(-0.9 * dt)));
     }
     this.manualT -= dt;
     const cp = Math.cos(this.pitch), sp = Math.sin(this.pitch), fx = Math.cos(this.yaw), fy = Math.sin(this.yaw);
@@ -42,7 +43,8 @@ const CAM = {
     this.curDist = d < this.curDist ? d : lerp(this.curDist, d, 1 - Math.exp(-2.5 * dt));
     const D = this.curDist, sh = G.shake ? G.shake * 0.4 : 0;
     camera.position.set(me.x - fx * cp * D + rand(-sh, sh), th + sp * D + rand(-sh, sh), me.y - fy * cp * D + rand(-sh, sh));
-    camera.lookAt(me.x + fx * 12, th + 7, me.y + fy * 12);
+    this.kick = Math.max(0, (this.kick || 0) - dt * 0.25);
+    camera.lookAt(me.x + fx * 12, th + 7 + this.kick * 120, me.y + fy * 12);
     const fov = 62 + (c ? Math.min(14, c.spd * 0.03) : 0);
     if (Math.abs(fov - camera.fov) > 0.1) { camera.fov = lerp(camera.fov, fov, 1 - Math.exp(-3 * dt)); camera.updateProjectionMatrix(); }
   },
@@ -62,7 +64,8 @@ const R3 = {
     r.shadowMap.enabled = true; r.shadowMap.type = THREE.PCFSoftShadowMap;
     const s = this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(62, 1, 2, 3200);
-    s.fog = new THREE.Fog(0x9fd0f0, 600, 2100); s.background = new THREE.Color(0x9fd0f0);
+    s.fog = new THREE.Fog(0x9fd0f0, 600, 2100); s.background = null;
+    this.skyDome();
     this.hemi = new THREE.HemisphereLight(0xd6ecff, 0x6a5d48, 0.65); s.add(this.hemi);
     const sun = this.sun = new THREE.DirectionalLight(0xfff0d6, 1.0);
     sun.castShadow = true; sun.shadow.mapSize.set(this.mobile ? 1024 : 2048, this.mobile ? 1024 : 2048);
@@ -72,7 +75,7 @@ const R3 = {
     this.headL = new THREE.SpotLight(0xfff2cc, 0, 520, 0.55, 0.5, 1.2); s.add(this.headL, this.headL.target);
     this.siren = new THREE.PointLight(0xff2222, 0, 260, 1.5); s.add(this.siren);
     this.boomL = new THREE.PointLight(0xff9a40, 0, 420, 1.5); s.add(this.boomL);
-    for (const b of BUILDINGS) { const d = districtOf(Math.floor(b.x / PT), Math.floor(b.y / PT)); b.house = (d === 'suburb' || d === 'beach') && (!b.label || b.label === 'CASA'); }
+    for (const b of BUILDINGS) { const d = districtOf(Math.floor(b.x / PT), Math.floor(b.y / PT)); b.house = (d === 'suburb' || d === 'beach' || d === 'rural') && (!b.label || b.label === 'CASA'); }
     this.buildGround(); this.buildCity(); this.buildTrees(); this.buildLamps(); this.buildFx(); this.buildProps();
     this.resize();
   },
@@ -152,9 +155,47 @@ const R3 = {
     const wt = new THREE.CanvasTexture(wc); wt.wrapS = wt.wrapT = THREE.RepeatWrapping; wt.anisotropy = 4;
     const et = new THREE.CanvasTexture(ec); et.wrapS = et.wrapT = THREE.RepeatWrapping;
     this.wallMat = new THREE.MeshLambertMaterial({ map: wt, vertexColors: true, emissive: 0xffffff, emissiveMap: et, emissiveIntensity: 0 });
+    this.buildShopfronts(); this.buildBaseAO();
     const walls = new THREE.Mesh(mk(W), this.wallMat); walls.castShadow = walls.receiveShadow = true;
     const roofs = new THREE.Mesh(mk(Rf), new THREE.MeshLambertMaterial({ vertexColors: true })); roofs.castShadow = roofs.receiveShadow = true;
     this.scene.add(walls, roofs);
+  },
+  buildBaseAO() {
+    const c = document.createElement('canvas'); c.width = 4; c.height = 32; const g = c.getContext('2d');
+    const gr = g.createLinearGradient(0, 0, 0, 32); gr.addColorStop(0, 'rgba(0,0,0,.45)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(0, 0, 4, 32);
+    const tex = new THREE.CanvasTexture(c);
+    const P = [], N = [], U = [], m = 14;
+    const quad = (a, b, c2, d) => { for (const v of [a, b, c2, a, c2, d]) { P.push(v[0], 0.35, v[1]); N.push(0, 1, 0); } U.push(0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1); };
+    for (const b of BUILDINGS) {
+      const x0 = b.x, x1 = b.x + b.w, z0 = b.y, z1 = b.y + b.h;
+      quad([x0 - m, z0 - m], [x1 + m, z0 - m], [x1, z0], [x0, z0]); quad([x1 + m, z1 + m], [x0 - m, z1 + m], [x0, z1], [x1, z1]);
+      quad([x0 - m, z1 + m], [x0 - m, z0 - m], [x0, z0], [x0, z1]); quad([x1 + m, z0 - m], [x1 + m, z1 + m], [x1, z1], [x1, z0]);
+    }
+    const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); geo.setAttribute('normal', new THREE.Float32BufferAttribute(N, 3)); geo.setAttribute('uv', new THREE.Float32BufferAttribute(U, 2));
+    // uv: 1 = encostado na parede (escuro), 0 = fora
+    const uv = geo.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, 0.5, uv.getY(i));
+    const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false })); mesh.renderOrder = 1; this.scene.add(mesh);
+    tex.flipY = false;
+  },
+  buildShopfronts() {
+    const names = ['PADARIA SOL', 'FARMÁCIA', 'LOJA 1,99', 'BAR DO TIÃO', 'CELULARES', 'AÇOUGUE', 'LAVANDERIA', 'PET SHOP', 'SALÃO DA BIA', 'LANCHES', 'ÓTICA', 'MERCADINHO', 'CAFÉ', 'SORVETERIA', 'TATTOO', 'PIZZARIA', 'ACADEMIA', 'LOTÉRICA'];
+    const cols = ['#d23a2a', '#2a6ad2', '#2aa25a', '#e8a21a', '#7a2ad2', '#1a1a1a', '#e86ab0', '#1a8a8a'];
+    const r = rng(2024);
+    for (const b of BUILDINGS) {
+      const bx = Math.floor(b.x / PT), by = Math.floor(b.y / PT), d = districtOf(bx, by);
+      if (!(b.shop || (d === 'downtown' && !b.label && b.w >= 60)) || b.house) continue;
+      const name = b.shop || names[Math.floor(r() * names.length)], col = cols[Math.floor(r() * cols.length)];
+      const W = Math.min(b.w - 8, 140), c = document.createElement('canvas'); c.width = 512; c.height = 96; const g = c.getContext('2d');
+      g.fillStyle = '#2c3440'; g.fillRect(0, 0, 512, 96);
+      g.fillStyle = '#9fc4dc'; for (let i = 0; i < 4; i++) g.fillRect(12 + i * 100 + (i >= 2 ? 100 : 0), 30, 88, 60);
+      g.fillStyle = 'rgba(255,255,255,.25)'; for (let i = 0; i < 4; i++) g.fillRect(14 + i * 100 + (i >= 2 ? 100 : 0), 32, 20, 56);
+      g.fillStyle = '#4a2a14'; g.fillRect(212, 30, 88, 66); g.fillStyle = '#d8c070'; g.fillRect(286, 62, 6, 6);
+      g.fillStyle = col; g.fillRect(0, 0, 512, 26); g.fillStyle = '#fff'; g.font = '900 20px "Arial Black", Arial'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(name, 256, 13);
+      const tex = new THREE.CanvasTexture(c);
+      const mat2 = new THREE.MeshLambertMaterial({ map: tex, emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: 0 });
+      (this.shopMats || (this.shopMats = [])).push(mat2);
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(W, W * 96 / 512), mat2); m.position.set(b.x + b.w / 2, W * 96 / 512 / 2 + 0.2, b.y + b.h + 0.6); this.scene.add(m);
+    }
   },
   addLabel(b, h) {
     const c = document.createElement('canvas'); c.width = 512; c.height = 96; const g = c.getContext('2d');
@@ -210,6 +251,31 @@ const R3 = {
     pole.castShadow = true; this.scene.add(pole, head);
     this.lampPts = pts;
   },
+  streakTex() {
+    const c = document.createElement('canvas'); c.width = 64; c.height = 8; const g = c.getContext('2d');
+    const gr = g.createLinearGradient(0, 0, 64, 0); gr.addColorStop(0, 'rgba(255,255,255,0)'); gr.addColorStop(0.7, 'rgba(255,240,200,.9)'); gr.addColorStop(1, 'rgba(255,255,255,1)');
+    g.fillStyle = gr; g.fillRect(0, 0, 64, 8); return new THREE.CanvasTexture(c);
+  },
+  flashTex() {
+    const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
+    g.translate(32, 32); g.fillStyle = 'rgba(255,230,160,1)';
+    for (let i = 0; i < 7; i++) { g.rotate(Math.PI * 2 / 7); g.beginPath(); g.moveTo(0, -3); g.lineTo(30, 0); g.lineTo(0, 3); g.fill(); }
+    const gr = g.createRadialGradient(0, 0, 0, 0, 0, 14); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(1, 'rgba(255,220,120,0)'); g.fillStyle = gr; g.fillRect(-16, -16, 32, 32);
+    return new THREE.CanvasTexture(c);
+  },
+  skyDome() {
+    const geo = new THREE.SphereGeometry(2900, 24, 12), n = geo.attributes.position.count, cols = new Float32Array(n * 3);
+    geo.setAttribute('color', new THREE.BufferAttribute(cols, 3));
+    this.sky = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide, fog: false, depthWrite: false }));
+    this.sky.renderOrder = -10; this.sky.frustumCulled = false; this.scene.add(this.sky);
+  },
+  updateSky(dk, dusk) {
+    const top = new THREE.Color(0x3f8fe0).lerp(new THREE.Color(0x02040f), dk), hor = new THREE.Color(0xb8dcf4).lerp(new THREE.Color(0x101a36), dk);
+    hor.lerp(new THREE.Color(0xf4905a), dusk * 0.7); top.lerp(new THREE.Color(0x6a4a8a), dusk * 0.35);
+    const pos = this.sky.geometry.attributes.position, c = this.sky.geometry.attributes.color;
+    for (let i = 0; i < pos.count; i++) { const t = clamp(pos.getY(i) / 2900, -0.1, 1); const k = Math.pow(Math.max(0, t), 0.55); c.setXYZ(i, lerp(hor.r, top.r, k), lerp(hor.g, top.g, k), lerp(hor.b, top.b, k)); }
+    c.needsUpdate = true; this.sky.position.copy(this.camera.position); this.scene.fog.color.copy(hor);
+  },
   glowTex() {
     if (this._glow) return this._glow;
     const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d');
@@ -232,8 +298,18 @@ const R3 = {
       p.frustumCulled = false; p.n = n; this.scene.add(p); return p;
     };
     this.pFire = mkP(500, 16, true, 1); this.pSmoke = mkP(300, 34, false, 0.5); this.pSmall = mkP(300, 5, false, 1);
-    const tg = new THREE.BufferGeometry(); tg.setAttribute('position', new THREE.BufferAttribute(new Float32Array(120 * 3), 3));
-    this.tracers = new THREE.LineSegments(tg, new THREE.LineBasicMaterial({ color: 0xffe8a0, transparent: true, opacity: 0.85 })); this.tracers.frustumCulled = false; this.scene.add(this.tracers);
+    // rastros de bala: quadros brilhantes (duas placas cruzadas)
+    const tq = mergeGeo([[new THREE.PlaneGeometry(1, 1.6), '#fff'], [new THREE.PlaneGeometry(1, 1.6).rotateX(Math.PI / 2), '#fff']]);
+    this.tracerM = new THREE.InstancedMesh(tq, new THREE.MeshBasicMaterial({ map: this.streakTex(), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }), 60);
+    this.tracerM.frustumCulled = false; this.tracerM.count = 0; this.scene.add(this.tracerM);
+    // clarão do cano
+    const fq = mergeGeo([[new THREE.PlaneGeometry(1, 1).rotateY(Math.PI / 2).translate(0.5, 0, 0), '#fff'], [new THREE.PlaneGeometry(1, 1).translate(0.5, 0, 0), '#fff'], [new THREE.PlaneGeometry(1, 1).rotateX(Math.PI / 2).translate(0.5, 0, 0), '#fff']]);
+    this.flashM = new THREE.InstancedMesh(fq, new THREE.MeshBasicMaterial({ map: this.flashTex(), color: 0xffe0a0, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }), 12);
+    this.flashM.frustumCulled = false; this.flashM.count = 0; this.scene.add(this.flashM);
+    this.gunL = new THREE.PointLight(0xffd080, 0, 160, 1.6); this.scene.add(this.gunL);
+    // destroços e cápsulas
+    this.debrisM = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshLambertMaterial(), 220);
+    this.debrisM.frustumCulled = false; this.debrisM.count = 0; this.debrisM.castShadow = true; this.scene.add(this.debrisM);
     this.skids = new THREE.InstancedMesh(new THREE.PlaneGeometry(8, 5).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x111111, transparent: true, opacity: 0.4, depthWrite: false }), 500);
     this.skids.frustumCulled = false; this.scene.add(this.skids);
     this.decals = new THREE.InstancedMesh(new THREE.CircleGeometry(1, 14).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.75, depthWrite: false }), 80);
@@ -268,7 +344,7 @@ const R3 = {
     const seen = new Set();
     for (const c of G.cars) {
       let m = this.carMeshes.get(c.id);
-      if (!m) { m = makeCarModel(c); this.scene.add(m); this.carMeshes.set(c.id, m); }
+      if (!m) { m = makeVehicle(c); this.scene.add(m); this.carMeshes.set(c.id, m); }
       seen.add(c.id);
       const far = Math.abs(c.x - cp.x) > 1300 || Math.abs(c.y - cp.z) > 1300;
       m.visible = !far; if (!far) updCarModel(c, m, dt, dk);
@@ -276,8 +352,8 @@ const R3 = {
     for (const [id, m] of this.carMeshes) if (!seen.has(id)) { this.scene.remove(m); this.carMeshes.delete(id); }
     // pedestres
     const ps = new Set();
-    const list = G.peds.filter(p => !p.car);
-    if (!pl.car) list.push(pl);
+    const list = G.peds.filter(p => !p.car || p.car.two);
+    if (!pl.car || pl.car.two) list.push(pl);
     for (const p of list) {
       if (Math.abs(p.x - cp.x) > 900 || Math.abs(p.y - cp.z) > 900) continue;
       let m = this.pedMeshes.get(p.id);
@@ -291,8 +367,15 @@ const R3 = {
       if (k.respawn > 0) return;
       if (!k.id) k.id = NEXT_ID++;
       let m = this.pickMeshes.get(k.id);
-      if (!m) { m = new THREE.Mesh(GEO.pick, new THREE.MeshLambertMaterial({ color: PK[k.type][1], emissive: PK[k.type][1], emissiveIntensity: 0.45 })); m.castShadow = true; this.scene.add(m); this.pickMeshes.set(k.id, m); }
-      ks.add(k.id); m.position.set(k.x, 12 + Math.sin(G.t * 3 + k.x) * 3, k.y); m.rotation.y = G.t * 2;
+      const wi = { pistol: 1, smg: 2, shotgun: 3 }[k.type];
+      if (!m) {
+        if (wi) { m = new THREE.Mesh(gunGeo(wi), PED_MAT()); m.scale.setScalar(1.25); }
+        else m = new THREE.Mesh(GEO.pick, new THREE.MeshLambertMaterial({ color: PK[k.type][1], emissive: PK[k.type][1], emissiveIntensity: 0.45 }));
+        m.castShadow = true; this.scene.add(m); this.pickMeshes.set(k.id, m);
+      }
+      ks.add(k.id);
+      if (k.drop) { m.position.set(k.x, 1.2, k.y); m.rotation.set(Math.PI / 2, 0, k.a || 0); }
+      else { m.position.set(k.x, (wi ? 9 : 12) + Math.sin(G.t * 3 + k.x) * 3, k.y); m.rotation.set(0, G.t * 2, wi ? 0.3 : 0); }
     });
     for (const [id, m] of this.pickMeshes) if (!ks.has(id)) { this.scene.remove(m); this.pickMeshes.delete(id); }
     // marcadores
@@ -314,10 +397,13 @@ const R3 = {
         if (nf >= this.pFire.n) continue;
         fp[nf * 3] = q.x; fp[nf * 3 + 1] = q.type === 'flash' ? 18 : 6 + age * 40; fp[nf * 3 + 2] = q.y;
         fc[nf * 3] = a; fc[nf * 3 + 1] = (q.type === 'flash' ? 0.95 : 0.35 + a * 0.45) * a; fc[nf * 3 + 2] = (q.type === 'flash' ? 0.6 : 0.1) * a; nf++;
-      } else if (q.type === 'smoke') {
+      } else if (q.type === 'smoke' || q.type === 'dust' || q.type === 'bloodpuff') {
         if (ns >= this.pSmoke.n) continue;
-        sp[ns * 3] = q.x; sp[ns * 3 + 1] = 12 + age * 30; sp[ns * 3 + 2] = q.y;
-        const v = 0.25 + (1 - a) * 0.2; sc[ns * 3] = sc[ns * 3 + 1] = sc[ns * 3 + 2] = v; ns++;
+        sp[ns * 3] = q.x; sp[ns * 3 + 1] = (q.type === 'smoke' ? 12 : 8) + age * (q.type === 'smoke' ? 30 : 12); sp[ns * 3 + 2] = q.y;
+        if (q.type === 'dust') { sc[ns * 3] = 0.6; sc[ns * 3 + 1] = 0.52; sc[ns * 3 + 2] = 0.4; }
+        else if (q.type === 'bloodpuff') { sc[ns * 3] = 0.45; sc[ns * 3 + 1] = 0.02; sc[ns * 3 + 2] = 0.02; }
+        else { const v = 0.25 + (1 - a) * 0.2; sc[ns * 3] = sc[ns * 3 + 1] = sc[ns * 3 + 2] = v; }
+        ns++;
       } else {
         if (nm >= this.pSmall.n) continue;
         mp[nm * 3] = q.x; mp[nm * 3 + 1] = q.type === 'blood' ? 10 - age * 20 : 12; mp[nm * 3 + 2] = q.y;
@@ -326,14 +412,35 @@ const R3 = {
       }
     }
     for (const [p, n] of [[this.pFire, nf], [this.pSmoke, ns], [this.pSmall, nm]]) { p.geometry.setDrawRange(0, n); p.geometry.attributes.position.needsUpdate = true; p.geometry.attributes.color.needsUpdate = true; }
-    const tp = this.tracers.geometry.attributes.position.array; let nt = 0;
-    for (const t of G.tracers) { if (nt >= 60) break; tp.set([t.x1, 17, t.y1, t.x2, 17, t.y2], nt * 6); nt++; }
-    this.tracers.geometry.setDrawRange(0, nt * 2); this.tracers.geometry.attributes.position.needsUpdate = true;
     const dmy = this._d || (this._d = new THREE.Object3D());
-    let n = 0;
+    let n = 0; const col = this._c || (this._c = new THREE.Color());
+    for (const t of G.tracers) {
+      if (n >= 60) break; const dx = t.x2 - t.x1, dy = t.y2 - t.y1, len = Math.hypot(dx, dy); if (len < 2) continue;
+      const k = t.life / (t.max || 0.09), head = Math.min(len, 10 + (1 - k) * len * 1.2);
+      const fr = Math.max(0, head - 110 * (1 - k) - 40) / len, to = head / len;
+      dmy.position.set(t.x1 + dx * (fr + to) / 2, 17, t.y1 + dy * (fr + to) / 2); dmy.rotation.set(0, -Math.atan2(dy, dx), 0); dmy.scale.set(Math.max(4, len * (to - fr)), 1, 1); dmy.updateMatrix();
+      this.tracerM.setMatrixAt(n, dmy.matrix); this.tracerM.setColorAt(n, col.setRGB(1, 0.9, 0.55 + 0.4 * k)); n++;
+    }
+    this.tracerM.count = n; this.tracerM.instanceMatrix.needsUpdate = true; if (this.tracerM.instanceColor) this.tracerM.instanceColor.needsUpdate = true;
+    n = 0;
+    for (const f of G.flashes) {
+      if (n >= 12) break;
+      dmy.position.set(f.x, 18, f.y); dmy.rotation.set(0, -f.a, 0); const sc2 = (f.big ? 26 : 16) * (0.6 + f.life / 0.07 * 0.6); dmy.scale.set(sc2, sc2, sc2); dmy.updateMatrix();
+      this.flashM.setMatrixAt(n++, dmy.matrix);
+    }
+    this.flashM.count = n; this.flashM.instanceMatrix.needsUpdate = true;
+    if (G.flashes.length) { const f = G.flashes[G.flashes.length - 1]; this.gunL.position.set(f.x, 22, f.y); this.gunL.intensity = 2.5 + 3 * (f.life / 0.07); } else this.gunL.intensity = 0;
+    n = 0;
+    for (const d of G.debris) {
+      if (n >= 220) break;
+      dmy.position.set(d.x, d.h + d.s * 0.5, d.y); dmy.rotation.set(d.rx, d.ry, 0); dmy.scale.set(d.s * (d.shell ? 1.6 : 1.4), d.s * (d.shell ? 0.45 : 0.4), d.s * (d.shell ? 0.45 : 1)); dmy.updateMatrix();
+      this.debrisM.setMatrixAt(n, dmy.matrix); this.debrisM.setColorAt(n, col.set(d.col)); n++;
+    }
+    this.debrisM.count = n; this.debrisM.instanceMatrix.needsUpdate = true; if (this.debrisM.instanceColor) this.debrisM.instanceColor.needsUpdate = true;
+    n = 0;
     for (const s of G.skids) { if (n >= 500) break; dmy.position.set(s.x, 0.25, s.y); dmy.rotation.set(0, -s.a, 0); dmy.scale.set(1, 1, 1); dmy.updateMatrix(); this.skids.setMatrixAt(n++, dmy.matrix); }
     this.skids.count = n; this.skids.instanceMatrix.needsUpdate = true;
-    n = 0; const col = this._c || (this._c = new THREE.Color());
+    n = 0;
     for (const d of G.decals) { if (n >= 80) break; dmy.position.set(d.x, 0.3 + n * 0.005, d.y); dmy.rotation.set(0, 0, 0); dmy.scale.set(d.r, 1, d.r); dmy.updateMatrix(); this.decals.setMatrixAt(n, dmy.matrix); col.set(d.c.startsWith('rgba(120') ? '#6a0808' : '#141414'); this.decals.setColorAt(n, col); n++; }
     this.decals.count = n; this.decals.instanceMatrix.needsUpdate = true; if (this.decals.instanceColor) this.decals.instanceColor.needsUpdate = true;
   },
@@ -342,7 +449,7 @@ const R3 = {
     const dk = darkness() / 0.62, day = 1 - dk;
     const sky = new THREE.Color(0x9fd0f0).lerp(new THREE.Color(0x060a1c), dk);
     const dusk = 4 * dk * (1 - dk); sky.lerp(new THREE.Color(0xf09a6a), dusk * 0.55);
-    this.scene.background.copy(sky); this.scene.fog.color.copy(sky);
+    this.updateSky(dk, dusk);
     this.scene.fog.near = lerp(600, 250, dk); this.scene.fog.far = lerp(2100, 1300, dk);
     this.sun.intensity = 0.1 + 0.95 * day; this.hemi.intensity = 0.28 + 0.4 * day;
     this.sun.color.setRGB(1, 0.94 - dusk * 0.25, 0.84 - dusk * 0.35);
@@ -351,6 +458,7 @@ const R3 = {
     this.sun.position.set(me.x + Math.cos(ang) * 500 + 150, 200 + Math.max(0.15, Math.sin(ang)) * 650, me.y + 320);
     this.sun.target.position.set(me.x, 0, me.y); this.sun.target.updateMatrixWorld();
     this.wallMat.emissiveIntensity = dk * 0.95;
+    if (this.shopMats) for (const m of this.shopMats) m.emissiveIntensity = dk * 0.7;
     this.lampMat.color.setRGB(0.47 + dk * 0.53, 0.47 + dk * 0.45, 0.47 + dk * 0.2);
     this.lampPoolMat.opacity = clamp((dk - 0.25) * 1.2, 0, 0.55);
     this.waterMat.color.setRGB(0.16 * (0.4 + day * 0.6), 0.5 * (0.4 + day * 0.6), 0.72 * (0.4 + day * 0.6));

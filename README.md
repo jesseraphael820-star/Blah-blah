@@ -22,7 +22,12 @@ Abra `index.html` no navegador (no celular, de preferência na horizontal e em t
 - Semáforos funcionando, com o trânsito parando no vermelho; carros estacionados nas vagas
 - Detalhes: meio-fio, bancos, lixeiras, hidrantes, caixas de correio, pontos de ônibus, casas com telhado e chaminé, toldos, outdoors, caixas d'água, antenas piscando, heliponto, píer, barcos, guarda-sóis, salva-vidas, nuvens, sol, lua e estrelas
 - Sistema de procurado (5 estrelas), viaturas que perseguem, policiais que prendem/atiram
-- 5 missões com história, checkpoints e cronômetro
+- 12 missões com história: entregas, corrida de carro e de moto, táxi com passageiros, carga rural, emboscada em ondas, resgate de refém, roubo de viatura e o golpe final
+- Zona rural ao sul da cidade: fazendas com celeiro, silo, moinho, cercas, vacas, plantações, lago com píer, posto de gasolina, cabanas na mata e montanhas no horizonte
+- Veículos: sedã, esportivo, van, táxi, viatura, caminhonete, trator, moto e bicicleta (com piloto visível, inclinação e queda em batidas fortes)
+- Física: giro nos impactos, amassados na lata, vidro trincado, peças voando, carros da IA que saem rodando, aderência menor em grama/terra/areia, pedestres atropelados voam (ragdoll)
+- Tiros: clarão no cano, luz, cápsulas ejetadas, rastro brilhante, faíscas, poeira e sangue no impacto; NPCs armados derrubam a arma ao morrer e você pega encostando
+- Mod menu no pause: vida, dinheiro, armas, munição infinita, modo deus, sem polícia, turbo, super velocidade, câmera lenta, gerar veículos, hora do dia, teleporte e pular missões
 - Loja de armas, PINTURA (zera estrelas), ponto de salvar, itens espalhados
 - Sons sintetizados (WebAudio) e progresso salvo no navegador
 - `python3 build.py` gera `dist/porto-sol.html` com tudo em um arquivo só.
