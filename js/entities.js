@@ -45,10 +45,13 @@ function spawnTraffic(near) {
     const d = Math.hypot(x - near.x, y - near.y);
     if (d < 560 || d > 1100) continue;
     if (G.cars.some(c => Math.abs(c.x - x) < 70 && Math.abs(c.y - y) < 70)) continue;
-    const type = pick(['sedan', 'sedan', 'sedan', 'sport', 'van', 'taxi', 'sedan']);
+    const patrol = G.wanted === 0 && Math.random() < 0.07;
+    const type = patrol ? 'police' : pick(['sedan', 'sedan', 'sedan', 'sport', 'van', 'taxi', 'sedan']);
     const c = makeCar(x, y, DA[dir], type);
     c.ai = { dir, road, pend: null, cruise: rand(95, 140) };
-    c.driver = makePed(x, y, 'civ'); c.driver.car = c; c.spd = c.ai.cruise * 0.6;
+    if (patrol) { c.police = true; c.patrol = true; c.cops = 1; } else c.cops = 0;
+    c.lights = darkness() > 0.22;
+    c.driver = makePed(x, y, patrol ? 'cop' : 'civ'); c.driver.car = c; c.spd = c.ai.cruise * 0.6;
     G.cars.push(c); return c;
   }
   return null;
@@ -62,17 +65,43 @@ function ringPos(r) {
   return [L + r.off, Tt + S - u, -Math.PI / 2];
 }
 function spawnPed(near, kind) {
+  const dk = darkness();
+  // alguns sentam em bancos / pontos de ônibus
+  if (!kind && Math.random() < 0.16 && dk < 0.4) {
+    const free = SEATS.filter(t => !t.busy && Math.hypot(t.x - near.x, t.y - near.y) > 480 && Math.hypot(t.x - near.x, t.y - near.y) < 950);
+    if (free.length) {
+      const st = pick(free), p = makePed(st.x, st.y, 'civ');
+      p.state = 'sit'; p.anim = 'sit'; p.a = st.a; p.t = rand(15, 45); p.seat = st; st.busy = p.id; p.spd = rand(38, 55);
+      G.peds.push(p); return p;
+    }
+  }
   for (let tries = 0; tries < 12; tries++) {
     const bx = clamp(Math.floor(near.x / PT) + randi(-3, 3), 0, NB - 1), by = clamp(Math.floor(near.y / PT) + randi(-2, 2), 0, NB - 1);
-    const ring = { bx, by, p: rand(0, 1152), dir: Math.random() < .5 ? 1 : -1, off: rand(-9, 9) };
+    const ring = { bx, by, p: rand(0, 1152), dir: Math.random() < .5 ? 1 : -1, off: rand(-5, 8) };
     const [x, y] = ringPos(ring);
     const d = Math.hypot(x - near.x, y - near.y);
     if (d < (kind === 'cop' ? 450 : 500) || d > 1000) continue;
-    const p = makePed(x, y, kind || 'civ'); p.ring = ring; p.spd = rand(38, 55);
+    let k = kind || 'civ';
+    if (!kind && G.wanted === 0 && Math.random() < 0.06) k = 'cop';
+    const p = makePed(x, y, k); p.ring = ring; p.spd = rand(36, 56);
+    const zone = districtOf(bx, by);
+    if (k === 'civ' && dk < 0.35 && Math.random() < ((zone === 'park' || zone === 'beach') ? 0.4 : 0.1)) { p.jog = true; p.spd = rand(95, 120); }
     if (kind === 'cop') { p.state = 'chase'; p.ring = null; }
+    if (k === 'cop' && !kind) p.weapon = 1;
     G.peds.push(p); return p;
   }
   return null;
+}
+// moradores fixos: vendedor de cachorro-quente e turma dançando na orla
+function spawnSpecials(me) {
+  const v = R3.vendorSpot; if (!v) return;
+  if (Math.hypot(v.x - me.x, v.y - me.y) < 1000 && !G.peds.some(p => p.kind === 'vendor')) {
+    const p = makePed(v.x, v.y, 'vendor'); p.state = 'vendor'; p.anim = 'sell'; p.a = v.a; G.peds.push(p);
+  }
+  const dx = CITY_T * T + 70, dy = 7 * PT + 220;
+  if (Math.hypot(dx - me.x, dy - me.y) < 1000 && !G.peds.some(p => p.dancer && p.hp > 0)) {
+    for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2, p = makePed(dx + Math.cos(a) * 18, dy + Math.sin(a) * 18, 'civ'); p.state = 'dance'; p.anim = 'dance'; p.a = a + Math.PI; p.dancer = true; G.peds.push(p); }
+  }
 }
 function spawnPolice(near) {
   for (let tries = 0; tries < 12; tries++) {
@@ -100,7 +129,7 @@ function driveCar(c, thr, steer, brake, hand, dt) {
   c.a = angN(c.a + steer * c.turn * (hand ? 1.35 : 1) * tf * dt);
   c.vx = fx * fwd - fy * lat; c.vy = fy * fwd + fx * lat;
   c.x += c.vx * dt; c.y += c.vy * dt;
-  c.spd = Math.hypot(c.vx, c.vy); c.fwd = fwd;
+  c.spd = Math.hypot(c.vx, c.vy); c.fwd = fwd; c.braking = brake && fwd > 5; c.reversing = fwd < -5;
   if (Math.abs(lat) > 70 && c.spd > 90) {
     for (const s of [-1, 1]) G.skids.push({ x: c.x - fx * c.L * 0.32 - fy * s * c.W * 0.38, y: c.y - fy * c.L * 0.32 + fx * s * c.W * 0.38, a: c.a, life: 8 });
     if (G.skids.length > 500) G.skids.splice(0, G.skids.length - 500);
@@ -143,8 +172,20 @@ function aiTraffic(c, dt) {
   const check = p => { const dx = p.x - c.x, dy = p.y - c.y; const al = dx * fx + dy * fy, lt = Math.abs(-dx * fy + dy * fx); if (al > 0 && al < look && lt < 22) { tgt = Math.min(tgt, Math.max(0, (al - 34) * 2)); return true; } return false; };
   if (!pl.car && pl.hp > 0 && check(pl) && c.spd < 5) { c.horn -= dt; if (c.horn < 0) { c.horn = rand(2, 5); if (dist(c, pl) < 300) SFX.horn(); } }
   for (const p of G.peds) if (p.hp > 0 && !p.car && Math.abs(p.x - c.x) < 120 && Math.abs(p.y - c.y) < 120) check(p);
-  c.spd = approach(c.spd, tgt, (tgt < c.spd ? 450 : 110) * dt);
   let s = hor ? c.x : c.y;
+  if (ai.pend) {
+    const k2 = ai.pend.k, front = s + sgn * c.L / 2;
+    const gap = sgn > 0 ? k2 * PT - 34 - front : front - (k2 * PT + RWP + 34);
+    if (gap > -4 && gap < 260) {
+      const st = lightState(hor ? k2 : ai.road, hor ? ai.road : k2), mine = hor ? st.ew : st.ns;
+      if (mine === 'R' || (mine === 'Y' && gap > 30)) tgt = Math.min(tgt, Math.max(0, gap * 2.2));
+    }
+    const tgap = Math.abs(ai.pend.target - s);
+    c.blink = ai.pend.nd !== ai.dir && tgap < 170 ? (ai.pend.nd === (ai.dir + 1) % 4 ? 'R' : 'L') : null;
+  } else c.blink = null;
+  c.braking = tgt < c.spd - 10 || (c.spd < 2 && tgt < 1);
+  c.spd = approach(c.spd, tgt, (tgt < c.spd ? 450 : 110) * dt);
+  if (((G.t + c.id) % 2) < dt) c.lights = darkness() > 0.22 + (c.id % 5) * 0.02;
   if (!ai.pend) {
     const k = sgn > 0 ? Math.floor(s / PT) + 1 : Math.floor((s - RWP) / PT);
     const opts = [];
@@ -297,17 +338,101 @@ function hitscan(sh, a, range, dmg) {
   G.tracers.push({ x1: sh.x + dx * 14, y1: sh.y + dy * 14, x2: ex, y2: ey, life: .07 });
 }
 // ===== IA de pedestres =====
+const RING_S = 288;
+function pedCorner(p, k) {
+  if (p.jog || p.kind !== 'civ' && p.kind !== 'cop' || Math.random() > 0.38) return;
+  const c = ((k % 4) + 4) % 4, { bx, by } = p.ring;
+  const right = c === 1 || c === 2, bottom = c === 2 || c === 3, opts = [];
+  const nbx = bx + (right ? 1 : -1), nby = by + (bottom ? 1 : -1);
+  if (nbx >= 0 && nbx < NB) opts.push({ nb: { bx: nbx, by }, nc: [1, 0, 3, 2][c], ax: 'ns' });
+  if (nby >= 0 && nby < NB) opts.push({ nb: { bx, by: nby }, nc: [3, 2, 1, 0][c], ax: 'ew' });
+  if (!opts.length) return;
+  const o = pick(opts), [tx, ty] = ringPos({ bx: o.nb.bx, by: o.nb.by, p: o.nc * RING_S, off: p.ring.off });
+  p.cross = { ...o, tx, ty, i: bx + (right ? 1 : 0), j: by + (bottom ? 1 : 0) };
+  p.state = 'waitcross'; p.t = 25; p.a = Math.atan2(ty - p.y, tx - p.x);
+}
+function pedActivity(p) {
+  const r = Math.random(), night = darkness() > 0.3;
+  if (r < 0.22) { p.state = 'idle'; p.anim = Math.random() < (night ? 0.7 : 0.5) ? 'phone' : null; p.t = rand(4, 10); return; }
+  if (r < 0.42) {
+    const o = G.peds.find(q => q !== p && q.kind === 'civ' && q.state === 'walk' && !q.jog && q.hp > 0 && Math.abs(q.x - p.x) < 40 && Math.abs(q.y - p.y) < 40);
+    if (o) {
+      const t = rand(6, 14);
+      for (const [a, b] of [[p, o], [o, p]]) { a.state = 'talk'; a.anim = 'talk'; a.t = t; a.a = Math.atan2(b.y - a.y, b.x - a.x); }
+      o.anim = 'idle'; o.talkSwap = 1.5; p.talkSwap = 3; return;
+    }
+  }
+  if (r < 0.58 && !night) {
+    const st = SEATS.find(t => !t.busy && t.ring && t.ring.bx === p.ring.bx && t.ring.by === p.ring.by && Math.hypot(t.x - p.x, t.y - p.y) < 90);
+    if (st) { p.state = 'gosit'; p.seat = st; st.busy = p.id; p.t = 12; return; }
+  }
+}
+function pedResume(p) {
+  p.anim = null;
+  if (p.ring) { const [x, y] = ringPos(p.ring); if (Math.hypot(x - p.x, y - p.y) > 6) { p.state = 'return'; p.t = 10; return; } p.state = 'walk'; }
+  else { p.state = 'wander'; p.t = rand(2, 5); p.wa = rand(-3, 3); }
+}
 function updatePed(p, dt) {
-  if (p.hp <= 0) { p.deadT += dt; return; }
+  if (p.hp <= 0) { p.deadT += dt; if (p.seat) { p.seat.busy = false; p.seat = null; } return; }
   const pl = G.player;
   let mvx = 0, mvy = 0, sp = 0;
   p.cd -= dt;
-  if (p.state === 'walk' && p.ring) {
-    p.ring.p += p.ring.dir * p.spd * dt;
-    const [x, y, a] = ringPos(p.ring);
-    p.vx = (x - p.x) / dt; p.vy = (y - p.y) / dt; p.x = x; p.y = y; p.a = p.ring.dir > 0 ? a : a + Math.PI; p.walk += dt * 9;
-    return;
+  // reações
+  if (p.kind === 'civ' && aimT === p && G.weap > 0 && !pl.car && ['walk', 'idle', 'talk', 'sit', 'waitcross', 'gosit', 'return', 'dance'].includes(p.state)) {
+    if (p.seat) { p.seat.busy = false; p.seat = null; }
+    p.state = 'handsup'; p.anim = 'handsup'; p.t = rand(1.5, 3); p.a = Math.atan2(pl.y - p.y, pl.x - p.x); p.ring = null;
   }
+  if (p.kind === 'cop' && p.state !== 'chase' && G.wanted > 0 && dist(p, pl.car || pl) < 380) { p.state = 'chase'; p.anim = null; p.ring = null; }
+  switch (p.state) {
+    case 'walk': {
+      if (!p.ring) { pedResume(p); return; }
+      const prev = Math.floor(p.ring.p / RING_S);
+      p.ring.p += p.ring.dir * p.spd * dt;
+      const now = Math.floor(p.ring.p / RING_S);
+      const [x, y, a] = ringPos(p.ring);
+      p.x = x; p.y = y; p.a = p.ring.dir > 0 ? a : a + Math.PI; p.walk += dt * p.spd * 0.11; p.anim = null;
+      if (now !== prev) pedCorner(p, p.ring.dir > 0 ? now : prev);
+      p.actT = (p.actT === undefined ? rand(4, 14) : p.actT) - dt;
+      if (p.actT < 0 && !p.jog && p.kind === 'civ' && p.state === 'walk') { p.actT = rand(8, 20); pedActivity(p); }
+      return;
+    }
+    case 'idle': p.t -= dt; if (p.t < 0) pedResume(p); return;
+    case 'talk':
+      p.t -= dt; p.talkSwap -= dt; if (p.talkSwap < 0) { p.talkSwap = rand(1.5, 3.5); p.anim = p.anim === 'talk' ? 'idle' : 'talk'; }
+      if (p.t < 0) pedResume(p); return;
+    case 'sit':
+      p.anim = 'sit'; p.t -= dt;
+      if (p.t < 0) { const st = p.seat; if (st) { st.busy = false; p.seat = null; if (st.ring) p.ring = { ...st.ring, dir: Math.random() < .5 ? 1 : -1, off: rand(-3, 6) }; } p.x += Math.cos(p.a) * 6; p.y += Math.sin(p.a) * 6; pedResume(p); }
+      return;
+    case 'gosit': {
+      const st = p.seat, d = Math.hypot(st.x - p.x, st.y - p.y); p.t -= dt;
+      if (d < 3 || p.t < 0) { p.x = st.x; p.y = st.y; p.a = st.a; p.state = 'sit'; p.t = rand(10, 30); return; }
+      p.a = Math.atan2(st.y - p.y, st.x - p.x); p.x += Math.cos(p.a) * Math.min(d, 45 * dt); p.y += Math.sin(p.a) * Math.min(d, 45 * dt); p.walk += dt * 5; return;
+    }
+    case 'return': {
+      const [x, y] = ringPos(p.ring), d = Math.hypot(x - p.x, y - p.y); p.t -= dt;
+      if (d < 3 || p.t < 0) { p.state = 'walk'; return; }
+      p.a = Math.atan2(y - p.y, x - p.x); p.x += Math.cos(p.a) * Math.min(d, 45 * dt); p.y += Math.sin(p.a) * Math.min(d, 45 * dt); p.walk += dt * 5; return;
+    }
+    case 'waitcross': {
+      const cr = p.cross; p.t -= dt; p.anim = null;
+      const st = lightState(cr.i, cr.j);
+      if ((st[cr.ax] === 'R' && st.left > 3.2) || p.t < 0) p.state = 'cross';
+      return;
+    }
+    case 'cross': {
+      const cr = p.cross, d = Math.hypot(cr.tx - p.x, cr.ty - p.y), v = Math.max(p.spd, 50) * 1.15;
+      if (d < 3) { p.ring = { bx: cr.nb.bx, by: cr.nb.by, p: cr.nc * RING_S + 1, dir: Math.random() < .5 ? 1 : -1, off: p.ring ? p.ring.off : 0 }; p.cross = null; p.state = 'walk'; return; }
+      p.a = Math.atan2(cr.ty - p.y, cr.tx - p.x); p.x += Math.cos(p.a) * Math.min(d, v * dt); p.y += Math.sin(p.a) * Math.min(d, v * dt); p.walk += dt * v * 0.11; return;
+    }
+    case 'handsup':
+      p.t -= dt; if (p.t < 0) { p.anim = null; p.state = 'flee'; p.t = 6; p.from = { x: pl.x, y: pl.y }; } return;
+    case 'vendor': {
+      const d = dist(p, pl); if (d < 120) p.a = Math.atan2(pl.y - p.y, pl.x - p.x); p.anim = d < 80 && Math.floor(G.t / 3) % 3 === 0 ? 'wave' : 'sell'; return;
+    }
+    case 'dance': return;
+  }
+  p.anim = null;
   if (p.state === 'flee') {
     p.t -= dt; const a = Math.atan2(p.y - p.from.y, p.x - p.from.x) + Math.sin(G.t * 2 + p.id) * 0.5;
     mvx = Math.cos(a); mvy = Math.sin(a); sp = 135;

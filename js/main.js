@@ -43,7 +43,7 @@ const Input = { jx: 0, jy: 0, jm: 0, joyId: null, ox: 0, oy: 0, btn: {}, edge: {
     const up = () => { Input.btn[k] = false; b.classList.remove('down'); };
     b.addEventListener('pointerup', up); b.addEventListener('pointercancel', up); b.addEventListener('lostpointercapture', up);
   });
-  const map = { ' ': 'fire', Shift: 'run', f: 'enter', e: 'enter', q: 'weap', Control: 'hand', r: 'radio' };
+  const map = { ' ': 'fire', Shift: 'run', f: 'enter', e: 'enter', q: 'weap', Control: 'hand', r: 'radio', h: 'lights' };
   window.addEventListener('keydown', e => {
     const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
     if (!Input.keys[k]) { if (map[k]) Input.edge[map[k]] = true; if (k === 'Escape' || k === 'p') Game.togglePause(); }
@@ -58,7 +58,7 @@ function readInput() {
   const up = k.w || k.ArrowUp, dn = k.s || k.ArrowDown, lf = k.a || k.ArrowLeft, rt = k.d || k.ArrowRight;
   const r = { mx: Input.jx, my: Input.jy, mag: Input.jm, kb: false, up, dn, lf, rt,
     fire: Input.btn.fire || k[' '], run: Input.btn.run || k.Shift, hand: Input.btn.fire || k[' '] || k.Control, brake: Input.btn.run || k.Shift,
-    enter: Input.edge.enter, weap: Input.edge.weap, radio: Input.edge.radio };
+    enter: Input.edge.enter, weap: Input.edge.weap, radio: Input.edge.radio, lights: Input.edge.lights };
   if (up || dn || lf || rt) { r.kb = true; r.mx = (rt ? 1 : 0) - (lf ? 1 : 0); r.my = (dn ? 1 : 0) - (up ? 1 : 0); r.mag = Math.min(1, Math.hypot(r.mx, r.my)); }
   Input.edge = {};
   return r;
@@ -332,6 +332,7 @@ function updatePlayer(dt, inp) {
   const pl = G.player;
   if (pl.hp <= 0) return;
   if (inp.radio) Radio.next();
+  if (inp.lights) toggleLights();
   if (inp.weap && !pl.car) { const owned = [0, 1, 2, 3].filter(i => G.ammo[i] > 0); const i = owned.indexOf(G.weap); G.weap = owned[(i + 1) % owned.length]; SFX.pickup(); }
   if (G.ammo[G.weap] <= 0) G.weap = 0;
   pl.weapon = G.weap;
@@ -383,7 +384,7 @@ function enterCar(c) {
     if (c.police) crime(4);
   }
   c.driver = pl; c.ai = null; pl.car = c; c.siren = false; c.cops = 0; SFX.door(); Radio.next();
-  if (!G.droveHint) { G.droveHint = 1; showHint('Analógico vira o volante. ACELERAR e FREIO/RÉ nos botões (ou analógico pra cima/baixo). FREIO DE MÃO para derrapar. A câmera volta sozinha pra trás do carro.', 8); }
+  if (!G.droveHint) { G.droveHint = 1; showHint('Analógico vira o volante. ACELERAR e FREIO/RÉ nos botões (ou analógico pra cima/baixo). FREIO DE MÃO aparece em velocidade. 💡 liga os faróis.', 8); }
   if (c.police) c.police = false;
   c.vx = Math.cos(c.a) * (c.spd || 0) * 0.3; c.vy = Math.sin(c.a) * (c.spd || 0) * 0.3;
 }
@@ -426,6 +427,16 @@ function populate(dt) {
   const traffic = G.cars.filter(c => c.ai).length, civs = G.peds.filter(p => p.kind === 'civ' && p.hp > 0).length;
   if (traffic < (night ? 11 : 17)) spawnTraffic(me);
   if (civs < (night ? 14 : 28)) spawnPed(me);
+  spawnSpecials(me);
+  // carros estacionados nas vagas
+  for (const sp of PARK_SPOTS) {
+    const d = Math.hypot(sp.x - me.x, sp.y - me.y);
+    if (d < 480 || d > 1000 || G.t < sp.t) continue;
+    sp.t = G.t + 60;
+    if (Math.random() < 0.55 && !G.cars.some(c => Math.abs(c.x - sp.x) < 30 && Math.abs(c.y - sp.y) < 40)) {
+      const c = makeCar(sp.x, sp.y, sp.a, pick(['sedan', 'sedan', 'sport', 'van', 'sedan'])); c.parked = true; G.cars.push(c);
+    }
+  }
   polT -= 0.35;
   if (G.wanted > 0 && polT <= 0) {
     const pc = G.cars.filter(c => c.police && c.driver && !c.wreck).length;
@@ -458,7 +469,10 @@ function update(dt) {
   for (const c of G.cars) {
     if (c === pl.car) { carWorldCollide(c); }
     else if (c.wreck || !c.driver) { driveCar(c, 0, 0, false, false, dt); if (c.spd > 2) carWorldCollide(c); }
-    else if (c.driver.kind === 'cop') { aiPolice(c, dt); carWorldCollide(c); }
+    else if (c.driver.kind === 'cop' && (!c.ai || (G.wanted > 0 && dist(c, pl.car || pl) < 750))) {
+      if (c.ai) { c.vx = Math.cos(c.a) * c.spd; c.vy = Math.sin(c.a) * c.spd; c.ai = null; c.patrol = false; c.blink = null; }
+      aiPolice(c, dt); carWorldCollide(c);
+    }
     else if (c.ai) {
       if (c.fire > 0 && c.driver) { const d = c.driver; d.car = null; d.x = c.x + 20; d.y = c.y; d.state = 'flee'; d.t = 5; d.from = c; d.ring = null; G.peds.push(d); c.driver = null; c.ai = null; continue; }
       aiTraffic(c, dt);
@@ -503,7 +517,7 @@ function update(dt) {
   const me = pl.car || pl;
   let sirD = 1e9; for (const c of G.cars) if (c.siren && !c.wreck) sirD = Math.min(sirD, dist(c, me));
   SFX.update(dt, pl.car ? pl.car.spd : 0, !!pl.car, sirD < 900, sirD); Radio.update(!!pl.car && !Game.over);
-  updateButtons();
+  updateButtons(dt);
 }
 function carCarCollide(a, b) {
   if (Math.abs(a.x - b.x) > 75 || Math.abs(a.y - b.y) > 75) return;
@@ -529,19 +543,36 @@ function carCarCollide(a, b) {
   }
 }
 // ===== Botões contextuais =====
+const bRadio = document.getElementById('bRadio'), bLights = document.getElementById('bLights');
 const bEnter = document.getElementById('bEnter'), bRun = document.getElementById('bRun'), bFire = document.getElementById('bFire'), bWeap = document.getElementById('bWeap');
 let lastBtnState = '';
-function updateButtons() {
-  const pl = G.player; const inCar = !!pl.car;
-  let near = false; if (!inCar) for (const c of G.cars) if (!c.wreck && dist(c, pl) < 60) { near = true; break; }
-  const st = inCar + '|' + near + '|' + G.weap + '|' + G.ammo[G.weap];
+const btnHold = {};
+function showBtn(el, k, want, dt) {
+  btnHold[k] = want ? 0.6 : (btnHold[k] || 0) - dt;   // pequena tolerância para não piscar
+  const vis = btnHold[k] > 0;
+  if (el.classList.contains('off') === vis) el.classList.toggle('off', !vis);
+  if (!vis && Input.btn[k]) { Input.btn[k] = false; el.classList.remove('down'); }
+}
+function updateButtons(dt) {
+  const pl = G.player, c = pl.car, inCar = !!c;
+  let near = false; if (!inCar) for (const o of G.cars) if (!o.wreck && Math.abs(o.x - pl.x) < 60 && Math.abs(o.y - pl.y) < 60 && dist(o, pl) < 60) { near = true; break; }
+  let foe = false; if (!inCar) for (const p of G.peds) if (p.hp > 0 && !p.car && Math.abs(p.x - pl.x) < 90 && Math.abs(p.y - pl.y) < 90) { foe = true; break; }
+  const owned = G.ammo.filter(a => a > 0).length;
+  const alive = pl.hp > 0 && !Game.over;
+  showBtn(bEnter, 'enter', alive && (inCar ? c.spd < 140 : near), dt);
+  showBtn(bFire, 'fire', alive && (inCar || G.weap > 0 || foe || G.wanted > 0), dt);
+  showBtn(bRun, 'run', alive && (inCar || Input.joyId !== null || Input.btn.run), dt);
+  showBtn(bWeap, 'weap', alive && (inCar ? c.spd > 45 || Input.btn.weap : owned > 1), dt);
+  showBtn(bRadio, 'radio', alive && inCar, dt); showBtn(bLights, 'lights', alive && inCar, dt);
+  if (inCar) bLights.classList.toggle('lit', !!c.lights);
+  const st = inCar + '|' + G.weap + '|' + G.ammo[G.weap];
   if (st === lastBtnState) return; lastBtnState = st;
-  bEnter.textContent = inCar ? 'SAIR' : 'ENTRAR'; bEnter.classList.toggle('glow', near || inCar);
+  bEnter.textContent = inCar ? 'SAIR' : 'ENTRAR';
   bRun.textContent = inCar ? 'FREIO / RÉ' : 'CORRER';
   bFire.textContent = inCar ? 'ACELERAR' : G.weap === 0 ? 'SOCO' : 'ATIRAR';
   bWeap.innerHTML = inCar ? '<small>FREIO DE</small>MÃO' : `<small>ARMA</small>${WEAPONS[G.weap].icon}`;
-  document.getElementById('bRadio').classList.toggle('hidden', !inCar);
 }
+function toggleLights() { const c = G.player.car; if (!c || c.wreck) return; c.lights = !c.lights; SFX.door(); }
 
 // ===== Render =====
 function render(dt) {
@@ -698,6 +729,5 @@ document.getElementById('bPause').onclick = () => Game.togglePause();
 document.getElementById('pResume').onclick = () => Game.togglePause(false);
 document.getElementById('pSound').onclick = e => { SFX.on = !SFX.on; e.target.textContent = 'SOM: ' + (SFX.on ? 'LIGADO' : 'DESLIGADO'); };
 document.getElementById('pShadow').onclick = e => { R3.lockQ = true; R3.setShadows(!R3.shadows); e.target.textContent = 'SOMBRAS: ' + (R3.shadows ? 'LIGADAS' : 'DESLIGADAS'); };
-document.getElementById('bRadio').onclick = () => Radio.next();
 document.getElementById('pFull').onclick = () => { try { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen(); } catch (e) { } };
 document.getElementById('pMenu').onclick = () => { Game.save(); Game.running = false; Game.paused = false; document.getElementById('pause').classList.add('hidden'); document.getElementById('ui').classList.add('hidden'); document.getElementById('title').classList.remove('hidden'); if (Game.loadSave()) { bCont.classList.remove('hidden'); bCont.onclick = () => startGame(true); } };

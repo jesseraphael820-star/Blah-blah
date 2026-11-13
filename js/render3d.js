@@ -20,7 +20,7 @@ const CAM = {
   snap() { const pl = G.player; this.yaw = pl.car ? pl.car.a : pl.a; this.curDist = this.dist; },
   update(dt, camera) {
     const pl = G.player, c = pl.car, me = c || pl;
-    const th = c ? 17 : 22;
+    const th = c ? 17 : 19;
     if (c) {
       this.dist = 98 + Math.min(70, c.spd * 0.16) + (c.type === 'van' ? 16 : 0);
       if (this.manualT <= 0) {
@@ -29,7 +29,7 @@ const CAM = {
         this.pitch = lerp(this.pitch, 0.27, 1 - Math.exp(-1.5 * dt));
       }
     } else {
-      this.dist = 92;
+      this.dist = 82;
       if (this.manualT <= 0 && pl.moving && Math.abs(angN(pl.a - this.yaw)) < 2.0) this.yaw = angN(this.yaw + angN(pl.a - this.yaw) * (1 - Math.exp(-0.9 * dt)));
     }
     this.manualT -= dt;
@@ -72,7 +72,8 @@ const R3 = {
     this.headL = new THREE.SpotLight(0xfff2cc, 0, 520, 0.55, 0.5, 1.2); s.add(this.headL, this.headL.target);
     this.siren = new THREE.PointLight(0xff2222, 0, 260, 1.5); s.add(this.siren);
     this.boomL = new THREE.PointLight(0xff9a40, 0, 420, 1.5); s.add(this.boomL);
-    this.buildGround(); this.buildCity(); this.buildTrees(); this.buildLamps(); this.buildFx();
+    for (const b of BUILDINGS) { const d = districtOf(Math.floor(b.x / PT), Math.floor(b.y / PT)); b.house = (d === 'suburb' || d === 'beach') && (!b.label || b.label === 'CASA'); }
+    this.buildGround(); this.buildCity(); this.buildTrees(); this.buildLamps(); this.buildFx(); this.buildProps();
     this.resize();
   },
   resize() { this.renderer.setSize(window.innerWidth, window.innerHeight, false); this.camera.aspect = window.innerWidth / window.innerHeight; this.camera.updateProjectionMatrix(); },
@@ -128,6 +129,7 @@ const R3 = {
       const h = b.ht * HS;
       col.set(b.col); const rc = new THREE.Color(b.roof);
       box(W, b.x, b.y, b.x + b.w, b.y + b.h, 0, h, col, rc, 1);
+      if (b.house) { if (b.label) this.addLabel(b, h); continue; }
       // mureta do telhado
       const pc = rc.clone().multiplyScalar(0.8), t = 3;
       box(Rf, b.x, b.y, b.x + b.w, b.y + t, h, h + 4, pc, pc); box(Rf, b.x, b.y + b.h - t, b.x + b.w, b.y + b.h, h, h + 4, pc, pc);
@@ -190,20 +192,34 @@ const R3 = {
   },
   buildLamps() {
     const pts = [];
-    for (let j = 0; j < NB; j++) for (let i = 0; i < NB; i++) { pts.push([i * PT + 140, j * PT + 140, -1]); pts.push([i * PT + PT - 12, j * PT + PT - 12, 1]); }
+    for (let j = 0; j < NB; j++) for (let i = 0; i < NB; i++) { const X = i * PT, Y = j * PT; pts.push([X + 288, Y + 132, 0, -1]); pts.push([X + 288, Y + 444, 0, 1]); pts.push([X + 132, Y + 288, -1, 0]); pts.push([X + 444, Y + 288, 1, 0]); }
     const dummy = new THREE.Object3D();
     const pole = new THREE.InstancedMesh(new THREE.CylinderGeometry(1, 1.4, 46, 6).translate(0, 23, 0), mat('#3a3d44'), pts.length);
     this.lampMat = new THREE.MeshBasicMaterial({ color: 0x777777 });
     const head = new THREE.InstancedMesh(new THREE.BoxGeometry(12, 3, 5), this.lampMat, pts.length);
-    pts.forEach(([x, y, s], i) => {
+    pts.forEach(([x, y, sx, sy], i) => {
       dummy.position.set(x, 0, y); dummy.rotation.set(0, 0, 0); dummy.scale.set(1, 1, 1); dummy.updateMatrix(); pole.setMatrixAt(i, dummy.matrix);
-      dummy.position.set(x + s * 5, 46, y + s * 5); dummy.rotation.set(0, Math.PI / 4, 0); dummy.updateMatrix(); head.setMatrixAt(i, dummy.matrix);
+      dummy.position.set(x + sx * 6, 46, y + sy * 6); dummy.rotation.set(0, sx ? 0 : Math.PI / 2, 0); dummy.updateMatrix(); head.setMatrixAt(i, dummy.matrix);
+      addObs({ type: 'c', x, y, r: 2 });
     });
+    // poças de luz dos postes à noite
+    this.lampPoolMat = new THREE.MeshBasicMaterial({ map: this.glowTex(), color: 0xffd890, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending });
+    const lp = new THREE.InstancedMesh(new THREE.PlaneGeometry(110, 110).rotateX(-Math.PI / 2), this.lampPoolMat, pts.length);
+    pts.forEach(([x, y, sx, sy], i) => { dummy.position.set(x + sx * 22, 0.5, y + sy * 22); dummy.rotation.set(0, 0, 0); dummy.updateMatrix(); lp.setMatrixAt(i, dummy.matrix); });
+    lp.renderOrder = 2; this.scene.add(lp);
     pole.castShadow = true; this.scene.add(pole, head);
     this.lampPts = pts;
   },
+  glowTex() {
+    if (this._glow) return this._glow;
+    const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d');
+    const gr = g.createRadialGradient(64, 64, 0, 64, 64, 64); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.4, 'rgba(255,255,255,.45)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = gr; g.fillRect(0, 0, 128, 128); return (this._glow = new THREE.CanvasTexture(c));
+  },
   // ----- Efeitos -----
   buildFx() {
+    this.poolGeo = new THREE.PlaneGeometry(120, 80).rotateX(-Math.PI / 2);
+    this.poolMat = new THREE.MeshBasicMaterial({ map: this.glowTex(), color: 0xfff0c0, transparent: true, opacity: 0.5, depthWrite: false, blending: THREE.AdditiveBlending });
     const dc = document.createElement('canvas'); dc.width = dc.height = 64; const g = dc.getContext('2d');
     const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.5, 'rgba(255,255,255,.6)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
     g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
@@ -244,87 +260,18 @@ const R3 = {
     k.cyl.position.set(m.p.x, 0.3, m.p.y); k.cyl.scale.set(r, m.obj && m.l ? 90 : 30, r);
     k.ring.position.set(m.p.x, 0.4, m.p.y); k.ring.scale.set(r, 1, r);
   },
-  // ----- Carros -----
-  makeCar(c) {
-    const g = new THREE.Group(), L = c.L, W = c.W, van = c.type === 'van';
-    const body = mat(c.col), glass = mat('#1a2431'), parts = [];
-    const add = m => { g.add(m); return m; };
-    parts.push(add(boxMesh(body, L, van ? 19 : 10, W, 0, van ? 14 : 9.5, 0)));
-    if (van) { add(boxMesh(glass, 1.5, 8, W * 0.88, L / 2, 17, 0)); add(boxMesh(glass, L * 0.5, 6, W + 0.4, L * 0.15, 17, 0)); }
-    else {
-      add(boxMesh(glass, L * 0.5, 8, W * 0.86, -L * 0.05, 18, 0));
-      parts.push(add(boxMesh(body, L * 0.38, 1.6, W * 0.8, -L * 0.08, 22.6, 0)));
-      parts.push(add(boxMesh(body, L * 0.18, 4, W * 0.9, L * 0.32, 15, 0)));
-    }
-    if (c.type === 'sport') add(boxMesh(mat('#151515'), 3, 4, W * 0.9, -L / 2 + 1.5, 17, 0));
-    if (c.type === 'police') {
-      const blk = mat('#14161c'); add(boxMesh(blk, L * 0.22, 10.2, W + 0.3, L * 0.39, 9.5, 0)); add(boxMesh(blk, L * 0.16, 10.2, W + 0.3, -L * 0.42, 9.5, 0));
-      g.userData.lb = [new THREE.MeshBasicMaterial({ color: 0x551111 }), new THREE.MeshBasicMaterial({ color: 0x112255 })];
-      add(boxMesh(g.userData.lb[0], 4, 3, 7, -L * 0.08, 25, -4.5)); add(boxMesh(g.userData.lb[1], 4, 3, 7, -L * 0.08, 25, 4.5));
-    }
-    if (c.type === 'taxi') add(boxMesh(mat('#222222'), 5, 4, 11, -L * 0.08, 25, 0));
-    const head = this.headMat || (this.headMat = new THREE.MeshBasicMaterial({ color: 0xfff3c0 }));
-    const tail = this.tailMat || (this.tailMat = new THREE.MeshBasicMaterial({ color: 0xcc1111 }));
-    for (const s of [-1, 1]) { add(boxMesh(head, 1, 3, 5, L / 2 + 0.2, 11, s * (W / 2 - 4), false)); add(boxMesh(tail, 1, 3, 5, -L / 2 - 0.2, 11, s * (W / 2 - 4), false)); }
-    g.userData.wheels = [];
-    const wm = mat('#121212');
-    for (const sx of [1, -1]) for (const sz of [1, -1]) {
-      const piv = new THREE.Group(), spin = new THREE.Group(), w = new THREE.Mesh(GEO.wheel, wm); w.castShadow = true;
-      piv.position.set(sx * L * 0.3, 4.6, sz * (W / 2 - 1)); spin.add(w); piv.add(spin); g.add(piv);
-      g.userData.wheels.push({ piv, spin, front: sx > 0 });
-    }
-    g.userData.parts = parts; g.userData.col = c.col; g.userData.wreck = false;
-    this.scene.add(g); return g;
-  },
-  // ----- Pedestres -----
-  makePed(p) {
-    const g = new THREE.Group(), body = new THREE.Group(); g.add(body);
-    const shirt = mat(p.shirt), pants = mat(p.pants), skin = mat(p.skin);
-    const hair = mat(p.kind === 'cop' ? '#101a33' : p.kind === 'gang' ? '#111111' : (p.hair || '#2a1a10'));
-    const leg = z => { const m = new THREE.Mesh(GEO.leg, pants); m.position.set(0, 13, z); m.castShadow = true; body.add(m); return m; };
-    const arm = z => { const m = new THREE.Mesh(GEO.arm, shirt); m.position.set(0, 25, z); m.castShadow = true; body.add(m); return m; };
-    const u = { legL: leg(-2.6), legR: leg(2.6), armL: arm(-6.6), armR: arm(6.6) };
-    body.add(boxMesh(shirt, 6, 12.5, 10, 0, 19.5, 0));
-    body.add(boxMesh(skin, 6.5, 6.5, 6.5, 0.3, 29.5, 0));
-    body.add(boxMesh(hair, 7, 2.6, 7, -0.3, 33.2, 0));
-    if (p.kind === 'cop') body.add(boxMesh(hair, 4, 1, 7.4, 4, 32, 0));
-    if (p.kind === 'gang') body.add(boxMesh(mat('#aa1111'), 6.8, 1.6, 6.8, 0.3, 31.6, 0));
-    const hand = boxMesh(skin, 3.2, 3, 3.2, 0, -11.5, 0); u.armR.add(hand); u.armL.add(boxMesh(skin, 3.2, 3, 3.2, 0, -11.5, 0));
-    u.gun = boxMesh(mat('#1c1c1c'), 2.4, 9, 2, 0, -15, 0); u.armR.add(u.gun);
-    g.userData = u; u.body = body; u.px = p.x; u.py = p.y;
-    this.scene.add(g); return g;
-  },
-  updPed(p, m, dt) {
-    const u = m.userData;
-    m.position.set(p.x, 0, p.y); m.rotation.y = -p.a;
-    if (p.hp <= 0) { u.body.rotation.z = Math.PI / 2; u.body.position.set(-4, 3, 0); u.gun.visible = false; u.legL.rotation.z = u.legR.rotation.z = 0; u.armL.rotation.z = 2.6; u.armR.rotation.z = 2.6; return; }
-    u.body.rotation.z = 0; u.body.position.set(0, 0, 0);
-    const mv = Math.hypot(p.x - u.px, p.y - u.py) / Math.max(dt, 0.001); u.px = p.x; u.py = p.y;
-    const amp = clamp(mv / 120, 0, 1) * 0.75, s = Math.sin(p.walk) * amp;
-    u.legL.rotation.z = s; u.legR.rotation.z = -s; u.armL.rotation.z = -s * 0.8;
-    const aiming = p.weapon > 0 && (p === G.player ? (Input.btn.fire || Input.keys[' '] || aimT) : p.state === 'attack' || p.state === 'chase' && G.wanted > 1);
-    u.armR.rotation.z = aiming ? Math.PI / 2 : s * 0.8;
-    if (aiming) u.armL.rotation.z = Math.PI / 2.4;
-    u.gun.visible = p.weapon > 0;
-    if (p === G.player && p.punchT > 0) { u.armR.rotation.z = Math.PI / 2; }
-  },
   // ----- Sincronização por quadro -----
   sync(dt) {
     const pl = G.player;
+    const dk = darkness() / 0.62, cp = this.camera.position;
     // carros
     const seen = new Set();
     for (const c of G.cars) {
       let m = this.carMeshes.get(c.id);
-      if (m && m.userData.col !== c.col) { this.scene.remove(m); m = null; }
-      if (!m) { m = this.makeCar(c); this.carMeshes.set(c.id, m); }
+      if (!m) { m = makeCarModel(c); this.scene.add(m); this.carMeshes.set(c.id, m); }
       seen.add(c.id);
-      m.position.set(c.x, 0, c.y); m.rotation.y = -c.a;
-      if (c.wreck && !m.userData.wreck) { m.userData.wreck = true; for (const p of m.userData.parts) p.material = mat('#2b2724'); }
-      const fwd = c.ai ? c.spd : (c.fwd || 0);
-      for (const w of m.userData.wheels) { w.spin.rotation.z -= fwd * dt / 4.6; if (w.front) w.piv.rotation.y = c === pl.car ? -(c.steerVis || 0) * 0.45 : 0; }
-      // suspensão: inclina na curva e na freada
-      const lat = c.latVis || 0; m.rotation.x = clamp(lat * 0.0004, -0.06, 0.06);
-      if (m.userData.lb) { const f = c.siren && Math.floor(G.t * 8) % 2; m.userData.lb[0].color.setHex(c.siren ? (f ? 0xff2222 : 0x661111) : 0x551111); m.userData.lb[1].color.setHex(c.siren ? (f ? 0x112255 : 0x3399ff) : 0x112255); }
+      const far = Math.abs(c.x - cp.x) > 1300 || Math.abs(c.y - cp.z) > 1300;
+      m.visible = !far; if (!far) updCarModel(c, m, dt, dk);
     }
     for (const [id, m] of this.carMeshes) if (!seen.has(id)) { this.scene.remove(m); this.carMeshes.delete(id); }
     // pedestres
@@ -332,12 +279,12 @@ const R3 = {
     const list = G.peds.filter(p => !p.car);
     if (!pl.car) list.push(pl);
     for (const p of list) {
-      if (Math.abs(p.x - pl.x) > 1500 || Math.abs(p.y - pl.y) > 1500) continue;
+      if (Math.abs(p.x - cp.x) > 900 || Math.abs(p.y - cp.z) > 900) continue;
       let m = this.pedMeshes.get(p.id);
-      if (!m) { m = this.makePed(p); this.pedMeshes.set(p.id, m); }
-      ps.add(p.id); this.updPed(p, m, dt);
+      if (!m) { m = makePedModel(p); this.scene.add(m); this.pedMeshes.set(p.id, m); }
+      ps.add(p.id); animPed(p, m, dt);
     }
-    for (const [id, m] of this.pedMeshes) if (!ps.has(id)) { this.scene.remove(m); this.pedMeshes.delete(id); }
+    for (const [id, m] of this.pedMeshes) if (!ps.has(id)) { this.scene.remove(m); disposeModel(m); this.pedMeshes.delete(id); }
     // itens
     const ks = new Set();
     G.pickups.forEach(k => {
@@ -405,10 +352,11 @@ const R3 = {
     this.sun.target.position.set(me.x, 0, me.y); this.sun.target.updateMatrixWorld();
     this.wallMat.emissiveIntensity = dk * 0.95;
     this.lampMat.color.setRGB(0.47 + dk * 0.53, 0.47 + dk * 0.45, 0.47 + dk * 0.2);
+    this.lampPoolMat.opacity = clamp((dk - 0.25) * 1.2, 0, 0.55);
     this.waterMat.color.setRGB(0.16 * (0.4 + day * 0.6), 0.5 * (0.4 + day * 0.6), 0.72 * (0.4 + day * 0.6));
     const c = G.player.car;
-    if (c && dk > 0.2) {
-      this.headL.intensity = 2.2 * dk; const fx = Math.cos(c.a), fy = Math.sin(c.a);
+    if (c && c.lights && !c.wreck) {
+      this.headL.intensity = 0.4 + 2.2 * dk; const fx = Math.cos(c.a), fy = Math.sin(c.a);
       this.headL.position.set(c.x + fx * 26, 12, c.y + fy * 26); this.headL.target.position.set(c.x + fx * 200, 0, c.y + fy * 200); this.headL.target.updateMatrixWorld();
     } else this.headL.intensity = 0;
     let best = null, bd = 700;
@@ -430,7 +378,7 @@ const R3 = {
   },
   render(dt) {
     if (this.mobile) this.autoQuality(dt);
-    this.sync(dt); this.lighting(dt); CAM.update(dt, this.camera);
+    this.sync(dt); this.lighting(dt); this.updateProps(dt, darkness() / 0.62); CAM.update(dt, this.camera);
     this.renderer.render(this.scene, this.camera);
   },
   project(x, h, y) {

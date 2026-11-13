@@ -17,7 +17,12 @@
   #c3d { width: 100%; height: 100%; }
   #c { pointer-events: none; }
   #lookZone { position: absolute; inset: 0; pointer-events: auto; touch-action: none; }
-  #bRadio { position: absolute; top: 12px; left: calc(50% + 34px); pointer-events: auto; height: 34px; padding: 0 10px; border-radius: 8px; border: 2px solid rgba(120,200,255,.6); background: rgba(0,0,0,.4); color: #9df; font-family: inherit; font-size: 11px; }
+  .topBtn { position: absolute; top: 12px; pointer-events: auto; touch-action: none; height: 34px; padding: 0 10px; border-radius: 8px; border: 2px solid rgba(120,200,255,.6); background: rgba(0,0,0,.4); color: #9df; font-family: inherit; font-size: 11px; transition: opacity .2s, transform .2s; }
+  #bRadio { left: calc(50% + 30px); }
+  #bLights { right: calc(50% + 30px); color: #ffe7a0; border-color: rgba(255,220,120,.6); }
+  #bLights.lit { background: rgba(255,210,90,.55); color: #111; box-shadow: 0 0 14px rgba(255,220,120,.7); }
+  .btn, .topBtn { transition: opacity .2s, transform .2s; }
+  .btn.off, .topBtn.off { opacity: 0; transform: scale(.55); pointer-events: none; }
   .hidden { display: none !important; }
   #ui { position: fixed; inset: 0; pointer-events: none; }
   #joyZone { position: absolute; left: 0; bottom: 0; width: 45%; height: 70%; pointer-events: auto; touch-action: none; }
@@ -75,13 +80,14 @@
   <div id="lookZone"></div>
   <div id="joyZone"><div id="joyBase"><div id="joyKnob"></div></div></div>
   <div id="btns">
-    <button class="btn" id="bEnter" data-k="enter">ENTRAR</button>
-    <button class="btn" id="bWeap" data-k="weap"><small>ARMA</small>✊</button>
-    <button class="btn" id="bRun" data-k="run">CORRER</button>
-    <button class="btn" id="bFire" data-k="fire">SOCO</button>
+    <button class="btn off" id="bEnter" data-k="enter">ENTRAR</button>
+    <button class="btn off" id="bWeap" data-k="weap"><small>ARMA</small>✊</button>
+    <button class="btn off" id="bRun" data-k="run">CORRER</button>
+    <button class="btn off" id="bFire" data-k="fire">SOCO</button>
   </div>
   <button id="bPause">❚❚</button>
-  <button id="bRadio" class="hidden">📻 RÁDIO</button>
+  <button id="bRadio" class="topBtn off" data-k="radio">📻 RÁDIO</button>
+  <button id="bLights" class="topBtn off" data-k="lights">💡 FARÓIS</button>
   <div id="rotate">↻ Gire o celular para jogar melhor</div>
 </div>
 <div id="title" class="screen">
@@ -90,7 +96,7 @@
   <h2>CRIME • CARROS • CIDADE • 3D</h2>
   <button class="menuBtn hidden" id="bCont">CONTINUAR</button>
   <button class="menuBtn alt" id="bNew">NOVO JOGO</button>
-  <div class="help">Celular: analógico à esquerda, botões à direita • Arraste o lado direito para girar a câmera • PC: WASD, mouse gira a câmera, Espaço atira/freio de mão, F entra/sai, Shift corre/freia, Q arma, R rádio</div>
+  <div class="help">Celular: analógico à esquerda, botões à direita • Arraste o lado direito para girar a câmera • PC: WASD, mouse gira a câmera, Espaço atira/freio de mão, F entra/sai, Shift corre/freia, Q arma, R rádio, H faróis</div>
 </div>
 <div id="dialog" class="screen hidden">
   <div class="card">
@@ -116,7 +122,9 @@
 <script src="js/world.js"></script>
 <script src="js/audio.js"></script>
 <script src="js/entities.js"></script>
+<script src="js/models.js"></script>
 <script src="js/render3d.js"></script>
+<script src="js/props.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>
