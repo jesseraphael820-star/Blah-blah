@@ -1,0 +1,12 @@
+{
+  "name": "Strike Ops Mobile X",
+  "short_name": "Strike Ops X",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#0b0f15",
+  "theme_color": "#0b0f15",
+  "lang": "pt-BR",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}
