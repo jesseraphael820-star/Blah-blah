@@ -1,0 +1,11 @@
+{
+  "name": "porto-brasa",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Jogo 2D top-down de mundo aberto (HTML5 Canvas, sem dependências).",
+  "scripts": {
+    "start": "node server.mjs 8080",
+    "test": "node tests/smoke.mjs"
+  }
+}

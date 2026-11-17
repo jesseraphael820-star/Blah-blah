@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#0c0e13" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="description" content="Porto Brasa — jogo de mundo aberto top-down com carros, missões e perseguições policiais." />
+  <title>Porto Brasa</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="assets/icon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <div id="hud" class="hidden">
+    <div class="hud-tl">
+      <button id="btn-pause" class="hud-btn" aria-label="Pausar">❚❚</button>
+      <div class="stat-box">
+        <div id="money" class="money">$0</div>
+        <div class="hp-row"><span class="hp-icon">♥</span><div class="bar"><div id="hp-fill"></div></div></div>
+        <div id="stars" class="stars"></div>
+      </div>
+    </div>
+    <div class="hud-tr">
+      <div class="minimap-wrap">
+        <canvas id="minimap" width="160" height="160"></canvas>
+        <div id="clock" class="clock">08:00</div>
+      </div>
+      <div id="district" class="district">—</div>
+      <button id="btn-map" class="hud-btn small" aria-label="Mapa">MAPA</button>
+    </div>
+    <div id="mission-panel" class="mission-panel hidden">
+      <div class="mp-head"><span id="mp-cat"></span><span id="mp-timer" class="mp-timer"></span></div>
+      <div id="mp-name" class="mp-name"></div>
+      <div id="mp-obj" class="mp-obj"></div>
+    </div>
+    <div id="speedo" class="speedo hidden">
+      <div id="sp-name" class="sp-name"></div>
+      <div class="sp-row"><span id="sp-val" class="sp-val">0</span><span class="sp-unit">km/h</span></div>
+      <div class="bar dmg"><div id="sp-dmg"></div></div>
+    </div>
+    <div id="prompt" class="prompt hidden"></div>
+    <div id="hint" class="hint hidden"></div>
+    <div id="toasts" class="toasts"></div>
+    <div id="banner" class="banner hidden"></div>
+    <div id="fps" class="fps hidden"></div>
+  </div>
+
+  <div id="touch" class="hidden">
+    <div id="joy-zone"><div id="joy-base"><div id="joy-knob"></div></div></div>
+    <div id="btns">
+      <button data-b="horn" class="tb tb-s foot-hide">BUZINA</button>
+      <button data-b="enter" class="tb tb-enter">ENTRAR</button>
+      <button data-b="run" class="tb car-hide">CORRER</button>
+      <button data-b="action" class="tb tb-action">AÇÃO</button>
+      <button data-b="brake" class="tb tb-brake foot-hide">FREAR</button>
+      <button data-b="accel" class="tb tb-accel foot-hide">ACELERAR</button>
+    </div>
+  </div>
+
+  <div id="screen"></div>
+  <div id="fade"></div>
+  <div id="loading">Carregando Porto Brasa…</div>
+
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>
