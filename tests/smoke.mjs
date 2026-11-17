@@ -63,10 +63,12 @@ try {
   // polícia
   await page.evaluate(() => game.police.setLevel(3));
   await wait(6000);
-  const pol = await page.evaluate(() => ({ lvl: game.police.level, cars: game.vehicles.filter((v) => v.isPolice && v.ai && v.ai.mode !== 'patrol').length }));
-  check(pol.lvl >= 2 && pol.cars >= 1, `polícia persegue (nível ${pol.lvl}, ${pol.cars} viaturas)`);
+  const pol = await page.evaluate(() => ({ lvl: game.police.level, busted: game.stats.busted, dying: !!game.dying, cars: game.vehicles.filter((v) => v.isPolice && v.ai && v.ai.mode !== 'patrol').length }));
+  // a polícia pode já ter prendido o jogador parado — também conta como sucesso
+  check((pol.lvl >= 2 && pol.cars >= 1) || pol.busted > 0 || pol.dying, `polícia persegue/prende (nível ${pol.lvl}, ${pol.cars} viaturas, detido ${pol.busted})`);
   await shot('04-police');
-  await page.evaluate(() => game.police.clear());
+  await page.waitForFunction(() => !game.dying, null, { timeout: 8000 });
+  await page.evaluate(() => { game.police.clear(); if (game.ui.open) game.ui.close(); for (const h of game.humans) if (h.kind === 'cop') h.dead = true; });
 
   // missão s1 completa via teleporte
   await page.evaluate(() => { const d = game.missions.byId.s1; game.missions.start(d); });
