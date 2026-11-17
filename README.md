@@ -19,6 +19,14 @@ node server.mjs          # ou: npm start   → http://localhost:8080
 Para instalar como app/jogar offline, hospede em HTTPS (ex.: GitHub Pages) e use
 “Adicionar à tela inicial”.
 
+### Versão em arquivo único (celular sem servidor)
+
+```bash
+node tools/build-single.mjs   # gera dist/porto-brasa.html (~255 KB, tudo embutido)
+```
+
+O arquivo `dist/porto-brasa.html` roda sozinho: copie para o celular e abra no Chrome, ou publique em qualquer hospedagem.
+
 ## 🎮 Controles
 
 | Ação | Teclado | Touch (celular) |

@@ -10,6 +10,20 @@ const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&l
 const fmtTime = (s) => { s = Math.round(s); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
 const money = (n) => '$' + Math.round(n).toLocaleString('pt-BR');
 
+// Tela cheia + travar paisagem (opcional: alguns navegadores/apps recusam)
+function canFullscreen() {
+  const d = document.documentElement;
+  return !!(d.requestFullscreen || d.webkitRequestFullscreen) && !document.fullscreenElement;
+}
+async function goFullscreen() {
+  const d = document.documentElement;
+  try {
+    if (d.requestFullscreen) await d.requestFullscreen({ navigationUI: 'hide' });
+    else if (d.webkitRequestFullscreen) d.webkitRequestFullscreen();
+    if (screen.orientation && screen.orientation.lock) await screen.orientation.lock('landscape').catch(() => {});
+  } catch { /* recusado pelo navegador */ }
+}
+
 export class UI {
   constructor(game) {
     this.game = game;
@@ -58,6 +72,7 @@ export class UI {
       },
       settings: () => this.showSettingsStandalone(),
       controls: () => this.showControlsStandalone(),
+      fullscreen: () => goFullscreen(),
     };
     this.show(`
       <div class="title-screen">
@@ -68,6 +83,7 @@ export class UI {
           <button class="btn ${has ? '' : 'primary'}" data-act="new">Novo jogo</button>
           <button class="btn" data-act="controls">Controles</button>
           <button class="btn" data-act="settings">Configurações</button>
+          ${canFullscreen() ? '<button class="btn" data-act="fullscreen">⛶ Tela cheia</button>' : ''}
         </div>
         <div class="rotate-tip">Dica: no celular, jogue com a tela na horizontal.</div>
         <div class="foot-note">Jogo original inspirado nos clássicos de ação top-down. Todos os nomes, lugares e personagens são fictícios.</div>
@@ -124,6 +140,7 @@ export class UI {
       resume: () => this.close(),
       save: () => { g.autosave(); g.hud.toast('Jogo salvo', 'ok'); this.close(); },
       quit: () => { g.autosave(); g.quitToTitle(); },
+      fullscreen: () => goFullscreen(),
       ...this.settingsHandlers(),
     };
     let body = '';
@@ -140,6 +157,7 @@ export class UI {
         <div class="row">
           <button class="btn primary" data-act="resume">▶ Continuar</button>
           <button class="btn" data-act="save">Salvar</button>
+          ${canFullscreen() ? '<button class="btn" data-act="fullscreen">⛶ Tela cheia</button>' : ''}
           <button class="btn danger" data-act="quit">Sair para o menu</button>
         </div>
       </div>`, { name: 'pause' });

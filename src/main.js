@@ -15,7 +15,7 @@ function boot() {
   document.getElementById('loading').remove();
   game.ui.showTitle();
 
-  if ('serviceWorker' in navigator && location.protocol.startsWith('http') && !location.hostname.match(/^(localhost|127\.)/)) {
+  if (!window.__ARTIFACT__ && 'serviceWorker' in navigator && location.protocol.startsWith('http') && !location.hostname.match(/^(localhost|127\.)/)) {
     navigator.serviceWorker.register('sw.js').catch(() => {});
   }
 }
