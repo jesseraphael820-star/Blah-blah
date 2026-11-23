@@ -1,0 +1,382 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BlockWorld</title>
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#8cc4ff;font-family:monospace;user-select:none}
+  canvas{display:block}
+  #cross{position:fixed;left:50%;top:50%;width:20px;height:20px;transform:translate(-50%,-50%);pointer-events:none}
+  #cross:before,#cross:after{content:"";position:absolute;background:#fff;mix-blend-mode:difference}
+  #cross:before{left:9px;top:0;width:2px;height:20px}
+  #cross:after{top:9px;left:0;height:2px;width:20px}
+  #hotbar{position:fixed;bottom:12px;left:50%;transform:translateX(-50%);display:flex;gap:4px;padding:4px;background:rgba(0,0,0,.45);border-radius:4px}
+  .slot{width:44px;height:44px;border:3px solid #555;position:relative;background:rgba(0,0,0,.3);cursor:pointer}
+  .slot.sel{border-color:#fff}
+  .slot canvas{width:32px;height:32px;margin:6px;image-rendering:pixelated}
+  .slot span{position:absolute;top:0;left:3px;color:#fff;font-size:11px;text-shadow:1px 1px #000}
+  #name{position:fixed;bottom:76px;left:50%;transform:translateX(-50%);color:#fff;text-shadow:1px 1px #000;font-size:14px}
+  #info{position:fixed;top:8px;left:8px;color:#fff;text-shadow:1px 1px #000;font-size:12px}
+  #overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.55);color:#fff;text-align:center;cursor:pointer;line-height:1.6}
+  #overlay h1{margin:0 0 10px;font-size:40px;letter-spacing:2px}
+</style>
+</head>
+<body>
+<div id="cross"></div>
+<div id="info"></div>
+<div id="name"></div>
+<div id="hotbar"></div>
+<div id="overlay"><div>
+  <h1>BLOCKWORLD</h1>
+  <b>Clique para jogar</b><br><br>
+  WASD mover · Mouse olhar · Espaço pular · Shift correr<br>
+  Clique esquerdo: quebrar · Clique direito: colocar<br>
+  1–9 / roda do mouse: escolher bloco · Esc: pausar
+</div></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+"use strict";
+// ---------- Texturas procedurais (atlas) ----------
+const TS = 16, NT = 12;
+const atlas = document.createElement('canvas');
+atlas.width = TS * NT; atlas.height = TS;
+const actx = atlas.getContext('2d');
+const R = Math.random;
+const vary = (c, a) => { const k = 1 + (R() - .5) * a; return [c[0]*k, c[1]*k, c[2]*k, 255]; };
+function tile(i, fn) {
+  const img = actx.createImageData(TS, TS);
+  for (let y = 0; y < TS; y++) for (let x = 0; x < TS; x++) {
+    const c = fn(x, y), o = (y * TS + x) * 4;
+    img.data[o] = c[0]; img.data[o+1] = c[1]; img.data[o+2] = c[2]; img.data[o+3] = c[3] === undefined ? 255 : c[3];
+  }
+  actx.putImageData(img, i * TS, 0);
+}
+const GRASS = [95,159,53], DIRT = [134,96,67];
+tile(0, () => vary(GRASS, .25));                                                  // grama topo
+tile(1, (x, y) => y < 3 + ((x * 7 + 3) % 5 < 2 ? 1 : 0) ? vary(GRASS, .25) : vary(DIRT, .3)); // grama lado
+tile(2, () => vary(DIRT, .3));                                                    // terra
+tile(3, () => vary([125,125,125], .22));                                          // pedra
+tile(4, (x) => vary(x % 4 === 0 ? [78,58,34] : [104,80,48], .15));               // tronco lado
+tile(5, (x, y) => { const d = Math.max(Math.abs(x-7.5), Math.abs(y-7.5));
+  return d > 6.5 ? vary([104,80,48], .1) : vary(Math.floor(d) % 3 === 0 ? [140,105,62] : [176,140,90], .08); }); // tronco topo
+tile(6, () => R() < .14 ? [0,0,0,0] : vary([58,128,38], .45));                   // folhas
+tile(7, () => vary([219,207,163], .1));                                           // areia
+tile(8, (x, y) => (y % 4 === 3 || (x + (Math.floor(y/4) % 2) * 8) % 16 === 0) ? vary([120,92,55], .1) : vary([170,136,84], .12)); // tábuas
+tile(9, () => R() < .22 ? vary([82,82,82], .2) : vary([132,132,132], .25));      // pedregulho
+tile(10, (x, y) => (y % 4 === 3 || (x + (Math.floor(y/4) % 2) * 4) % 8 === 0) ? vary([200,196,186], .05) : vary([152,62,46], .15)); // tijolo
+tile(11, (x, y) => (x === 0 || y === 0 || x === 15 || y === 15) ? [215,235,250,255]
+  : (x === y && x > 3 && x < 8) ? [255,255,255,230] : [0,0,0,0]);               // vidro
+
+const tex = new THREE.CanvasTexture(atlas);
+tex.magFilter = THREE.NearestFilter; tex.minFilter = THREE.NearestFilter;
+
+// ---------- Blocos ----------
+// tiles: [lado, topo, fundo]
+const BLOCKS = {
+  1:{name:'Grama',     t:[1,0,2]},
+  2:{name:'Terra',     t:[2,2,2]},
+  3:{name:'Pedra',     t:[3,3,3]},
+  4:{name:'Tronco',    t:[4,5,5]},
+  5:{name:'Folhas',    t:[6,6,6], tr:true},
+  6:{name:'Areia',     t:[7,7,7]},
+  7:{name:'Tábuas',    t:[8,8,8]},
+  8:{name:'Pedregulho',t:[9,9,9]},
+  9:{name:'Tijolo',    t:[10,10,10]},
+  10:{name:'Vidro',    t:[11,11,11], tr:true},
+};
+const HOTBAR = [1,2,3,8,4,7,9,10,6];
+
+// ---------- Mundo ----------
+const SX = 128, SY = 64, SZ = 128, CS = 16;
+const world = new Uint8Array(SX * SY * SZ);
+const inside = (x,y,z) => x >= 0 && y >= 0 && z >= 0 && x < SX && y < SY && z < SZ;
+const get = (x,y,z) => inside(x,y,z) ? world[(y*SZ+z)*SX+x] : 0;
+const set = (x,y,z,v) => { if (inside(x,y,z)) world[(y*SZ+z)*SX+x] = v; };
+
+const SEED = (R() * 1e9) | 0;
+function hash(x, z) {
+  let h = (Math.imul(x, 374761393) + Math.imul(z, 668265263) + SEED) | 0;
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967295;
+}
+function noise(x, z) {
+  const xi = Math.floor(x), zi = Math.floor(z), xf = x - xi, zf = z - zi;
+  const u = xf*xf*(3-2*xf), v = zf*zf*(3-2*zf);
+  const a = hash(xi,zi), b = hash(xi+1,zi), c = hash(xi,zi+1), d = hash(xi+1,zi+1);
+  return a + (b-a)*u + (c-a)*v + (a-b-c+d)*u*v;
+}
+function fbm(x, z) { let s = 0, amp = 1, f = 1, t = 0;
+  for (let i = 0; i < 4; i++) { s += noise(x*f, z*f) * amp; t += amp; amp *= .5; f *= 2; } return s / t; }
+
+const SEA = 21;
+for (let x = 0; x < SX; x++) for (let z = 0; z < SZ; z++) {
+  const h = Math.floor(12 + fbm(x / 36, z / 36) * 26);
+  const beach = h <= SEA;
+  for (let y = 0; y <= h; y++) {
+    let b = 3;
+    if (y === h) b = beach ? 6 : 1;
+    else if (y > h - 4) b = beach ? 6 : 2;
+    set(x, y, z, b);
+  }
+}
+// árvores
+for (let x = 3; x < SX - 3; x++) for (let z = 3; z < SZ - 3; z++) {
+  if (hash(x * 7 + 11, z * 13 + 5) > 0.012) continue;
+  let y = SY - 1; while (y > 0 && !get(x,y,z)) y--;
+  if (get(x,y,z) !== 1 || y > SY - 10) continue;
+  const th = 4 + Math.floor(hash(x, z * 3) * 3);
+  for (let dy = -2; dy <= 1; dy++) {
+    const r = dy >= 0 ? 1 : 2;
+    for (let dx = -r; dx <= r; dx++) for (let dz = -r; dz <= r; dz++) {
+      if (Math.abs(dx) === r && Math.abs(dz) === r && hash(x+dx*31, z+dz*17+dy) < .5) continue;
+      if (!get(x+dx, y+th+dy, z+dz)) set(x+dx, y+th+dy, z+dz, 5);
+    }
+  }
+  for (let i = 1; i <= th; i++) set(x, y+i, z, 4);
+}
+
+// ---------- Three.js ----------
+const renderer = new THREE.WebGLRenderer({ antialias: false });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+document.body.prepend(renderer.domElement);
+const scene = new THREE.Scene();
+const SKY = 0x8cc4ff;
+scene.background = new THREE.Color(SKY);
+scene.fog = new THREE.Fog(SKY, 40, 110);
+const camera = new THREE.PerspectiveCamera(75, innerWidth / innerHeight, 0.05, 400);
+camera.rotation.order = 'YXZ';
+
+scene.add(new THREE.HemisphereLight(0xdde8ff, 0x6a5a40, 0.65));
+const sunLight = new THREE.DirectionalLight(0xfff2d8, 0.75);
+sunLight.position.set(0.5, 1, 0.3);
+scene.add(sunLight);
+const sun = new THREE.Mesh(new THREE.PlaneGeometry(30, 30), new THREE.MeshBasicMaterial({ color: 0xfff6c0, fog: false }));
+scene.add(sun);
+// nuvens
+const cloudMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: .85 });
+const clouds = new THREE.Group();
+for (let i = 0; i < 40; i++) {
+  const c = new THREE.Mesh(new THREE.BoxGeometry(8 + R()*20, 2, 6 + R()*16), cloudMat);
+  c.position.set(R()*260 - 66, 58 + R()*4, R()*260 - 66);
+  clouds.add(c);
+}
+scene.add(clouds);
+
+const material = new THREE.MeshLambertMaterial({ map: tex, alphaTest: 0.5 });
+const FACES = [
+  { d:[-1,0,0], s:0, c:[[0,1,0],[0,0,0],[0,1,1],[0,0,1]], uv:[[0,1],[0,0],[1,1],[1,0]] },
+  { d:[ 1,0,0], s:0, c:[[1,1,1],[1,0,1],[1,1,0],[1,0,0]], uv:[[0,1],[0,0],[1,1],[1,0]] },
+  { d:[0,-1,0], s:2, c:[[1,0,1],[0,0,1],[1,0,0],[0,0,0]], uv:[[1,0],[0,0],[1,1],[0,1]] },
+  { d:[0, 1,0], s:1, c:[[0,1,1],[1,1,1],[0,1,0],[1,1,0]], uv:[[1,1],[0,1],[1,0],[0,0]] },
+  { d:[0,0,-1], s:0, c:[[1,0,0],[0,0,0],[1,1,0],[0,1,0]], uv:[[0,0],[1,0],[0,1],[1,1]] },
+  { d:[0,0, 1], s:0, c:[[0,0,1],[1,0,1],[0,1,1],[1,1,1]], uv:[[0,0],[1,0],[0,1],[1,1]] },
+];
+const chunks = {};
+function buildChunk(cx, cz) {
+  const pos = [], nor = [], uvs = [], idx = [];
+  for (let y = 0; y < SY; y++) for (let z = cz*CS; z < cz*CS+CS; z++) for (let x = cx*CS; x < cx*CS+CS; x++) {
+    const b = get(x,y,z); if (!b) continue;
+    const def = BLOCKS[b];
+    for (const f of FACES) {
+      const n = get(x+f.d[0], y+f.d[1], z+f.d[2]);
+      if (n && (!BLOCKS[n].tr || n === b)) continue;
+      const t = def.t[f.s], base = pos.length / 3;
+      for (let i = 0; i < 4; i++) {
+        const c = f.c[i];
+        pos.push(x+c[0], y+c[1], z+c[2]);
+        nor.push(f.d[0], f.d[1], f.d[2]);
+        uvs.push((t + 0.002 + f.uv[i][0] * 0.996) / NT, f.uv[i][1]);
+      }
+      idx.push(base, base+1, base+2, base+2, base+1, base+3);
+    }
+  }
+  const key = cx + ',' + cz;
+  if (chunks[key]) { scene.remove(chunks[key]); chunks[key].geometry.dispose(); }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  g.setIndex(idx);
+  const m = new THREE.Mesh(g, material);
+  scene.add(m); chunks[key] = m;
+}
+for (let cx = 0; cx < SX/CS; cx++) for (let cz = 0; cz < SZ/CS; cz++) buildChunk(cx, cz);
+
+function setBlock(x, y, z, v) {
+  if (!inside(x,y,z)) return;
+  set(x, y, z, v);
+  const cx = Math.floor(x / CS), cz = Math.floor(z / CS), lx = x % CS, lz = z % CS;
+  buildChunk(cx, cz);
+  if (lx === 0 && cx > 0) buildChunk(cx-1, cz);
+  if (lx === CS-1 && cx < SX/CS-1) buildChunk(cx+1, cz);
+  if (lz === 0 && cz > 0) buildChunk(cx, cz-1);
+  if (lz === CS-1 && cz < SZ/CS-1) buildChunk(cx, cz+1);
+}
+
+// ---------- Jogador ----------
+const player = { x: SX/2 + .5, y: 0, z: SZ/2 + .5, vx: 0, vy: 0, vz: 0, ground: false, yaw: 0, pitch: 0 };
+const PW = 0.3, PH = 1.8, EYE = 1.62;
+function spawn() {
+  let y = SY - 1; while (y > 0 && !get(Math.floor(player.x), y, Math.floor(player.z))) y--;
+  player.y = y + 1; player.vy = 0;
+}
+spawn();
+const solid = (x,y,z) => get(x,y,z) !== 0;
+function collides(px, py, pz) {
+  for (let x = Math.floor(px-PW); x <= Math.floor(px+PW-1e-4); x++)
+    for (let y = Math.floor(py); y <= Math.floor(py+PH-1e-4); y++)
+      for (let z = Math.floor(pz-PW); z <= Math.floor(pz+PW-1e-4); z++)
+        if (solid(x,y,z)) return true;
+  return false;
+}
+function move(dt) {
+  const steps = Math.ceil(Math.max(Math.abs(player.vx), Math.abs(player.vy), Math.abs(player.vz)) * dt / 0.1) || 1;
+  const h = dt / steps;
+  player.ground = false;
+  for (let s = 0; s < steps; s++) {
+    player.x += player.vx * h;
+    if (collides(player.x, player.y, player.z)) { player.x -= player.vx * h; player.vx = 0; }
+    player.z += player.vz * h;
+    if (collides(player.x, player.y, player.z)) { player.z -= player.vz * h; player.vz = 0; }
+    const oy = player.y;
+    player.y += player.vy * h;
+    if (collides(player.x, player.y, player.z)) {
+      if (player.vy < 0) { player.y = Math.floor(player.y) + 1; if (collides(player.x, player.y, player.z)) player.y = oy; player.ground = true; }
+      else player.y = oy;
+      player.vy = 0;
+    }
+  }
+}
+
+// ---------- Entrada ----------
+const keys = {};
+let locked = false, sel = 0;
+const overlay = document.getElementById('overlay');
+overlay.addEventListener('click', () => renderer.domElement.requestPointerLock());
+document.addEventListener('pointerlockchange', () => {
+  locked = document.pointerLockElement === renderer.domElement;
+  overlay.style.display = locked ? 'none' : 'flex';
+});
+addEventListener('keydown', e => {
+  keys[e.code] = true;
+  if (e.code >= 'Digit1' && e.code <= 'Digit9') selectSlot(+e.code.slice(5) - 1);
+  if (e.code === 'Space') e.preventDefault();
+});
+addEventListener('keyup', e => { keys[e.code] = false; });
+addEventListener('mousemove', e => {
+  if (!locked) return;
+  player.yaw -= e.movementX * 0.0022;
+  player.pitch = Math.max(-1.55, Math.min(1.55, player.pitch - e.movementY * 0.0022));
+});
+addEventListener('wheel', e => { if (locked) selectSlot((sel + (e.deltaY > 0 ? 1 : -1) + HOTBAR.length) % HOTBAR.length); });
+addEventListener('contextmenu', e => e.preventDefault());
+addEventListener('mousedown', e => {
+  if (!locked) return;
+  const hit = pick();
+  if (!hit) return;
+  if (e.button === 0) setBlock(hit.x, hit.y, hit.z, 0);
+  else if (e.button === 2) {
+    const { px, py, pz } = hit;
+    if (px === hit.x && py === hit.y && pz === hit.z) return;
+    if (!inside(px, py, pz) || get(px, py, pz)) return;
+    set(px, py, pz, HOTBAR[sel]);
+    const blocked = collides(player.x, player.y, player.z);
+    set(px, py, pz, 0);
+    if (!blocked) setBlock(px, py, pz, HOTBAR[sel]);
+  }
+});
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+// ---------- Hotbar ----------
+const hotbar = document.getElementById('hotbar'), nameEl = document.getElementById('name');
+let nameTimer = 0;
+HOTBAR.forEach((b, i) => {
+  const slot = document.createElement('div'); slot.className = 'slot';
+  const c = document.createElement('canvas'); c.width = c.height = TS;
+  c.getContext('2d').drawImage(atlas, BLOCKS[b].t[0] * TS, 0, TS, TS, 0, 0, TS, TS);
+  const n = document.createElement('span'); n.textContent = i + 1;
+  slot.append(c, n); slot.onclick = () => selectSlot(i);
+  hotbar.append(slot);
+});
+function selectSlot(i) {
+  sel = i;
+  [...hotbar.children].forEach((s, j) => s.classList.toggle('sel', j === i));
+  nameEl.textContent = BLOCKS[HOTBAR[i]].name; nameEl.style.opacity = 1; nameTimer = 2;
+}
+selectSlot(0);
+
+// ---------- Raycast (DDA) ----------
+const dir = new THREE.Vector3();
+function pick() {
+  camera.getWorldDirection(dir);
+  const o = camera.position;
+  let x = Math.floor(o.x), y = Math.floor(o.y), z = Math.floor(o.z);
+  const sx = Math.sign(dir.x), sy = Math.sign(dir.y), sz = Math.sign(dir.z);
+  const dx = Math.abs(1 / dir.x), dy = Math.abs(1 / dir.y), dz = Math.abs(1 / dir.z);
+  let tx = dir.x > 0 ? (x + 1 - o.x) * dx : dir.x < 0 ? (o.x - x) * dx : Infinity;
+  let ty = dir.y > 0 ? (y + 1 - o.y) * dy : dir.y < 0 ? (o.y - y) * dy : Infinity;
+  let tz = dir.z > 0 ? (z + 1 - o.z) * dz : dir.z < 0 ? (o.z - z) * dz : Infinity;
+  let px = x, py = y, pz = z, t = 0;
+  while (t <= 6) {
+    if (get(x, y, z)) return { x, y, z, px, py, pz };
+    px = x; py = y; pz = z;
+    if (tx < ty && tx < tz) { x += sx; t = tx; tx += dx; }
+    else if (ty < tz) { y += sy; t = ty; ty += dy; }
+    else { z += sz; t = tz; tz += dz; }
+  }
+  return null;
+}
+const outline = new THREE.LineSegments(
+  new THREE.EdgesGeometry(new THREE.BoxGeometry(1.004, 1.004, 1.004)),
+  new THREE.LineBasicMaterial({ color: 0x000000 }));
+scene.add(outline);
+
+// ---------- Loop ----------
+const info = document.getElementById('info');
+let last = performance.now(), fpsT = 0, frames = 0;
+function loop(now) {
+  requestAnimationFrame(loop);
+  const dt = Math.min((now - last) / 1000, 0.05); last = now;
+
+  if (locked) {
+    const fw = (keys.KeyW ? 1 : 0) - (keys.KeyS ? 1 : 0);
+    const st = (keys.KeyD ? 1 : 0) - (keys.KeyA ? 1 : 0);
+    const sp = keys.ShiftLeft || keys.ShiftRight ? 6.5 : 4.3;
+    const sin = Math.sin(player.yaw), cos = Math.cos(player.yaw);
+    let mx = -sin * fw + cos * st, mz = -cos * fw - sin * st;
+    const len = Math.hypot(mx, mz) || 1;
+    player.vx = mx / len * sp; player.vz = mz / len * sp;
+    if (keys.Space && player.ground) player.vy = 8.4;
+  } else { player.vx = player.vz = 0; }
+  player.vy = Math.max(player.vy - 25 * dt, -40);
+  move(dt);
+  if (player.y < -20) { player.x = SX/2 + .5; player.z = SZ/2 + .5; spawn(); }
+
+  camera.position.set(player.x, player.y + EYE, player.z);
+  camera.rotation.set(player.pitch, player.yaw, 0);
+
+  const hit = locked ? pick() : null;
+  outline.visible = !!hit;
+  if (hit) outline.position.set(hit.x + .5, hit.y + .5, hit.z + .5);
+
+  sun.position.set(camera.position.x + 150, camera.position.y + 300, camera.position.z + 90);
+  sun.lookAt(camera.position);
+  clouds.position.x = (clouds.position.x + dt * 1.2) % 120;
+
+  if (nameTimer > 0) { nameTimer -= dt; if (nameTimer <= 0) nameEl.style.opacity = 0; }
+  frames++; fpsT += dt;
+  if (fpsT >= 0.5) {
+    info.textContent = `FPS ${Math.round(frames / fpsT)}  XYZ ${player.x.toFixed(1)} ${player.y.toFixed(1)} ${player.z.toFixed(1)}`;
+    frames = 0; fpsT = 0;
+  }
+  renderer.render(scene, camera);
+}
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
