@@ -1,0 +1,120 @@
+1
+00:00:03,200 --> 00:00:06,067
+O futuro da inteligência artificial.
+
+2
+00:00:10,200 --> 00:00:12,705
+Claude Opus 5.5.
+
+3
+00:00:16,300 --> 00:00:22,224
+O que acontece quando uma inteligência artificial consegue compreender problemas complexos,
+
+4
+00:00:22,244 --> 00:00:26,122
+analisar informações e transformar ideias em soluções?
+
+5
+00:00:29,000 --> 00:00:33,531
+Ela lê. Conecta. Raciocina, passo a passo, até encontrar um caminho.
+
+6
+00:00:41,000 --> 00:00:43,346
+Na programação, ela escreve código,
+
+7
+00:00:43,366 --> 00:00:46,961
+constrói interfaces e analisa projetos inteiros.
+
+8
+00:00:48,600 --> 00:00:51,074
+Quando algo falha, ela investiga a causa,
+
+9
+00:00:51,094 --> 00:00:53,878
+corrige o erro e roda os testes de novo.
+
+10
+00:00:56,800 --> 00:00:59,313
+Tudo o que você vê aqui é real: código,
+
+11
+00:00:59,333 --> 00:01:03,059
+testes e aplicação foram executados para este vídeo.
+
+12
+00:01:06,000 --> 00:01:08,931
+Mas inteligência vai além do código.
+
+13
+00:01:09,600 --> 00:01:12,237
+Planejar estratégias. Analisar documentos
+
+14
+00:01:12,257 --> 00:01:15,134
+longos. Resolver problemas com clareza.
+
+15
+00:01:18,200 --> 00:01:20,320
+E transformar grandes volumes de
+
+16
+00:01:20,340 --> 00:01:23,499
+informação em algo organizado e acionável.
+
+17
+00:01:31,000 --> 00:01:32,778
+Com ferramentas conectadas,
+
+18
+00:01:32,798 --> 00:01:36,811
+ela pode conduzir fluxos de trabalho com várias etapas.
+
+19
+00:01:37,800 --> 00:01:42,054
+Planejar. Organizar. Executar. E verificar cada resultado.
+
+20
+00:01:44,800 --> 00:01:47,586
+E quando uma ferramenta não está disponível,
+
+21
+00:01:47,606 --> 00:01:51,081
+ela diz isso com transparência, em vez de fingir.
+
+22
+00:01:56,000 --> 00:01:58,782
+Agora, uma demonstração real, do zero.
+
+23
+00:02:00,000 --> 00:02:01,374
+Uma ideia.
+
+24
+00:02:03,600 --> 00:02:04,846
+Um plano.
+
+25
+00:02:07,200 --> 00:02:08,574
+O código.
+
+26
+00:02:11,000 --> 00:02:13,313
+A interface ganhando forma.
+
+27
+00:02:15,400 --> 00:02:18,609
+6 testes executados. 6 aprovados.
+
+28
+00:02:20,200 --> 00:02:22,726
+E o resultado final, funcionando.
+
+29
+00:02:28,600 --> 00:02:31,851
+Inteligência. Criatividade. Possibilidade.
+
+30
+00:02:36,200 --> 00:02:38,705
+Claude Opus 5.5.
+
