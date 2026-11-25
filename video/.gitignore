@@ -1,0 +1,6 @@
+out/
+assets/vo/*.wav
+assets/mix.wav
+assets/mix_norm.wav
+__pycache__/
+assets/app_*.png

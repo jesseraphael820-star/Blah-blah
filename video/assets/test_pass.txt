@@ -1,0 +1,14 @@
+✔ quadro novo começa vazio (0.687248ms)
+✔ progresso de quadro vazio é 0 (0.250444ms)
+✔ adiciona tarefa com id incremental (0.731288ms)
+✔ rejeita título vazio (0.229853ms)
+✔ concluir metade das tarefas = 50% (1.146879ms)
+✔ filtra por etapa (0.126602ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 66.383513

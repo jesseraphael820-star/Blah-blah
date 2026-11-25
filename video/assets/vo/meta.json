@@ -1,0 +1,178 @@
+[
+ {
+  "i": 0,
+  "start": 3.2,
+  "dur": 2.517333333333333,
+  "sub": "O futuro da inteligência artificial.",
+  "path": "assets/vo/l00.wav",
+  "sr": 24000
+ },
+ {
+  "i": 1,
+  "start": 10.2,
+  "dur": 2.1546666666666665,
+  "sub": "Claude Opus 5.5.",
+  "path": "assets/vo/l01.wav",
+  "sr": 24000
+ },
+ {
+  "i": 2,
+  "start": 16.3,
+  "dur": 9.472,
+  "sub": "O que acontece quando uma inteligência artificial consegue compreender problemas complexos, analisar informações e transformar ideias em soluções?",
+  "path": "assets/vo/l02.wav",
+  "sr": 24000
+ },
+ {
+  "i": 3,
+  "start": 29.0,
+  "dur": 4.181333333333333,
+  "sub": "Ela lê. Conecta. Raciocina, passo a passo, até encontrar um caminho.",
+  "path": "assets/vo/l03.wav",
+  "sr": 24000
+ },
+ {
+  "i": 4,
+  "start": 41.0,
+  "dur": 5.610666666666667,
+  "sub": "Na programação, ela escreve código, constrói interfaces e analisa projetos inteiros.",
+  "path": "assets/vo/l04.wav",
+  "sr": 24000
+ },
+ {
+  "i": 5,
+  "start": 48.6,
+  "dur": 4.928,
+  "sub": "Quando algo falha, ela investiga a causa, corrige o erro e roda os testes de novo.",
+  "path": "assets/vo/l05.wav",
+  "sr": 24000
+ },
+ {
+  "i": 6,
+  "start": 56.8,
+  "dur": 5.9093333333333335,
+  "sub": "Tudo o que você vê aqui é real: código, testes e aplicação foram executados para este vídeo.",
+  "path": "assets/vo/l06.wav",
+  "sr": 24000
+ },
+ {
+  "i": 7,
+  "start": 66.0,
+  "dur": 2.5813333333333333,
+  "sub": "Mas inteligência vai além do código.",
+  "path": "assets/vo/l07.wav",
+  "sr": 24000
+ },
+ {
+  "i": 8,
+  "start": 69.6,
+  "dur": 5.184,
+  "sub": "Planejar estratégias. Analisar documentos longos. Resolver problemas com clareza.",
+  "path": "assets/vo/l08.wav",
+  "sr": 24000
+ },
+ {
+  "i": 9,
+  "start": 78.2,
+  "dur": 4.949333333333334,
+  "sub": "E transformar grandes volumes de informação em algo organizado e acionável.",
+  "path": "assets/vo/l09.wav",
+  "sr": 24000
+ },
+ {
+  "i": 10,
+  "start": 91.0,
+  "dur": 5.461333333333333,
+  "sub": "Com ferramentas conectadas, ela pode conduzir fluxos de trabalho com várias etapas.",
+  "path": "assets/vo/l10.wav",
+  "sr": 24000
+ },
+ {
+  "i": 11,
+  "start": 97.8,
+  "dur": 3.904,
+  "sub": "Planejar. Organizar. Executar. E verificar cada resultado.",
+  "path": "assets/vo/l11.wav",
+  "sr": 24000
+ },
+ {
+  "i": 12,
+  "start": 104.8,
+  "dur": 5.930666666666666,
+  "sub": "E quando uma ferramenta não está disponível, ela diz isso com transparência, em vez de fingir.",
+  "path": "assets/vo/l12.wav",
+  "sr": 24000
+ },
+ {
+  "i": 13,
+  "start": 116.0,
+  "dur": 2.432,
+  "sub": "Agora, uma demonstração real, do zero.",
+  "path": "assets/vo/l13.wav",
+  "sr": 24000
+ },
+ {
+  "i": 14,
+  "start": 120.0,
+  "dur": 1.024,
+  "sub": "Uma ideia.",
+  "path": "assets/vo/l14.wav",
+  "sr": 24000
+ },
+ {
+  "i": 15,
+  "start": 123.6,
+  "dur": 0.896,
+  "sub": "Um plano.",
+  "path": "assets/vo/l15.wav",
+  "sr": 24000
+ },
+ {
+  "i": 16,
+  "start": 127.2,
+  "dur": 1.024,
+  "sub": "O código.",
+  "path": "assets/vo/l16.wav",
+  "sr": 24000
+ },
+ {
+  "i": 17,
+  "start": 131.0,
+  "dur": 1.9626666666666666,
+  "sub": "A interface ganhando forma.",
+  "path": "assets/vo/l17.wav",
+  "sr": 24000
+ },
+ {
+  "i": 18,
+  "start": 135.4,
+  "dur": 2.8586666666666667,
+  "sub": "6 testes executados. 6 aprovados.",
+  "path": "assets/vo/l18.wav",
+  "sr": 24000
+ },
+ {
+  "i": 19,
+  "start": 140.2,
+  "dur": 2.176,
+  "sub": "E o resultado final, funcionando.",
+  "path": "assets/vo/l19.wav",
+  "sr": 24000
+ },
+ {
+  "i": 20,
+  "start": 148.6,
+  "dur": 2.9013333333333335,
+  "sub": "Inteligência. Criatividade. Possibilidade.",
+  "path": "assets/vo/l20.wav",
+  "sr": 24000
+ },
+ {
+  "i": 21,
+  "start": 156.2,
+  "dur": 2.1546666666666665,
+  "sub": "Claude Opus 5.5.",
+  "path": "assets/vo/l21.wav",
+  "sr": 24000
+ }
+]

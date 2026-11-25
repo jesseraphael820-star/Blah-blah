@@ -1,0 +1,23 @@
+:root{--bg:#05040b;--panel:#0e0b1d;--line:#2a2350;--violet:#8b5cf6;--blue:#38bdf8;--text:#ece9ff;--mut:#8f88b8}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:radial-gradient(1200px 600px at 70% -10%,#1d1145 0%,var(--bg) 60%);color:var(--text);font:16px/1.4 Inter,system-ui,sans-serif;padding:40px 56px}
+header{display:flex;align-items:center;justify-content:space-between;margin-bottom:28px}
+.brand{font-size:30px;font-weight:700;letter-spacing:-.02em;display:flex;align-items:center;gap:12px}
+.dot{width:16px;height:16px;border-radius:50%;background:linear-gradient(135deg,var(--violet),var(--blue));box-shadow:0 0 24px var(--violet)}
+.ring{position:relative;width:96px;height:96px}
+.ring svg{transform:rotate(-90deg)}
+.ring circle{fill:none;stroke-width:10}
+.track{stroke:var(--line)}
+.bar{stroke:url(#g);stroke:var(--blue);stroke-linecap:round;stroke-dasharray:326.7;stroke-dashoffset:326.7;transition:stroke-dashoffset .6s;filter:drop-shadow(0 0 6px var(--blue))}
+.ring b{position:absolute;inset:0;display:grid;place-items:center;font-size:22px}
+form{display:flex;gap:12px;margin-bottom:28px}
+input,select,button{font:inherit;color:var(--text);background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+input{flex:1}
+button{background:linear-gradient(135deg,var(--violet),#5b5bf6);border:0;font-weight:600;padding:14px 26px;cursor:pointer}
+main{display:grid;grid-template-columns:repeat(4,1fr);gap:18px}
+.col{background:linear-gradient(180deg,#120e26,#0a0816);border:1px solid var(--line);border-radius:18px;padding:18px;min-height:360px}
+.col h2{margin:0 0 14px;font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:var(--mut);display:flex;justify-content:space-between}
+.card{display:flex;gap:12px;align-items:center;background:#16122e;border:1px solid #2f2763;border-radius:12px;padding:12px 14px;margin-bottom:10px;cursor:pointer}
+.card i{width:18px;height:18px;border-radius:6px;border:2px solid var(--violet);flex:none}
+.card.done{opacity:.6}.card.done span{text-decoration:line-through}
+.card.done i{background:var(--blue);border-color:var(--blue);box-shadow:0 0 10px var(--blue)}

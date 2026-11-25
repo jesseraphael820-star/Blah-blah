@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Orbit — Planejador</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <div class="brand"><span class="dot"></span>Orbit</div>
+  <div class="ring" id="ring"><svg viewBox="0 0 120 120"><circle class="track" cx="60" cy="60" r="52"/><circle class="bar" id="bar" cx="60" cy="60" r="52"/></svg><b id="pct">0%</b></div>
+</header>
+<form id="form">
+  <input id="title" placeholder="Nova tarefa…" autocomplete="off">
+  <select id="stage">
+    <option value="ideia">Ideia</option><option value="plano">Plano</option>
+    <option value="codigo">Código</option><option value="testes">Testes</option>
+  </select>
+  <button>Adicionar</button>
+</form>
+<main id="cols"></main>
+<script type="module" src="app.js"></script>
+</body>
+</html>

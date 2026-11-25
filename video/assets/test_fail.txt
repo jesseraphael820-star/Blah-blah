@@ -1,0 +1,66 @@
+TAP version 13
+# Subtest: quadro novo começa vazio
+ok 1 - quadro novo começa vazio
+  ---
+  duration_ms: 0.741608
+  type: 'test'
+  ...
+# Subtest: progresso de quadro vazio é 0
+not ok 2 - progresso de quadro vazio é 0
+  ---
+  duration_ms: 0.950877
+  type: 'test'
+  location: '/home/user/Blah-blah/video/buggy/tasks.test.js:9:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    NaN !== 0
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 0
+  actual: NaN
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///home/user/Blah-blah/video/buggy/tasks.test.js:10:10)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+    Test.postRun (node:internal/test_runner/test:1173:19)
+    Test.run (node:internal/test_runner/test:1101:12)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:296:3)
+  ...
+# Subtest: adiciona tarefa com id incremental
+ok 3 - adiciona tarefa com id incremental
+  ---
+  duration_ms: 1.064771
+  type: 'test'
+  ...
+# Subtest: rejeita título vazio
+ok 4 - rejeita título vazio
+  ---
+  duration_ms: 0.199375
+  type: 'test'
+  ...
+# Subtest: concluir metade das tarefas = 50%
+ok 5 - concluir metade das tarefas = 50%
+  ---
+  duration_ms: 0.292963
+  type: 'test'
+  ...
+# Subtest: filtra por etapa
+ok 6 - filtra por etapa
+  ---
+  duration_ms: 0.123209
+  type: 'test'
+  ...
+1..6
+# tests 6
+# suites 0
+# pass 5
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 82.72429

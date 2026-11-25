@@ -1,0 +1,37 @@
+✔ quadro novo começa vazio (0.547543ms)
+✖ progresso de quadro vazio é 0 (0.691202ms)
+✔ adiciona tarefa com id incremental (0.668949ms)
+✔ rejeita título vazio (0.227839ms)
+✔ concluir metade das tarefas = 50% (0.230466ms)
+✔ filtra por etapa (0.113827ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 5
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 66.182825
+
+✖ failing tests:
+
+test at tasks.test.js:9:1
+✖ progresso de quadro vazio é 0 (0.691202ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  NaN !== 0
+  
+      at TestContext.<anonymous> (file:///home/user/Blah-blah/video/buggy/tasks.test.js:10:10)
+      at Test.runInAsyncScope (node:async_hooks:214:14)
+      at Test.run (node:internal/test_runner/test:1047:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+      at Test.postRun (node:internal/test_runner/test:1173:19)
+      at Test.run (node:internal/test_runner/test:1101:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:296:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: NaN,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
