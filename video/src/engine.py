@@ -106,8 +106,8 @@ def grade_layers():
     if _VIG is None:
         _VIG = _vignette()
         rng = np.random.default_rng(3)
-        _GRAIN = [Image.fromarray(rng.integers(0, 7, (H // 2, W // 2, 1), dtype=np.uint8).repeat(3, 2), 'RGB')
-                  .resize((W, H), Image.NEAREST) for _ in range(6)]
+        _GRAIN = [Image.fromarray(rng.integers(0, 5, (H // 3, W // 3, 1), dtype=np.uint8).repeat(3, 2), 'RGB')
+                  .resize((W, H), Image.BILINEAR) for _ in range(6)]
         y, x = np.mgrid[0:H // 8, 0:W // 8]
         r = np.sqrt(((x - W / 16) / (W / 8)) ** 2 + ((y - H / 16 * 1.15) / (H / 8) * .6) ** 2)
         k = np.clip(1 - r * 1.25, 0, 1) ** 2
@@ -197,5 +197,5 @@ class Frame:
             cx, cy = W / 2 + self.cam_x, H / 2 + self.cam_y
             img = img.transform((W, H), Image.AFFINE, (1 / s, 0, cx - W / 2 / s, 0, 1 / s, cy - H / 2 / s), Image.BILINEAR)
         img = ImageChops.multiply(img, vig)
-        img = ImageChops.add(img, grain[frame_idx % 6], 1.0, -3)
+        img = ImageChops.add(img, grain[frame_idx % 6], 1.0, -2)
         return img

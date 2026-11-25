@@ -95,7 +95,7 @@ def render_bytes(f): return render_frame(f).tobytes()
 
 def encode_chunk(f0, f1, out, workers=3):
     cmd = ['ffmpeg', '-y', '-loglevel', 'error', '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-s', f'{W}x{H}', '-r', str(FPS),
-           '-i', '-', '-c:v', 'libx264', '-preset', 'medium', '-crf', '17', '-tune', 'film',
+           '-i', '-', '-c:v', 'libx264', '-preset', 'medium', '-crf', '19', '-tune', 'film',
            '-pix_fmt', 'yuv420p', '-profile:v', 'high', '-level', '5.2', '-color_primaries', 'bt709',
            '-color_trc', 'bt709', '-colorspace', 'bt709', '-g', '120', '-threads', '2', out + '.part.mp4']
     p = subprocess.Popen(cmd, stdin=subprocess.PIPE)
