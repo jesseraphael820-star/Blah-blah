@@ -1,0 +1,11 @@
+{
+  "name": "shadows-of-the-kingdom",
+  "version": "1.0.0",
+  "description": "Shadows of the Kingdom — RPG 2D top-down em pixel art (HTML5 Canvas, sem engine externa)",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node tests/data.test.js && node tests/browser.test.js"
+  },
+  "license": "UNLICENSED"
+}
