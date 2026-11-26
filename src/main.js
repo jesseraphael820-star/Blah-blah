@@ -245,10 +245,12 @@ function frame(now) {
   const dtReal = Math.min(0.1, (now - last) / 1000); last = now;
   acc += dtReal;
   let steps = 0;
-  while (acc >= STEP && steps < 4) { update(STEP); acc -= STEP; steps++; input.endFrame(); }
-  if (steps === 4) acc = 0;
-  render(dtReal);
   requestAnimationFrame(frame);
+  try {
+    while (acc >= STEP && steps < 4) { update(STEP); acc -= STEP; steps++; input.endFrame(); }
+    if (steps === 4) acc = 0;
+    render(dtReal);
+  } catch (e) { if (!frame.errT || now - frame.errT > 2000) { frame.errT = now; console.error('Erro no laço do jogo:', e); } input.endFrame(); }
 }
 function handleGlobalKeys() {
   const m = G.mode;
