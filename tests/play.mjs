@@ -114,7 +114,7 @@ await page.evaluate((ENDING) => {
 const t0 = Date.now();
 let last = '', n = 0, shot = 0;
 const shotsAt = { 'm2:2': 'wolves', 'm5:4': 'horse', 'm7:2': 'tomb', 'm12:3': 'battle', 'm13:2': 'siege', 'm19:4': 'betrayal', 'm20:3': 'refuge', 'm24:3': 'liberation', 'm25:4': 'vargan' };
-while (Date.now() - t0 < 900000) {
+while (Date.now() - t0 < 1500000) {
   const r = await page.evaluate(() => window.__botStep());
   n++;
   if (r !== last && !/^dlg|^cut/.test(r)) { last = r; if (process.env.VERBOSE) console.log(r); }

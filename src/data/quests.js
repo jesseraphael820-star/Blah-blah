@@ -252,7 +252,7 @@ export const QUESTS = {
       { start: [{ cutscene: 'liberation' }], obj: [{ t: 'flag', flag: 'liberated', label: L.liberation }] },
       { obj: [talk('oswin', 'm24_oswin')] },
     ] },
-  m25: { type: 'main', ch: 5, reward: { xp: 600 }, after: [{ cutscene: 'ending' }],
+  m25: { type: 'main', ch: 5, reward: { xp: 600 }, after: [{ achievement: 'ch5' }, { cutscene: 'ending' }],
     desc: H('O último confronto em Drakmor.', 'The final confrontation in Drakmor.'),
     stages: [
       { start: [{ flag: 'noEvents' }, { spawn: { e: 'ally', at: 'drakmor_camp', n: 6, tag: 'm25a' } }, { npcAt: ['edrik', 'world', 'drakmor_gate', 0, 12] }], obj: [go('drakmor_camp', { r: 90 })], hint: H('O acampamento aliado fica ao sul de Drakmor, nas Montanhas de Ferro.', 'The allied camp lies south of Drakmor, in the Iron Mountains.') },

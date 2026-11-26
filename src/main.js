@@ -98,6 +98,7 @@ function newGame() {
   audio.init();
   hideTitle();
   resetState(); initWar();
+  if (!G.playerLook) G.playerLook = { skin: '#e0ac85', hair: '#4a2e1a', hairStyle: 0, top: '#5a4a6a', pants: '#3a3028', boots: '#2a1e18', eye: '#3a5a7a' };
   G.inv = newInventory();
   G.achievements = {};
   startWorld();
