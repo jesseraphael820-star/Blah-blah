@@ -40,9 +40,10 @@ function enterStage(id, idx) {
 }
 function completeStage(id) {
   const q = QUESTS[id], st = G.quests[id];
-  if (!st || st.state !== 'active') return;
+  if (!st || st.state !== 'active' || st.busy) return;
+  st.busy = true;
   const S = q.stages[st.stage];
-  if (S.done) runActions(S.done);
+  try { if (S.done) runActions(S.done); } finally { st.busy = false; }
   if (G.quests[id].state !== 'active') return;
   if (st.stage + 1 >= q.stages.length) completeQuest(id);
   else { audio.sfx('pickup'); enterStage(id, st.stage + 1); }
@@ -88,7 +89,7 @@ export function sideOfferFor(npcId) {
 }
 export function hasOffer(npcId) { return !!sideOfferFor(npcId); }
 function checkStage(id) {
-  if (!isActive(id)) return;
+  if (!isActive(id) || G.quests[id].busy) return;
   const os = objs(id);
   if (os.every((_, i) => objDone(id, i))) completeStage(id);
 }
