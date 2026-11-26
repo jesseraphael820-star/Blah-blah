@@ -54,7 +54,7 @@ export function updateHUD(dt) {
   const it = G.interactTarget;
   if (it && G.mode === 'play' && !G.capture) {
     els.prompt.classList.remove('hidden');
-    const key = input.lastDevice === 'pad' ? 'A' : input.keyName(input.binds.interact[0]);
+    const key = document.body.classList.contains('touch-ui') ? '✋' : input.lastDevice === 'pad' ? 'A' : input.keyName(input.binds.interact[0]);
     let label = typeof it.label === 'object' ? loc(it.label) : t(it.label);
     if (it.kind === 'talk' && it.target.name) label = t('act_talk_to', { name: it.target.npcId ? npcName(it.target.npcId, getLang()) : it.target.name });
     els.prompt.replaceChildren(h('kbd', {}, key), label);

@@ -25,6 +25,7 @@ import { checkAchievements, unlockAchievement } from './systems/achievements.js'
 import { save, load, saveSettings, loadSettings } from './systems/save.js';
 import { runActions } from './systems/actions.js';
 import { renderScene } from './render.js';
+import { initTouch, updateTouch } from './ui/touch.js';
 import { initHUD, updateHUD, toast, chapterCard } from './ui/hud.js';
 import { initDialogueUI, updateDialogueUI, dialogueKey, chooseByNumber } from './ui/dialogueUI.js';
 import { initMenus, openMenu, closeMenu, menuOpen, openService, useItem, canSave, renderMenu } from './ui/menus.js';
@@ -68,7 +69,7 @@ function boot() {
   if (saved) Object.assign(G.settings, saved);
   else { const nl = (navigator.language || 'pt').slice(0, 2); G.settings.lang = ['pt', 'en', 'es', 'fr', 'de', 'it', 'ja', 'ko', 'zh', 'ru', 'pl', 'tr', 'ar', 'hi'].includes(nl) ? nl : 'pt'; }
   input.attach(canvas);
-  initHUD(uiRoot); initDialogueUI(uiRoot); initMenus(uiRoot); initScreens(uiRoot);
+  initHUD(uiRoot); initDialogueUI(uiRoot); initMenus(uiRoot); initScreens(uiRoot); initTouch(uiRoot);
   applySettings();
   initQuestEvents();
   wireEvents();
@@ -360,6 +361,7 @@ function render(dt) {
   updateHUD(dt);
   updateDialogueUI(dt);
   updateCinema(dt);
+  updateTouch();
 }
 
 // API de depuração/testes automatizados

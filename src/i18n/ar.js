@@ -60,4 +60,5 @@ export default {
   ach_end_sacrifice: 'بلا راية', achd_end_sacrifice: 'بلغ نهاية التضحية.', ach_side_all: 'صديق المملكة', achd_side_all: 'أكمل كل المهام الجانبية.', ach_meteor: 'سماء مشتعلة', achd_meteor: 'شاهد زخّة شهب.', ach_dawnblade: 'نصل الفجر', achd_dawnblade: 'استعد سيف الحارس الأول.',
   ach_level10: 'مخضرم', achd_level10: 'ابلغ المستوى 10.', ach_tournament: 'البطل', achd_tournament: 'افُز ببطولة فاردن.',
   enemy_bandit_chief: 'زعيم قطّاع الطرق', enemy_captain_drakmor: 'قائد الفيلق', enemy_whitebear: 'الدبّة الجليدية', enemy_vargan: 'المارشال فارغان', enemy_morwen: 'السيدة مورين', enemy_kael_duel: 'كايل',
+  set_touch: 'أزرار الشاشة', touch_auto: 'تلقائي', touch_on: 'مفعّلة دائمًا', touch_off: 'معطّلة', dev_pc: 'حاسوب', dev_mobile: 'هاتف', dev_tablet: 'جهاز لوحي', rotate_hint: 'أدر الجهاز للّعب بالوضع الأفقي', title_hint_touch: 'عصا التحكم يسارًا · الأزرار يمينًا · المس الحوار',
 };

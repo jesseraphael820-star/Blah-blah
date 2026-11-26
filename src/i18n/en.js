@@ -62,4 +62,5 @@ export default {
   enemy_bandit_chief: 'Bandit Chief', enemy_captain_drakmor: 'Legion Captain', enemy_whitebear: 'Ice Bear', enemy_vargan: 'Marshal Vargan', enemy_morwen: 'Lady Morwen', enemy_kael_duel: 'Kael',
   pl_abandoned_camp: 'Abandoned camp', pl_cave_whisper_entrance: 'Whispering Grotto', pl_mid2: 'Depths of the grotto', pl_bridge_west: 'Várden Bridge (west bank)', pl_watch_eld: 'Eldoria border tower', pl_watch_drak: 'Drakmor pass tower', pl_watch_sol: 'Sun Road tower',
   pl_kael_trail1: 'Southwest trail', pl_kael_trail2: 'Southern fields', pl_mill: 'Old Mill', pl_betrayal_bridge: 'North bridge', pl_drakmor_camp: 'Allied camp', pl_center: 'Hall of Drakmor',
+  set_touch: 'On-screen controls', touch_auto: 'Automatic', touch_on: 'Always on', touch_off: 'Off', dev_pc: 'PC', dev_mobile: 'Phone', dev_tablet: 'Tablet', rotate_hint: 'Rotate your device to play in landscape', title_hint_touch: 'Joystick on the left · buttons on the right · tap dialogues',
 };

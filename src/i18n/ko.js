@@ -60,4 +60,5 @@ export default {
   ach_end_sacrifice: '깃발 없는 자', achd_end_sacrifice: '희생 엔딩에 도달하세요.', ach_side_all: '왕국의 벗', achd_side_all: '모든 서브 퀘스트를 완료하세요.', ach_meteor: '불타는 하늘', achd_meteor: '유성우를 목격하세요.', ach_dawnblade: '새벽의 칼날', achd_dawnblade: '최초 수호자의 검을 되찾으세요.',
   ach_level10: '베테랑', achd_level10: '레벨 10에 도달하세요.', ach_tournament: '챔피언', achd_tournament: '바르덴 마상 대회에서 우승하세요.',
   enemy_bandit_chief: '산적 두목', enemy_captain_drakmor: '군단 대장', enemy_whitebear: '얼음 곰', enemy_vargan: '바르간 원수', enemy_morwen: '레이디 모웬', enemy_kael_duel: '카엘',
+  set_touch: '화면 조작', touch_auto: '자동', touch_on: '항상 켜기', touch_off: '끄기', dev_pc: 'PC', dev_mobile: '휴대폰', dev_tablet: '태블릿', rotate_hint: '기기를 가로로 돌려 플레이하세요', title_hint_touch: '왼쪽 조이스틱 · 오른쪽 버튼 · 대화는 탭',
 };

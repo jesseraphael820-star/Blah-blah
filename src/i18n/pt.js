@@ -62,4 +62,5 @@ export default {
   enemy_bandit_chief: 'Chefe dos Bandidos', enemy_captain_drakmor: 'Capitão da Legião', enemy_whitebear: 'Ursa do Gelo', enemy_vargan: 'Marechal Vargan', enemy_morwen: 'Lady Morwen', enemy_kael_duel: 'Kael',
   pl_abandoned_camp: 'Acampamento abandonado', pl_cave_whisper_entrance: 'Gruta Sussurrante', pl_mid2: 'Profundezas da gruta', pl_bridge_west: 'Ponte de Várden (margem oeste)', pl_watch_eld: 'Torre da borda de Eldoria', pl_watch_drak: 'Torre do passo de Drakmor', pl_watch_sol: 'Torre da Estrada do Sol',
   pl_kael_trail1: 'Trilha a sudoeste', pl_kael_trail2: 'Campos ao sul', pl_mill: 'Moinho Velho', pl_betrayal_bridge: 'Ponte do norte', pl_drakmor_camp: 'Acampamento aliado', pl_center: 'Salão de Drakmor',
+  set_touch: 'Controles na tela', touch_auto: 'Automático', touch_on: 'Sempre ligados', touch_off: 'Desligados', dev_pc: 'PC', dev_mobile: 'Celular', dev_tablet: 'Tablet', rotate_hint: 'Gire o aparelho para jogar na horizontal', title_hint_touch: 'Joystick à esquerda · botões à direita · toque nos diálogos',
 };

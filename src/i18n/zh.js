@@ -60,4 +60,5 @@ export default {
   ach_end_sacrifice: '无旗之人', achd_end_sacrifice: '达成“牺牲”结局。', ach_side_all: '王国之友', achd_side_all: '完成所有支线任务。', ach_meteor: '燃烧的天空', achd_meteor: '目睹一场流星雨。', ach_dawnblade: '黎明之刃', achd_dawnblade: '寻回初代守护者之剑。',
   ach_level10: '老兵', achd_level10: '达到10级。', ach_tournament: '冠军', achd_tournament: '赢得瓦尔登比武大会。',
   enemy_bandit_chief: '强盗头目', enemy_captain_drakmor: '军团队长', enemy_whitebear: '冰熊', enemy_vargan: '瓦尔甘元帅', enemy_morwen: '莫文夫人', enemy_kael_duel: '凯尔',
+  set_touch: '屏幕按键', touch_auto: '自动', touch_on: '始终开启', touch_off: '关闭', dev_pc: '电脑', dev_mobile: '手机', dev_tablet: '平板', rotate_hint: '请将设备横屏游玩', title_hint_touch: '左侧摇杆 · 右侧按键 · 点击推进对话',
 };

@@ -60,4 +60,5 @@ export default {
   ach_end_sacrifice: 'Sancaksız', achd_end_sacrifice: 'Fedakârlık sonuna ulaş.', ach_side_all: 'Krallığın Dostu', achd_side_all: 'Tüm yan görevleri tamamla.', ach_meteor: 'Yanan Gökyüzü', achd_meteor: 'Bir yıldız yağmuruna tanık ol.', ach_dawnblade: 'Şafak Kılıcı', achd_dawnblade: 'İlk Muhafızın kılıcını geri al.',
   ach_level10: 'Kıdemli', achd_level10: '10. seviyeye ulaş.', ach_tournament: 'Şampiyon', achd_tournament: 'Várden Turnuvasını kazan.',
   enemy_bandit_chief: 'Haydut Reisi', enemy_captain_drakmor: 'Lejyon Yüzbaşısı', enemy_whitebear: 'Buz Ayısı', enemy_vargan: 'Mareşal Vargan', enemy_morwen: 'Leydi Morwen', enemy_kael_duel: 'Kael',
+  set_touch: 'Ekran kontrolleri', touch_auto: 'Otomatik', touch_on: 'Her zaman açık', touch_off: 'Kapalı', dev_pc: 'PC', dev_mobile: 'Telefon', dev_tablet: 'Tablet', rotate_hint: 'Yatay oynamak için cihazı çevir', title_hint_touch: 'Solda joystick · sağda tuşlar · diyaloğa dokun',
 };

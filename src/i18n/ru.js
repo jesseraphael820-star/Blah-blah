@@ -60,4 +60,5 @@ export default {
   ach_end_sacrifice: 'Без знамени', achd_end_sacrifice: 'Получите концовку Жертвы.', ach_side_all: 'Друг королевства', achd_side_all: 'Выполните все побочные задания.', ach_meteor: 'Небо в огне', achd_meteor: 'Станьте свидетелем звездопада.', ach_dawnblade: 'Клинок Зари', achd_dawnblade: 'Верните меч первого Стража.',
   ach_level10: 'Ветеран', achd_level10: 'Достигните 10 уровня.', ach_tournament: 'Чемпион', achd_tournament: 'Победите в Турнире Вардена.',
   enemy_bandit_chief: 'Атаман разбойников', enemy_captain_drakmor: 'Капитан Легиона', enemy_whitebear: 'Ледяная медведица', enemy_vargan: 'Маршал Варган', enemy_morwen: 'Леди Морвен', enemy_kael_duel: 'Каэл',
+  set_touch: 'Сенсорное управление', touch_auto: 'Авто', touch_on: 'Всегда вкл.', touch_off: 'Выкл.', dev_pc: 'ПК', dev_mobile: 'Телефон', dev_tablet: 'Планшет', rotate_hint: 'Поверните устройство горизонтально', title_hint_touch: 'Джойстик слева · кнопки справа · нажмите на диалог',
 };

@@ -60,4 +60,5 @@ export default {
   ach_end_sacrifice: 'Sans Bannière', achd_end_sacrifice: 'Atteignez la fin du Sacrifice.', ach_side_all: 'Ami du Royaume', achd_side_all: 'Terminez toutes les quêtes secondaires.', ach_meteor: 'Ciel en Feu', achd_meteor: 'Assistez à une pluie d\'étoiles.', ach_dawnblade: 'Lame de l\'Aube', achd_dawnblade: 'Récupérez l\'épée du premier Gardien.',
   ach_level10: 'Vétéran', achd_level10: 'Atteignez le niveau 10.', ach_tournament: 'Champion', achd_tournament: 'Remportez le Tournoi de Várden.',
   enemy_bandit_chief: 'Chef des Bandits', enemy_captain_drakmor: 'Capitaine de la Légion', enemy_whitebear: 'Ourse de Glace', enemy_vargan: 'Maréchal Vargan', enemy_morwen: 'Lady Morwen', enemy_kael_duel: 'Kael',
+  set_touch: 'Commandes tactiles', touch_auto: 'Automatique', touch_on: 'Toujours actives', touch_off: 'Désactivées', dev_pc: 'PC', dev_mobile: 'Téléphone', dev_tablet: 'Tablette', rotate_hint: "Tournez l'appareil pour jouer en paysage", title_hint_touch: 'Joystick à gauche · boutons à droite · touchez les dialogues',
 };

@@ -212,7 +212,8 @@ export function settingsPanel(rerender) {
     h('h4', { class: 'panel-title' }, t('set_game')),
     select('lang', 'set_lang', LANGS.map((l) => [l.code, l.name])),
     select('textSpeed', 'set_textspeed', [[0.6, t('ts_slow')], [1, t('ts_normal')], [1.8, t('ts_fast')], [3, t('ts_instant')]]),
-    toggle('autosave', 'set_autosave')),
+    toggle('autosave', 'set_autosave'),
+    select('touch', 'set_touch', [['auto', t('touch_auto') + (G.device ? ` (${t('dev_' + G.device.type)})` : '')], ['on', t('touch_on')], ['off', t('touch_off')]])),
   h('div', { class: 'side' }, h('h4', { class: 'panel-title' }, t('set_controls')), keys, h('button', { class: 'btn small', style: { marginTop: '10px' }, onclick: () => { input.resetBinds(); S.binds = null; apply(); rerender && rerender(); } }, t('set_reset_keys')),
     h('div', { class: 'kv', style: { marginTop: '10px', lineHeight: 1.6 } }, t('set_pad_hint'))));
 }

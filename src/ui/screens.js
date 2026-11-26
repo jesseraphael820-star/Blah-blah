@@ -42,7 +42,7 @@ function renderTitle() {
       btn('menu_load', () => { sub = 'load'; renderTitle(); }, !anySave()),
       btn('menu_settings', () => { sub = 'settings'; renderTitle(); }),
       btn('menu_credits', () => showCredits(() => showTitle()))),
-    h('div', { class: 'ver' }, 'v1.0 · ' + t('title_hint')));
+    h('div', { class: 'ver' }, 'v1.0 · ' + t(G.device && G.device.touch ? 'title_hint_touch' : 'title_hint')));
 }
 function newGamePanel() {
   const look = Object.assign({ skin: SKINS[1], hair: HAIRS[1], hairStyle: 0, top: '#5a4a6a', pants: '#3a3028', boots: '#2a1e18', eye: '#3a5a7a' }, G.playerLook || {});

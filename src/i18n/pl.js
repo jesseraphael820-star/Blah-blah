@@ -60,4 +60,5 @@ export default {
   ach_end_sacrifice: 'Bez Sztandaru', achd_end_sacrifice: 'Osiągnij zakończenie Poświęcenia.', ach_side_all: 'Przyjaciel Królestwa', achd_side_all: 'Ukończ wszystkie zadania poboczne.', ach_meteor: 'Płonące Niebo', achd_meteor: 'Zobacz deszcz gwiazd.', ach_dawnblade: 'Ostrze Świtu', achd_dawnblade: 'Odzyskaj miecz pierwszego Strażnika.',
   ach_level10: 'Weteran', achd_level10: 'Osiągnij poziom 10.', ach_tournament: 'Mistrz', achd_tournament: 'Wygraj Turniej Várden.',
   enemy_bandit_chief: 'Herszt Bandytów', enemy_captain_drakmor: 'Kapitan Legionu', enemy_whitebear: 'Lodowa Niedźwiedzica', enemy_vargan: 'Marszałek Vargan', enemy_morwen: 'Lady Morwen', enemy_kael_duel: 'Kael',
+  set_touch: 'Sterowanie dotykowe', touch_auto: 'Automatycznie', touch_on: 'Zawsze włączone', touch_off: 'Wyłączone', dev_pc: 'PC', dev_mobile: 'Telefon', dev_tablet: 'Tablet', rotate_hint: 'Obróć urządzenie poziomo, aby grać', title_hint_touch: 'Joystick po lewej · przyciski po prawej · stuknij dialog',
 };

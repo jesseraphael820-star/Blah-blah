@@ -60,4 +60,5 @@ export default {
   ach_end_sacrifice: 'बिना झंडे के', achd_end_sacrifice: 'बलिदान का अंत प्राप्त करें।', ach_side_all: 'राज्य का मित्र', achd_side_all: 'सभी साइड मिशन पूरे करें।', ach_meteor: 'जलता आकाश', achd_meteor: 'उल्का वर्षा देखें।', ach_dawnblade: 'भोर की धार', achd_dawnblade: 'पहले संरक्षक की तलवार वापस पाएँ।',
   ach_level10: 'अनुभवी', achd_level10: 'स्तर 10 तक पहुँचें।', ach_tournament: 'विजेता', achd_tournament: 'वार्डन प्रतियोगिता जीतें।',
   enemy_bandit_chief: 'डाकुओं का सरदार', enemy_captain_drakmor: 'सेना का कप्तान', enemy_whitebear: 'बर्फ़ीली भालू', enemy_vargan: 'मार्शल वारगन', enemy_morwen: 'लेडी मॉर्वेन', enemy_kael_duel: 'केल',
+  set_touch: 'स्क्रीन नियंत्रण', touch_auto: 'स्वचालित', touch_on: 'हमेशा चालू', touch_off: 'बंद', dev_pc: 'पीसी', dev_mobile: 'फ़ोन', dev_tablet: 'टैबलेट', rotate_hint: 'खेलने के लिए डिवाइस को आड़ा घुमाएँ', title_hint_touch: 'बाएँ जॉयस्टिक · दाएँ बटन · संवाद पर टैप करें',
 };

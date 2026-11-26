@@ -60,4 +60,5 @@ export default {
   ach_end_sacrifice: 'Sin Bandera', achd_end_sacrifice: 'Alcanza el final del Sacrificio.', ach_side_all: 'Amigo del Reino', achd_side_all: 'Completa todas las misiones secundarias.', ach_meteor: 'Cielo en Llamas', achd_meteor: 'Presencia una lluvia de estrellas.', ach_dawnblade: 'Hoja del Alba', achd_dawnblade: 'Recupera la espada del primer Guardián.',
   ach_level10: 'Veterano', achd_level10: 'Alcanza el nivel 10.', ach_tournament: 'Campeón', achd_tournament: 'Gana el Torneo de Várden.',
   enemy_bandit_chief: 'Jefe de los Bandidos', enemy_captain_drakmor: 'Capitán de la Legión', enemy_whitebear: 'Osa de Hielo', enemy_vargan: 'Mariscal Vargan', enemy_morwen: 'Lady Morwen', enemy_kael_duel: 'Kael',
+  set_touch: 'Controles en pantalla', touch_auto: 'Automático', touch_on: 'Siempre activos', touch_off: 'Desactivados', dev_pc: 'PC', dev_mobile: 'Móvil', dev_tablet: 'Tableta', rotate_hint: 'Gira el dispositivo para jugar en horizontal', title_hint_touch: 'Joystick a la izquierda · botones a la derecha · toca los diálogos',
 };

@@ -60,4 +60,5 @@ export default {
   ach_end_sacrifice: '旗なき者', achd_end_sacrifice: '「犠牲」エンディングを見る。', ach_side_all: '王国の友', achd_side_all: 'サイドクエストをすべて達成する。', ach_meteor: '燃える空', achd_meteor: '流星群を目撃する。', ach_dawnblade: '暁の刃', achd_dawnblade: '最初の守護者の剣を取り戻す。',
   ach_level10: '歴戦の勇士', achd_level10: 'レベル10に到達する。', ach_tournament: 'チャンピオン', achd_tournament: 'ヴァーデン武闘大会で優勝する。',
   enemy_bandit_chief: '山賊の頭領', enemy_captain_drakmor: '軍団の隊長', enemy_whitebear: '氷の熊', enemy_vargan: 'ヴァルガン元帥', enemy_morwen: 'レディ・モーウェン', enemy_kael_duel: 'カエル',
+  set_touch: '画面操作', touch_auto: '自動', touch_on: '常に表示', touch_off: 'オフ', dev_pc: 'PC', dev_mobile: 'スマホ', dev_tablet: 'タブレット', rotate_hint: '端末を横向きにしてプレイしてください', title_hint_touch: '左にスティック · 右にボタン · 会話はタップ',
 };

@@ -60,4 +60,5 @@ export default {
   ach_end_sacrifice: 'Senza Stendardo', achd_end_sacrifice: 'Raggiungi il finale del Sacrificio.', ach_side_all: 'Amico del Regno', achd_side_all: 'Completa tutte le missioni secondarie.', ach_meteor: 'Cielo in Fiamme', achd_meteor: 'Assisti a una pioggia di stelle.', ach_dawnblade: 'Lama dell\'Alba', achd_dawnblade: 'Recupera la spada del primo Guardiano.',
   ach_level10: 'Veterano', achd_level10: 'Raggiungi il livello 10.', ach_tournament: 'Campione', achd_tournament: 'Vinci il Torneo di Várden.',
   enemy_bandit_chief: 'Capo dei Banditi', enemy_captain_drakmor: 'Capitano della Legione', enemy_whitebear: 'Orsa di Ghiaccio', enemy_vargan: 'Maresciallo Vargan', enemy_morwen: 'Lady Morwen', enemy_kael_duel: 'Kael',
+  set_touch: 'Comandi su schermo', touch_auto: 'Automatico', touch_on: 'Sempre attivi', touch_off: 'Disattivati', dev_pc: 'PC', dev_mobile: 'Telefono', dev_tablet: 'Tablet', rotate_hint: 'Ruota il dispositivo per giocare in orizzontale', title_hint_touch: 'Joystick a sinistra · pulsanti a destra · tocca i dialoghi',
 };

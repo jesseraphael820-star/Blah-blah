@@ -60,4 +60,5 @@ export default {
   ach_end_sacrifice: 'Ohne Banner', achd_end_sacrifice: 'Erreiche das Ende des Opfers.', ach_side_all: 'Freund des Reiches', achd_side_all: 'Schließe alle Nebenquests ab.', ach_meteor: 'Himmel in Flammen', achd_meteor: 'Erlebe einen Sternschnuppenregen.', ach_dawnblade: 'Morgenklinge', achd_dawnblade: 'Hole das Schwert des ersten Wächters zurück.',
   ach_level10: 'Veteran', achd_level10: 'Erreiche Stufe 10.', ach_tournament: 'Champion', achd_tournament: 'Gewinne das Turnier von Várden.',
   enemy_bandit_chief: 'Banditenanführer', enemy_captain_drakmor: 'Hauptmann der Legion', enemy_whitebear: 'Eisbärin', enemy_vargan: 'Marschall Vargan', enemy_morwen: 'Lady Morwen', enemy_kael_duel: 'Kael',
+  set_touch: 'Bildschirmsteuerung', touch_auto: 'Automatisch', touch_on: 'Immer an', touch_off: 'Aus', dev_pc: 'PC', dev_mobile: 'Handy', dev_tablet: 'Tablet', rotate_hint: 'Drehe das Gerät ins Querformat', title_hint_touch: 'Joystick links · Tasten rechts · Dialoge antippen',
 };

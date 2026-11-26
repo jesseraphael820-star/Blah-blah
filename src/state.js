@@ -3,7 +3,7 @@ import { Particles, Weather, Lighting } from './gfx/fx.js';
 
 export const DEFAULT_SETTINGS = {
   lang: 'pt', master: 0.8, music: 0.6, sfx: 0.8, resolution: 1, quality: 2, fullscreen: false,
-  textSpeed: 1, fxIntensity: 1, showDamage: true, screenShake: true, autosave: true, binds: null,
+  textSpeed: 1, fxIntensity: 1, showDamage: true, screenShake: true, autosave: true, binds: null, touch: 'auto',
 };
 
 export const G = {
